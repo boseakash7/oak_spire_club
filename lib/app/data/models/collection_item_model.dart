@@ -112,5 +112,18 @@ class CollectionItemModel {
       bluebook: bluebook,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'type': type,
+      'created_at': createdAt,
+      'fill': fill,
+      'image': image,
+      'proof': proof,
+      'price_paid': pricePaid,
+      'bluebook': bluebook,
+    };
+  }
 }
 

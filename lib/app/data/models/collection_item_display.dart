@@ -1,4 +1,5 @@
 import '../../core/constants/app_constants.dart';
+import '../../core/storage/app_storage.dart';
 import 'collection_item_model.dart';
 
 /// CMS static files usually live under `/v2/…`, not under `/v2/api/…`.
@@ -18,29 +19,64 @@ Uri _cmsRootUri(Uri apiBase) {
 
 /// Display helpers for `collection/all` items (bourboneur-style payloads).
 extension CollectionItemDisplay on CollectionItemModel {
-  /// Absolute URL for bottle art. Handles protocol-relative URLs and paths
-  /// relative to the CMS root (same pattern as bourboneur reference app).
-  String? get resolvedImageUrl {
-    var raw = image?.trim();
-    if (raw == null || raw.isEmpty || raw == 'null') return null;
+  /// Some CMS responses differ in base-path; return a few candidates and try them in order.
+  List<String> get resolvedImageCandidates {
+    final raw0 = image?.trim();
+    if (raw0 == null || raw0.isEmpty || raw0 == 'null') return const [];
+
+    var raw = raw0;
     if (raw.startsWith('//')) raw = 'https:$raw';
     if (raw.startsWith('http://') || raw.startsWith('https://')) {
-      return raw;
+      final uri = Uri.tryParse(raw);
+      if (uri == null) return const [];
+
+      final out = <String>[raw];
+      // If someone accidentally returns `/v2/api/...` as an asset URL, try `/v2/...`.
+      final p = uri.path;
+      if (p.contains('/v2/api/')) {
+        out.add(uri.replace(path: p.replaceFirst('/v2/api/', '/v2/')).toString());
+      }
+      return out.toSet().toList();
     }
 
     final api = Uri.parse(AppConstants.apiBaseUrl);
-    final root = _cmsRootUri(api);
+    final cmsRoot = _cmsRootUri(api);
+    final uploadUrl = AppStorage.uploadUrl;
+    final origin = Uri(
+      scheme: api.scheme,
+      host: api.host,
+      port: api.hasPort ? api.port : null,
+      path: '/',
+    );
 
     if (raw.startsWith('/')) {
-      return Uri(
-        scheme: api.scheme,
-        host: api.host,
-        port: api.hasPort ? api.port : null,
-        path: raw,
-      ).toString();
+      return [
+        Uri(
+          scheme: api.scheme,
+          host: api.host,
+          port: api.hasPort ? api.port : null,
+          path: raw,
+        ).toString(),
+      ];
     }
 
-    return root.resolve(raw).toString();
+    final candidates = <String>{
+      cmsRoot.resolve(raw).toString(),
+      origin.resolve(raw).toString(),
+      // Also try under /v2/ explicitly.
+      origin.resolve('v2/$raw').toString(),
+      if (uploadUrl != null && uploadUrl.trim().isNotEmpty)
+        '${uploadUrl.trim().replaceAll(RegExp(r'/+$'), '')}/$raw',
+    };
+
+    return candidates.toList();
+  }
+
+  /// Absolute URL for bottle art. Handles protocol-relative URLs and paths
+  /// relative to the CMS root (same pattern as bourboneur reference app).
+  String? get resolvedImageUrl {
+    final list = resolvedImageCandidates;
+    return list.isEmpty ? null : list.first;
   }
 
   String? _pickBluebook(List<String> keys) {

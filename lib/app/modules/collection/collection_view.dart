@@ -1,12 +1,16 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/network/app_cache_manager.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
+import '../../routes/app_routes.dart';
 import 'collection_controller.dart';
 import 'collection_loading_view.dart';
 
@@ -21,6 +25,7 @@ class CollectionView extends GetView<CollectionController> {
 
   @override
   Widget build(BuildContext context) {
+    _CollectionAssetPrecache.ensure(context);
     return Obx(() {
       if (controller.isLoading.value) {
         return const CollectionLoadingView();
@@ -37,7 +42,12 @@ class CollectionView extends GetView<CollectionController> {
               color: Colors.transparent,
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: () {},
+                onTap: () async {
+                  final res = await Get.toNamed(AppRoutes.addToCollection);
+                  if (res == true) {
+                    await controller.forceReload();
+                  }
+                },
                 child: Ink(
                   width: _kFabSize,
                   height: _kFabSize,
@@ -65,6 +75,22 @@ class CollectionView extends GetView<CollectionController> {
   }
 }
 
+class _CollectionAssetPrecache {
+  _CollectionAssetPrecache._();
+  static bool _done = false;
+
+  static void ensure(BuildContext context) {
+    if (_done) return;
+    _done = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      precacheImage(
+        const AssetImage(AppAssets.collectionBottlePlaceholder),
+        context,
+      );
+    });
+  }
+}
+
 class _CollectionBody extends StatelessWidget {
   const _CollectionBody({required this.controller});
 
@@ -87,7 +113,7 @@ class _CollectionBody extends StatelessWidget {
             top: false,
             child: RefreshIndicator(
               color: AppColors.gold1,
-              onRefresh: controller.load,
+              onRefresh: controller.forceReload,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
@@ -227,10 +253,62 @@ class _ValueHeader extends StatelessWidget {
   }
 }
 
-class _FilterRow extends StatelessWidget {
+class _FilterRow extends StatefulWidget {
   const _FilterRow({required this.controller});
 
   final CollectionController controller;
+
+  @override
+  State<_FilterRow> createState() => _FilterRowState();
+}
+
+class _FilterRowState extends State<_FilterRow> {
+  final _link = LayerLink();
+  OverlayEntry? _entry;
+  bool _open = false;
+
+  @override
+  void dispose() {
+    _hide();
+    super.dispose();
+  }
+
+  void _hide() {
+    _entry?.remove();
+    _entry = null;
+    if (_open) setState(() => _open = false);
+  }
+
+  void _toggle() {
+    if (_entry != null) {
+      _hide();
+      return;
+    }
+
+    setState(() => _open = true);
+    _entry = OverlayEntry(
+      builder: (ctx) {
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _hide,
+                behavior: HitTestBehavior.translucent,
+              ),
+            ),
+            CompositedTransformFollower(
+              link: _link,
+              showWhenUnlinked: false,
+              offset: const Offset(41, 0),
+              child: _SortMenu(controller: widget.controller, onClose: _hide),
+            ),
+          ],
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_entry!);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -238,10 +316,40 @@ class _FilterRow extends StatelessWidget {
       height: 34,
       child: Row(
         children: [
-          Icon(
-            Icons.filter_list_rounded,
-            size: 28,
-            color: AppColors.textCream.withValues(alpha: 0.9),
+          CompositedTransformTarget(
+            link: _link,
+            child: Obx(
+              () => InkResponse(
+                onTap: _toggle,
+                radius: 24,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    SvgPicture.asset(
+                      AppAssets.collectionFilterIcon,
+                      width: 18,
+                      height: 18,
+                      colorFilter: const ColorFilter.mode(
+                        AppColors.textMuted,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                    if (widget.controller.hasActiveSort)
+                      const Positioned(
+                        right: -2,
+                        top: -2,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: SizedBox(width: 9, height: 9),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -253,37 +361,192 @@ class _FilterRow extends StatelessWidget {
                 children: [
                   _FilterChip(
                     label: 'All',
-                    selected: controller.filter.value == CollectionFilter.all,
-                    onTap: () => controller.setFilter(CollectionFilter.all),
+                    selected:
+                        widget.controller.filter.value == CollectionFilter.all,
+                    onTap: () =>
+                        widget.controller.setFilter(CollectionFilter.all),
                   ),
                   const SizedBox(width: 10),
                   _FilterChip(
                     label: 'Opened',
                     selected:
-                        controller.filter.value == CollectionFilter.opened,
-                    onTap: () => controller.setFilter(CollectionFilter.opened),
+                        widget.controller.filter.value ==
+                        CollectionFilter.opened,
+                    onTap: () =>
+                        widget.controller.setFilter(CollectionFilter.opened),
                   ),
                   const SizedBox(width: 10),
                   _FilterChip(
                     label: 'Not opened',
                     selected:
-                        controller.filter.value == CollectionFilter.notOpened,
+                        widget.controller.filter.value ==
+                        CollectionFilter.notOpened,
                     onTap: () =>
-                        controller.setFilter(CollectionFilter.notOpened),
+                        widget.controller.setFilter(CollectionFilter.notOpened),
                   ),
                   const SizedBox(width: 10),
                   _FilterChip(
                     label: 'Rare Find',
                     selected:
-                        controller.filter.value == CollectionFilter.rareFind,
+                        widget.controller.filter.value ==
+                        CollectionFilter.rareFind,
                     onTap: () =>
-                        controller.setFilter(CollectionFilter.rareFind),
+                        widget.controller.setFilter(CollectionFilter.rareFind),
                   ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SortMenu extends StatelessWidget {
+  const _SortMenu({required this.controller, required this.onClose});
+
+  final CollectionController controller;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 156,
+        height: 148,
+        margin: const EdgeInsets.only(top: 2),
+        decoration: BoxDecoration(
+          color: AppColors.menuSurface,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadowBlack32,
+              blurRadius: 4.8,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(7, 12, 6, 10),
+        child: Obx(
+          () => Column(
+            children: [
+              _SortMenuRow(
+                label: 'Name',
+                selected: controller.sort.value == CollectionSort.name,
+                ascending: controller.sortAscending.value,
+                onTap: () {
+                  controller.toggleSort(CollectionSort.name);
+                  onClose();
+                },
+              ),
+              const SizedBox(height: 5),
+              _SortMenuRow(
+                label: 'Price',
+                selected: controller.sort.value == CollectionSort.price,
+                ascending: controller.sortAscending.value,
+                onTap: () {
+                  controller.toggleSort(CollectionSort.price);
+                  onClose();
+                },
+              ),
+              const SizedBox(height: 5),
+              _SortMenuRow(
+                label: 'Fill Rate',
+                selected: controller.sort.value == CollectionSort.fillRate,
+                ascending: controller.sortAscending.value,
+                onTap: () {
+                  controller.toggleSort(CollectionSort.fillRate);
+                  onClose();
+                },
+              ),
+              _SortMenuRow(
+                label: 'Added Time',
+                selected: controller.sort.value == CollectionSort.addedTime,
+                ascending: controller.sortAscending.value,
+                onTap: () {
+                  controller.toggleSort(CollectionSort.addedTime);
+                  onClose();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SortMenuRow extends StatelessWidget {
+  const _SortMenuRow({
+    required this.label,
+    required this.selected,
+    required this.ascending,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final bool ascending;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected ? AppColors.menuRowSelected : Colors.transparent;
+    final upColor = selected && ascending
+        ? AppColors.white
+        : AppColors.sortChevronInactive;
+    final downColor = selected && !ascending
+        ? AppColors.white
+        : AppColors.sortChevronInactive;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        height: 29,
+        width: 143,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: AppTextStyles.body16().copyWith(
+                  fontSize: 12,
+                  fontFamily: 'Inter',
+                  color: AppColors.white,
+                ),
+              ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SvgPicture.asset(
+                  AppAssets.sortChevronUp,
+                  width: 6,
+                  height: 7,
+                  colorFilter: ColorFilter.mode(upColor, BlendMode.srcIn),
+                ),
+                const SizedBox(height: 2),
+                Transform.rotate(
+                  angle: 3.1415926535,
+                  child: SvgPicture.asset(
+                    AppAssets.sortChevronDown,
+                    width: 6,
+                    height: 7,
+                    colorFilter: ColorFilter.mode(downColor, BlendMode.srcIn),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -341,10 +604,13 @@ class _BottleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = item.resolvedImageUrl;
+    final urls = item.resolvedImageCandidates;
     final ratio = item.fillRatio;
-    Widget bottlePlaceholder() =>
-        Image.asset(AppAssets.collectionBottlePlaceholder, fit: BoxFit.contain);
+    Widget bottlePlaceholder() => Image.asset(
+      AppAssets.collectionBottlePlaceholder,
+      fit: BoxFit.contain,
+      gaplessPlayback: true,
+    );
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(_kCollectionCardRadius),
@@ -385,30 +651,19 @@ class _BottleCard extends StatelessWidget {
                                 gradient: AppColors.bottleRadialGlow,
                               ),
                             ),
-                            if (url != null)
-                              Image.network(
-                                url,
+                            if (urls.isNotEmpty)
+                              _NetworkImageWithFallback(
+                                urls: urls,
                                 fit: BoxFit.contain,
-                                loadingBuilder: (context, child, progress) {
-                                  if (progress == null) return child;
-                                  return Center(
-                                    child: SizedBox(
-                                      width: 22 * scale,
-                                      height: 22 * scale,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.gold1.withValues(
-                                          alpha: 0.7,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) =>
-                                    bottlePlaceholder(),
-                              )
-                            else
-                              bottlePlaceholder(),
+                                placeholder: bottlePlaceholder(),
+                                cacheWidthPx:
+                                    (imageSide *
+                                            MediaQuery.devicePixelRatioOf(
+                                              context,
+                                            ))
+                                        .round(),
+                              ),
+                            if (urls.isEmpty) bottlePlaceholder(),
                           ],
                         ),
                       ),
@@ -511,6 +766,103 @@ class _BottleCard extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+class _NetworkImageWithFallback extends StatefulWidget {
+  const _NetworkImageWithFallback({
+    required this.urls,
+    required this.fit,
+    required this.placeholder,
+    required this.cacheWidthPx,
+  });
+
+  final List<String> urls;
+  final BoxFit fit;
+  final Widget placeholder;
+  final int cacheWidthPx;
+
+  @override
+  State<_NetworkImageWithFallback> createState() =>
+      _NetworkImageWithFallbackState();
+}
+
+class _NetworkImageWithFallbackState extends State<_NetworkImageWithFallback> {
+  int _index = 0;
+  bool _scheduled = false;
+  bool _loaded = false;
+  bool _loadScheduled = false;
+
+  void _log(String message) {
+    if (!kDebugMode) return;
+    debugPrint(message);
+  }
+
+  void _scheduleNext() {
+    if (_scheduled) return;
+    if (_index >= widget.urls.length - 1) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _index += 1;
+        _scheduled = false;
+        _loaded = false;
+      });
+    });
+  }
+
+  void _markLoaded() {
+    if (_loaded || _loadScheduled) return;
+    _loadScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _loaded = true;
+        _loadScheduled = false;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = widget.urls[_index];
+    _log('[CollectionImage] try ${_index + 1}/${widget.urls.length}: $url');
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        AnimatedOpacity(
+          opacity: _loaded ? 0 : 1,
+          duration: const Duration(milliseconds: 140),
+          child: widget.placeholder,
+        ),
+        CachedNetworkImage(
+          imageUrl: url,
+          cacheManager: AppCacheManager.images,
+          imageBuilder: (context, provider) {
+            _markLoaded();
+            return Image(
+              image: provider,
+              fit: widget.fit,
+              filterQuality: FilterQuality.medium,
+              gaplessPlayback: true,
+            );
+          },
+          memCacheWidth: widget.cacheWidthPx > 0 ? widget.cacheWidthPx : null,
+          fadeInDuration: Duration.zero,
+          fadeOutDuration: Duration.zero,
+          placeholderFadeInDuration: Duration.zero,
+          placeholder: (context, _) => const SizedBox.shrink(),
+          errorWidget: (context, error, stackTrace) {
+            _log('[CollectionImage] fail: $url');
+            _log('[CollectionImage] error: $error');
+            _scheduleNext();
+            return const SizedBox.shrink();
+          },
+        ),
+      ],
     );
   }
 }

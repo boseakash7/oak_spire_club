@@ -6,5 +6,6 @@ class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   static const String shell = '/shell';
   static const String splash = '/splash';
+  static const String addToCollection = '/add-to-collection';
 }
 

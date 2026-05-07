@@ -5,6 +5,6 @@ class AppConstants {
   static const String appName = 'Oak Spire Club';
 
   /// From `bourboneur-app/lib/Core/Constants.dart`
-  static const String apiBaseUrl = 'https://b-cms1.com/v2/api/';
+  static const String apiBaseUrl = 'https://www.oakspireclub.com/api/';
 }
 

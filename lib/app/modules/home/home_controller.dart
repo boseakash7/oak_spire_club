@@ -25,16 +25,19 @@ class HomeController extends GetxController {
     fetchHomeData();
   }
 
-  Future<void> fetchHomeData() async {
+  Future<void> fetchHomeData({bool forceRefresh = false}) async {
     isLoading.value = true;
     try {
-      final list = await _repo.fetchMyCollection();
+      final list = await _repo.fetchMyCollection(forceRefresh: forceRefresh);
       hasCollection.value = list.isNotEmpty;
       if (list.isNotEmpty) {
         totalCollectionCount.value = list.length;
       }
 
-      final chart = await _repo.fetchChartData(lookBackDays: 90);
+      final chart = await _repo.fetchChartData(
+        lookBackDays: 90,
+        forceRefresh: forceRefresh,
+      );
       if (chart != null) {
         final series = chart['data'];
         if (series is List && series.isNotEmpty) {
@@ -77,5 +80,7 @@ class HomeController extends GetxController {
       isLoading.value = false;
     }
   }
+
+  Future<void> forceReload() => fetchHomeData(forceRefresh: true);
 }
 

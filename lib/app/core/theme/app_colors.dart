@@ -58,6 +58,15 @@ class AppColors {
 
   static const Color navBarBorder = Color(0xFF422F2B);
 
+  /// Sort / filter menu surface (Figma: #221713).
+  static const Color menuSurface = Color(0xFF221713);
+
+  /// Selected menu row background (Figma: rgba(241,232,190,0.14)).
+  static const Color menuRowSelected = Color(0x24F1E8BE);
+
+  /// Sort chevron inactive tint (Figma: #664C42).
+  static const Color sortChevronInactive = Color(0xFF664C42);
+
   /// Black at ~20% — scrims over dark backgrounds.
   static const Color overlayBlack20 = Color(0x33000000);
 

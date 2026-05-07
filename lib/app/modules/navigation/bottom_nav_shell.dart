@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../collection/collection_view.dart';
 import '../home/home_view.dart';
+import '../market/market_view.dart';
 import '../profile/profile_view.dart';
 import 'bottom_nav_controller.dart';
 
@@ -20,7 +21,7 @@ class BottomNavShell extends GetView<BottomNavController> {
       const HomeView(),
       const CollectionView(),
       const _PlaceholderTab(label: 'Taste'),
-      const _PlaceholderTab(label: 'Market'),
+      const MarketView(),
       const ProfileView(),
     ];
 
@@ -52,33 +53,36 @@ class BottomNavShell extends GetView<BottomNavController> {
                   children: [
                     _NavItem(
                       label: 'Home',
-                      asset: AppAssets.navHome,
+                      asset: AppAssets.navHomeFilled,
                       selected: selected == 0,
                       onTap: () => controller.setIndex(0),
                     ),
                     _NavItem(
                       label: 'Collection',
-                      asset: AppAssets.navCollection,
+                      asset: AppAssets.navCollectionActive,
                       selected: selected == 1,
                       onTap: () => controller.setIndex(1),
                     ),
                     _NavItem(
                       label: 'Taste',
-                      asset: AppAssets.navCollection,
+                      asset: AppAssets.navCollectionInactive,
                       selected: selected == 2,
                       onTap: () => controller.setIndex(2),
                     ),
                     _NavItem(
                       label: 'Market',
-                      asset: AppAssets.navCollection,
+                      asset: AppAssets.navCollectionInactive,
                       selected: selected == 3,
                       onTap: () => controller.setIndex(3),
                     ),
                     _NavItem(
                       label: 'Profile',
-                      asset: AppAssets.navCollection,
+                      asset: '',
                       selected: selected == 4,
                       onTap: () => controller.setIndex(4),
+                      iconOverride: _ProfileNavIcon(
+                        selected: selected == 4,
+                      ),
                     ),
                   ],
                 ),
@@ -97,12 +101,14 @@ class _NavItem extends StatelessWidget {
     required this.asset,
     required this.selected,
     required this.onTap,
+    this.iconOverride,
   });
 
   final String label;
   final String asset;
   final bool selected;
   final VoidCallback onTap;
+  final Widget? iconOverride;
 
   static const double _iconSize = 19;
 
@@ -119,13 +125,23 @@ class _NavItem extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.max,
           children: [
-            SvgPicture.asset(
-              asset,
-              height: _iconSize,
-              width: _iconSize,
-              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-            ),
-            const SizedBox(height: 4),
+            if (iconOverride != null)
+              SizedBox(
+                height: _iconSize,
+                width: _iconSize,
+                child: IconTheme(
+                  data: IconThemeData(color: color, size: _iconSize),
+                  child: iconOverride!,
+                ),
+              )
+            else
+              SvgPicture.asset(
+                asset,
+                height: _iconSize,
+                width: _iconSize,
+                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+              ),
+            const SizedBox(height: 6),
             Text(
               label,
               style: AppTextStyles.body16().copyWith(
@@ -139,6 +155,44 @@ class _NavItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProfileNavIcon extends StatelessWidget {
+  const _ProfileNavIcon({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.textCream : AppColors.textMuted;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: 9,
+            height: 9,
+            child: SvgPicture.asset(
+              AppAssets.navProfileHead,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: SizedBox(
+            width: 18,
+            height: 10,
+            child: SvgPicture.asset(
+              AppAssets.navProfileBody,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
