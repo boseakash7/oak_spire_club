@@ -7,5 +7,13 @@ class AppRoutes {
   static const String shell = '/shell';
   static const String splash = '/splash';
   static const String addToCollection = '/add-to-collection';
+  static const String tasteBottles = '/taste-bottles';
+  static const String benchmarkDetail = '/benchmark-detail';
+  static const String subscription = '/subscription';
+  static const String settingsAccount = '/settings/account';
+  static const String settingsNotifications = '/settings/notifications';
+  static const String settingsPrivacy = '/settings/privacy';
+  static const String settingsHelp = '/settings/help';
+  static const String settingsAbout = '/settings/about';
+  static const String settingsLegalWeb = '/settings/legal-web';
 }
-

@@ -13,11 +13,13 @@ class UserModel {
     this.lastPaymentMethod,
     this.subscriptionStatus,
     this.isFree,
+    this.gender,
   });
 
   final String id;
   final String? name;
   final String? email;
+  final String? gender;
   final String? packageId;
   final String? customerId;
   final String? paymentMethodId;
@@ -44,6 +46,30 @@ class UserModel {
       lastPaymentMethod: json['last_payment_method']?.toString(),
       subscriptionStatus: json['subscription_status']?.toString(),
       isFree: json['is_free']?.toString(),
+      gender: json['gender']?.toString(),
+    );
+  }
+
+  UserModel copyWith({
+    String? name,
+    String? email,
+    String? gender,
+  }) {
+    return UserModel(
+      id: id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      packageId: packageId,
+      customerId: customerId,
+      paymentMethodId: paymentMethodId,
+      status: status,
+      packageType: packageType,
+      packagePrice: packagePrice,
+      subscriptionType: subscriptionType,
+      lastPaymentMethod: lastPaymentMethod,
+      subscriptionStatus: subscriptionStatus,
+      isFree: isFree,
+      gender: gender ?? this.gender,
     );
   }
 
@@ -61,6 +87,7 @@ class UserModel {
         'last_payment_method': lastPaymentMethod,
         'subscription_status': subscriptionStatus,
         'is_free': isFree,
+        'gender': gender,
       };
 }
 

@@ -2,10 +2,7 @@ import 'category_bottle_model.dart';
 import 'category_model.dart';
 
 class CategoryDetailModel {
-  CategoryDetailModel({
-    required this.category,
-    required this.bottles,
-  });
+  CategoryDetailModel({required this.category, required this.bottles});
 
   final CategoryModel category;
   final List<CategoryBottleModel> bottles;
@@ -25,15 +22,21 @@ class CategoryDetailModel {
             ),
       bottles: (b is List)
           ? b
-              .whereType<Map>()
-              .map(
-                (e) => CategoryBottleModel.fromJson(
-                  Map<String, dynamic>.from(e),
-                ),
-              )
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (e) => CategoryBottleModel.fromJson(
+                    Map<String, dynamic>.from(e),
+                  ),
+                )
+                .toList()
           : <CategoryBottleModel>[],
     );
   }
-}
 
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'category': category.toJson(),
+      'bottles': bottles.map((e) => e.toJson()).toList(),
+    };
+  }
+}

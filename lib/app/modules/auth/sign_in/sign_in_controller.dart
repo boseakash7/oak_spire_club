@@ -1,6 +1,10 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/analytics/app_analytics_controller.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/utils/app_snackbar.dart';
 import '../../../core/utils/validators.dart';
@@ -27,9 +31,16 @@ class SignInController extends GetxController {
       return;
     }
 
+    if (Get.isRegistered<AppAnalyticsController>()) {
+      unawaited(AppAnalyticsController.to.logTap('sign_in_submit'));
+    }
+
     isLoading.value = true;
     try {
-      await _repo.login(email: email, password: password);
+      final user = await _repo.login(email: email, password: password);
+      if (kDebugMode) {
+        debugPrint('[Auth] Login success user_id=${user.id}');
+      }
       Get.offAllNamed(AppRoutes.shell);
     } on ApiException catch (e) {
       AppSnackbar.error(e.message);

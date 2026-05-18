@@ -8,6 +8,7 @@ class AuthRemoteDataSource {
 
   static const String _register = 'auth/register';
   static const String _login = 'auth/login';
+  static const String _update = 'auth/update';
 
   Future<UserModel> login({
     required String email,
@@ -43,6 +44,30 @@ class AuthRemoteDataSource {
       throw ApiException('Unexpected server response.');
     }
     return UserModel.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  Future<void> updateProfile({
+    required String userId,
+    required String name,
+    String? gender,
+    String? oldPassword,
+    String? password,
+  }) async {
+    final body = <String, dynamic>{
+      'user_id': userId,
+      'name': name,
+    };
+    if (gender != null && gender.isNotEmpty) {
+      body['gender'] = gender;
+    }
+    if (oldPassword != null && oldPassword.isNotEmpty) {
+      body['old_password'] = oldPassword;
+    }
+    if (password != null && password.isNotEmpty) {
+      body['password'] = password;
+    }
+
+    await _client.postJson(_update, body);
   }
 }
 

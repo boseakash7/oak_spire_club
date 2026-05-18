@@ -22,8 +22,7 @@ class AppSnackbar {
   static Future<void> error(String message) => _show(message, _textError);
 
   /// Optional success line after mutations.
-  static Future<void> success(String message) =>
-      _show(message, _textSuccess);
+  static Future<void> success(String message) => _show(message, _textSuccess);
 
   /// Neutral API / info copy.
   static Future<void> info(String message) => _show(message, _textInfo);
@@ -90,10 +89,7 @@ class AppSnackbar {
 }
 
 class _AppToastChip extends StatelessWidget {
-  const _AppToastChip({
-    required this.message,
-    required this.textColor,
-  });
+  const _AppToastChip({required this.message, required this.textColor});
 
   final String message;
   final Color textColor;

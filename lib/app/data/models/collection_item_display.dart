@@ -1,5 +1,6 @@
 import '../../core/constants/app_constants.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/utils/price_formatter.dart';
 import 'collection_item_model.dart';
 
 /// CMS static files usually live under `/v2/…`, not under `/v2/api/…`.
@@ -91,6 +92,29 @@ extension CollectionItemDisplay on CollectionItemModel {
     return null;
   }
 
+  /// Bluebook bottle id when present (for deduping home “top moved” rows).
+  String? get bluebookBottleId {
+    final id = bluebook?['id']?.toString().trim();
+    if (id != null && id.isNotEmpty && id != 'null') return id;
+    return null;
+  }
+
+  /// `price_movement` from `collection/all` (root or nested bluebook).
+  String? get priceMovementRaw {
+    final root = priceMovement?.trim();
+    if (root != null && root.isNotEmpty && root != 'null') return root;
+    return _pickBluebook(const ['price_movement', 'priceMovement']);
+  }
+
+  double? get priceMovementValue =>
+      PriceFormatter.parsePriceMovementValue(priceMovementRaw);
+
+  /// Market / bluebook average for display (not user `price_paid`).
+  String get marketAverageLabel =>
+      PriceFormatter.format(
+        _pickBluebook(const ['average', 'avg', 'market_value', 'price']),
+      );
+
   /// Primary line (brand / expression name).
   String get lineTitle =>
       _pickBluebook(const ['name', 'title', 'product_name', 'bottle_name']) ??
@@ -122,11 +146,13 @@ extension CollectionItemDisplay on CollectionItemModel {
     return 'Proof $p';
   }
 
+  /// Total paid for this line: unit `price_paid` × bottle `quantity` (default 1 when absent).
   String get priceLabel {
-    final raw = pricePaid?.trim();
-    if (raw == null || raw.isEmpty) return '—';
-    if (raw.startsWith(r'$')) return raw;
-    return '\$$raw';
+    final unit = double.tryParse(pricePaid ?? '') ?? 0;
+    final qtyRaw = int.tryParse(quantity ?? '');
+    final normalizedQty = (qtyRaw == null || qtyRaw <= 0) ? 1 : qtyRaw;
+    final total = (unit * normalizedQty).round();
+    return PriceFormatter.format(total.toString());
   }
 
   /// How full the bottle is for the gold bar (0–1).

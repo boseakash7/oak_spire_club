@@ -5,6 +5,9 @@ import 'package:get/get.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/price_formatter.dart';
+import '../../core/widgets/app_header.dart';
+import '../../data/models/collection_item_display.dart';
 import 'home_controller.dart';
 import 'widgets/home_value_chart.dart';
 
@@ -31,7 +34,12 @@ class HomeFilledView extends StatelessWidget {
           SafeArea(
             top: false,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(23, 108, 0, 96),
+              padding: const EdgeInsets.fromLTRB(
+                23,
+                kShellTabBodyContentTopGap,
+                0,
+                96,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -48,28 +56,41 @@ class HomeFilledView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: _kHomeHeadingToCardsGap),
-                  SizedBox(
-                    height: 68,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none,
-                      padding: const EdgeInsets.only(left: 0, right: 23),
-                      itemCount: 2,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(width: 14),
-                      itemBuilder: (context, index) {
-                        return _TrendingCard(
-                          title: 'Wild turkey 101 8 years',
-                          subtitle: 'Spicy and sweet',
-                          price: '\$500',
-                          changeText: index == 0 ? '+3.4%' : '-2.3%',
-                          changeColor: index == 0
-                              ? const Color(0xFFD4AF37)
-                              : const Color(0xFFFF0404),
-                        );
-                      },
-                    ),
-                  ),
+                  Obx(() {
+                    final bottles = home.topMovedBottles;
+                    if (bottles.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return SizedBox(
+                      height: 68,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        clipBehavior: Clip.none,
+                        padding: const EdgeInsets.only(left: 0, right: 23),
+                        itemCount: bottles.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(width: 14),
+                        itemBuilder: (context, index) {
+                          final item = bottles[index];
+                          final subtitle = item.lineSubtitle.trim().isNotEmpty
+                              ? item.lineSubtitle.trim()
+                              : item.proofLabel;
+                          final movementRaw = item.priceMovementRaw;
+                          return _TrendingCard(
+                            title: item.lineTitle,
+                            subtitle: subtitle,
+                            price: item.marketAverageLabel,
+                            changeText: PriceFormatter.formatPriceMovementLabel(
+                              movementRaw,
+                            ),
+                            changeColor: PriceFormatter.priceMovementColor(
+                              movementRaw,
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 28),
                   Padding(
                     padding: const EdgeInsets.only(right: 23),
@@ -97,11 +118,15 @@ class HomeFilledView extends StatelessWidget {
                           1 => 'Total\nDrunk',
                           _ => 'Total\nCollection',
                         };
-                        final value = switch (index) {
-                          0 => '54',
-                          1 => '12',
-                          _ => '54',
-                        };
+                        if (index == 0 || index == 3) {
+                          return Obx(
+                            () => _StatCard(
+                              label: label,
+                              value: home.totalCollectionCount.value.toString(),
+                            ),
+                          );
+                        }
+                        const value = '12';
                         return _StatCard(label: label, value: value);
                       },
                     ),
@@ -141,19 +166,19 @@ class _CollectionValue extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         ShaderMask(
+          blendMode: BlendMode.srcIn,
           shaderCallback: (bounds) => const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [AppColors.gold2, AppColors.gold1],
             stops: [0.21591, 0.90909],
           ).createShader(bounds),
-          blendMode: BlendMode.srcIn,
           child: Obx(
             () => Text(
               home.collectionValueText.value,
               style: AppTextStyles.button20Bold().copyWith(
                 fontSize: 36,
-                height: 1.0,
+                height: 1.12,
               ),
             ),
           ),

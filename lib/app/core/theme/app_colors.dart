@@ -53,10 +53,60 @@ class AppColors {
   /// Track behind collection “fill” bar.
   static const Color fillBarTrack = Color(0xFF382923);
 
+  /// Fill-level slider thumb (Figma node 108:396).
+  static const Color fillSliderThumb = Color(0xFFA27E28);
+
   /// Bottom navigation bar surface.
   static const Color navBarBackground = Color(0xFF1E1412);
 
   static const Color navBarBorder = Color(0xFF422F2B);
+
+  // --- Benchmark detail chart (Figma 83:653) ---------------------------------
+
+  /// Plot fill — same token as [surfaceDeep]; kept as alias for readability at call sites.
+  static const Color chartPlotBackground = surfaceDeep;
+
+  static const Color chartGridLine = Color(0xFF4A4248);
+
+  /// Upper series (Market Value).
+  static const Color chartLineMarketValue = Color(0xFFE8C547);
+
+  /// Lower series (BSMI).
+  static const Color chartLineBsmi = Color(0xFFA898C8);
+
+  // --- Detail / tags / rating -------------------------------------------------
+
+  /// Header greeting, near-white on dark.
+  static const Color textGreeting = Color(0xFFF5F5F5);
+
+  /// Dark chip surface (AI badge, inactive period tag, etc.).
+  static const Color surfaceChip = Color(0xFF1F1E1E);
+
+  /// “Bought at” style caption on owned row.
+  static const Color textOwnedLabel = Color(0xFF605F5D);
+
+  static const Color trendPositive = Color(0xFF769828);
+
+  static const Color trendNegative = Color(0xFF982828);
+
+  static const Color tagGoldBorder = Color(0xFF9F8632);
+
+  static const Color tagInactiveBorder = Color(0xFF2D2D2D);
+
+  static const Color ratingChipBackground = Color(0xFF271E21);
+
+  static const Color ratingStarMuted = Color(0xFF7B7878);
+
+  // --- Market list -----------------------------------------------------------
+
+  /// Search field border when focused (lighter than [border]).
+  static const Color inputBorderFocused = Color(0xFF585858);
+
+  /// Down / risk accent on benchmark cards.
+  static const Color marketTrendDown = Color(0xFFA32A2A);
+
+  /// Light neutral icon tint (e.g. dash placeholder).
+  static const Color iconNeutralLight = Color(0xFFD9D9D9);
 
   /// Sort / filter menu surface (Figma: #221713).
   static const Color menuSurface = Color(0xFF221713);

@@ -13,12 +13,14 @@ class CommonTextField extends StatefulWidget {
     this.showVisibilityToggle = false,
     this.textInputAction,
     this.onSubmitted,
+    this.readOnly = false,
   });
 
   final String hintText;
   final TextEditingController? controller;
   final TextInputType? keyboardType;
   final bool obscureText;
+  final bool readOnly;
   /// When true (usually with [obscureText]), shows an eye icon to show/hide the value.
   final bool showVisibilityToggle;
   final TextInputAction? textInputAction;
@@ -60,15 +62,22 @@ class _CommonTextFieldState extends State<CommonTextField> {
         controller: widget.controller,
         keyboardType: widget.keyboardType,
         obscureText: effectiveObscure,
+        readOnly: widget.readOnly,
         autocorrect: !_passwordLike,
         enableSuggestions: !_passwordLike,
         textInputAction: widget.textInputAction,
         onSubmitted: widget.onSubmitted,
-        style: AppTextStyles.body16(),
+        style: AppTextStyles.body16().copyWith(
+          color: widget.readOnly
+              ? AppColors.textMuted
+              : AppColors.white,
+        ),
         decoration: InputDecoration(
           isDense: true,
           filled: true,
-          fillColor: AppColors.panel,
+          fillColor: widget.readOnly
+              ? AppColors.surfaceChip
+              : AppColors.panel,
           hintText: widget.hintText,
           hintStyle: AppTextStyles.body16().copyWith(
             color: AppColors.white.withValues(alpha: 0.9),

@@ -1,10 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/storage/app_storage.dart';
 import '../../core/utils/app_snackbar.dart';
+import '../../core/utils/price_formatter.dart';
 import '../../data/models/bluebook_model.dart';
 import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/collection_repository.dart';
@@ -13,158 +12,194 @@ class AddCollectionController extends GetxController {
   AddCollectionController({
     required BluebookRepository bluebookRepo,
     required CollectionRepository collectionRepo,
-  })  : _bluebookRepo = bluebookRepo,
-        _collectionRepo = collectionRepo;
+  }) : _bluebookRepo = bluebookRepo,
+       _collectionRepo = collectionRepo;
 
   final BluebookRepository _bluebookRepo;
   final CollectionRepository _collectionRepo;
 
-  final searchCtrl = TextEditingController();
+  final bottleNameCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
   final qtyCtrl = TextEditingController(text: '1');
+  final fillCtrl = TextEditingController(text: '100');
+  final dateAcquiredCtrl = TextEditingController();
+  final notesCtrl = TextEditingController();
 
-  final isSearching = false.obs;
   final isSubmitting = false.obs;
-  final results = <BluebookModel>[].obs;
   final selected = Rxn<BluebookModel>();
+  final isEditMode = false.obs;
 
-  final fillPercent = 100.0.obs;
+  final previewImageUrl = ''.obs;
 
-  int _page = 1;
-  bool _hasMore = true;
-  Timer? _debounce;
-
-  static const int _limit = 25;
+  DateTime? dateAcquired;
+  String? _originalBottleId;
 
   @override
   void onInit() {
     super.onInit();
-    searchCtrl.addListener(_onKeywordChanged);
-    _fetch(reset: true);
+    _applyPrefill(Get.arguments);
+    _ensureDefaultDate();
   }
 
   @override
   void onClose() {
-    _debounce?.cancel();
-    searchCtrl.dispose();
+    bottleNameCtrl.dispose();
     priceCtrl.dispose();
     qtyCtrl.dispose();
+    fillCtrl.dispose();
+    dateAcquiredCtrl.dispose();
+    notesCtrl.dispose();
     super.onClose();
   }
 
-  void _onKeywordChanged() {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), () {
-      _fetch(reset: true);
-    });
-  }
+  void _applyPrefill(dynamic args) {
+    if (args is! Map) return;
+    final map = Map<String, dynamic>.from(args);
+    final prefillRaw = map['prefill'];
+    isEditMode.value = map['editMode'] == true;
+    final originalBottleIdRaw = map['originalBottleId']?.toString();
+    if (originalBottleIdRaw != null &&
+        originalBottleIdRaw.isNotEmpty &&
+        originalBottleIdRaw != 'null') {
+      _originalBottleId = originalBottleIdRaw;
+    }
+    if (prefillRaw is! Map) return;
+    final prefill = Map<String, dynamic>.from(prefillRaw);
 
-  Future<void> _fetch({required bool reset}) async {
-    if (isSearching.value) return;
+    final id = prefill['id']?.toString();
+    final name = prefill['name']?.toString() ?? '';
+    final average = prefill['average']?.toString();
+    final image = prefill['image']?.toString();
+    final fill = double.tryParse(prefill['fill']?.toString() ?? '');
+    final qty = int.tryParse(prefill['quantity']?.toString() ?? '');
+    final notes = prefill['notes']?.toString() ?? '';
+    final dateAcquiredRaw = prefill['date_acquired']?.toString() ?? '';
 
-    if (reset) {
-      _page = 1;
-      _hasMore = true;
-      results.clear();
-    } else {
-      if (!_hasMore) return;
-      _page += 1;
+    bottleNameCtrl.text = name;
+    if (average != null && average.trim().isNotEmpty && average != 'null') {
+      _setFormattedPrice(average);
+    }
+    if (qty != null && qty > 0) qtyCtrl.text = qty.toString();
+    if (fill != null) {
+      final normalized = fill.round().clamp(1, 100);
+      fillCtrl.text = normalized.toString();
+    }
+    if (notes.isNotEmpty) notesCtrl.text = notes;
+    if (dateAcquiredRaw.isNotEmpty && dateAcquiredRaw != 'null') {
+      dateAcquiredCtrl.text = dateAcquiredRaw;
+      final parsed = DateTime.tryParse(dateAcquiredRaw);
+      if (parsed != null) {
+        dateAcquired = DateTime(parsed.year, parsed.month, parsed.day);
+      }
+    }
+    if (image != null && image.isNotEmpty && image != 'null') {
+      previewImageUrl.value = image;
     }
 
-    isSearching.value = true;
-    try {
-      final list = await _bluebookRepo.search(
-        page: _page,
-        limit: _limit,
-        keyword: searchCtrl.text,
+    if (id != null && id.isNotEmpty && id != 'null') {
+      selected.value = BluebookModel(
+        id: id,
+        bottleName: name,
+        average: average,
+        image: image,
       );
-      if (list.isEmpty) {
-        _hasMore = false;
-      } else {
-        results.addAll(list);
-      }
-    } catch (e) {
-      if (reset) {
-        results.clear();
-      }
-      await AppSnackbar.error(e.toString());
-    } finally {
-      isSearching.value = false;
     }
   }
 
-  Future<void> loadMore() => _fetch(reset: false);
-
-  void pick(BluebookModel b) {
-    selected.value = b;
-    // Pre-fill price with average when available.
-    final avg = b.average?.toString();
-    if (avg != null && avg.trim().isNotEmpty && avg != 'null') {
-      priceCtrl.text = avg;
+  void _setFormattedPrice(String value) {
+    final normalized = PriceFormatter.normalizeForApi(value);
+    if (normalized == null) {
+      priceCtrl.clear();
+      return;
     }
+    priceCtrl.text = PriceFormatter.format(normalized, withSymbol: false);
   }
 
-  void clearSelection() {
-    selected.value = null;
-    fillPercent.value = 100;
-    priceCtrl.clear();
-    qtyCtrl.text = '1';
+  void _ensureDefaultDate() {
+    if (dateAcquiredCtrl.text.trim().isNotEmpty) return;
+    final now = DateTime.now();
+    dateAcquired = DateTime(now.year, now.month, now.day);
+    dateAcquiredCtrl.text = _formatDate(dateAcquired!);
   }
 
-  Future<void> createCustomBottle() async {
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  String _digitsOnly(String value) {
+    return PriceFormatter.normalizeForApi(value) ?? '';
+  }
+
+  Future<void> pickDate(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(1990),
+      lastDate: DateTime(now.year + 2),
+      initialDate: dateAcquired ?? now,
+    );
+    if (picked == null) return;
+    dateAcquired = picked;
+    dateAcquiredCtrl.text = _formatDate(picked);
+  }
+
+  Future<void> submit() async {
     final userId = AppStorage.userId;
     if (userId == null || userId.isEmpty) {
       await AppSnackbar.error('Please sign in again.');
       return;
     }
 
-    final name = searchCtrl.text.trim();
-    final price = priceCtrl.text.trim();
+    final name = bottleNameCtrl.text.trim();
     if (name.isEmpty) {
-      await AppSnackbar.error('Enter bottle name first.');
-      return;
-    }
-    if (price.isEmpty) {
-      await AppSnackbar.error('Enter price first.');
-      return;
-    }
-
-    isSubmitting.value = true;
-    try {
-      final b = await _bluebookRepo.create(
-        bottleName: name,
-        bottlePrice: price,
-        userId: userId,
-      );
-      pick(b);
-      await AppSnackbar.success('Bottle created.');
-    } catch (e) {
-      await AppSnackbar.error(e.toString());
-    } finally {
-      isSubmitting.value = false;
-    }
-  }
-
-  Future<void> submit() async {
-    final b = selected.value;
-    if (b == null) {
-      await AppSnackbar.error('Select a bottle first.');
+      await AppSnackbar.error('Enter bottle name.');
       return;
     }
 
     final qty = int.tryParse(qtyCtrl.text.trim()) ?? 1;
-    final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
-    final fill = fillPercent.value.toInt().clamp(0, 100);
+    final priceRaw = _digitsOnly(priceCtrl.text.trim());
+    final price = double.tryParse(priceRaw) ?? 0;
+    final fill = int.tryParse(fillCtrl.text.trim()) ?? 100;
+    final normalizedFill = fill.clamp(1, 100);
 
     isSubmitting.value = true;
     try {
-      await _collectionRepo.addToCollection(
-        bottleId: b.id,
-        quantity: qty <= 0 ? 1 : qty,
-        fill: fill,
-        pricePaid: price,
-        image: b.image,
-      );
+      var b = selected.value;
+      if (b == null) {
+        final created = await _bluebookRepo.create(
+          bottleName: name,
+          bottlePrice: priceRaw,
+          userId: userId,
+        );
+        b = created;
+        selected.value = created;
+      }
+
+      final resolvedQty = qty <= 0 ? 1 : qty;
+      if (isEditMode.value &&
+          _originalBottleId != null &&
+          _originalBottleId!.isNotEmpty) {
+        await _collectionRepo.replaceCollectionItem(
+          originalBottleId: _originalBottleId!,
+          bottleId: b.id,
+          quantity: resolvedQty,
+          fill: normalizedFill,
+          pricePaid: price,
+          image: b.image,
+          notes: notesCtrl.text.trim(),
+          dateAcquired: dateAcquiredCtrl.text.trim(),
+        );
+      } else {
+        await _collectionRepo.addToCollection(
+          bottleId: b.id,
+          quantity: resolvedQty,
+          fill: normalizedFill,
+          pricePaid: price,
+          image: b.image,
+          notes: notesCtrl.text.trim(),
+          dateAcquired: dateAcquiredCtrl.text.trim(),
+        );
+      }
       await AppSnackbar.success('Added to collection.');
       Get.back(result: true);
     } catch (e) {
@@ -174,4 +209,3 @@ class AddCollectionController extends GetxController {
     }
   }
 }
-

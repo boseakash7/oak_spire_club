@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/analytics/app_analytics_controller.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -54,7 +57,15 @@ class SignInView extends GetView<SignInController> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: GestureDetector(
-                      onTap: () => Get.toNamed(AppRoutes.forgotPassword),
+                      onTap: () {
+                        if (Get.isRegistered<AppAnalyticsController>()) {
+                          unawaited(
+                            AppAnalyticsController.to
+                                .logTap('sign_in_forgot_password'),
+                          );
+                        }
+                        Get.toNamed(AppRoutes.forgotPassword);
+                      },
                       child: Text(
                         'Forgot password?',
                         style: AppTextStyles.body16().copyWith(
@@ -92,6 +103,12 @@ class SignInView extends GetView<SignInController> {
                             ),
                             recognizer: TapGestureRecognizer()
                               ..onTap = () {
+                                if (Get.isRegistered<AppAnalyticsController>()) {
+                                  unawaited(
+                                    AppAnalyticsController.to
+                                        .logTap('sign_in_go_sign_up'),
+                                  );
+                                }
                                 if (Navigator.of(context).canPop()) {
                                   Get.back();
                                 } else {

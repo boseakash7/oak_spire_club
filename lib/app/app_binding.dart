@@ -1,13 +1,16 @@
 import 'package:get/get.dart';
 
+import 'core/analytics/app_analytics_controller.dart';
 import 'core/network/api_client.dart';
 import 'data/datasources/auth_remote_datasource.dart';
+import 'data/datasources/bluebook_price_history_remote_datasource.dart';
 import 'data/datasources/bluebook_remote_datasource.dart';
 import 'data/datasources/categories_remote_datasource.dart';
 import 'data/datasources/collection_remote_datasource.dart';
 import 'data/datasources/config_remote_datasource.dart';
 import 'data/datasources/user_remote_datasource.dart';
 import 'data/repositories/auth_repository.dart';
+import 'data/repositories/bluebook_price_history_repository.dart';
 import 'data/repositories/bluebook_repository.dart';
 import 'data/repositories/categories_repository.dart';
 import 'data/repositories/collection_repository.dart';
@@ -19,6 +22,7 @@ import 'modules/session/user_session_controller.dart';
 class AppBinding extends Bindings {
   @override
   void dependencies() {
+    Get.put<AppAnalyticsController>(AppAnalyticsController(), permanent: true);
     Get.put<UserSessionController>(UserSessionController(), permanent: true);
     Get.lazyPut<ApiClient>(() => ApiClient(), fenix: true);
     Get.lazyPut<AuthRemoteDataSource>(
@@ -45,6 +49,17 @@ class AppBinding extends Bindings {
     );
     Get.lazyPut<BluebookRepository>(
       () => BluebookRepository(Get.find<BluebookRemoteDataSource>()),
+      fenix: true,
+    );
+
+    Get.lazyPut<BluebookPriceHistoryRemoteDataSource>(
+      () => BluebookPriceHistoryRemoteDataSource(Get.find<ApiClient>()),
+      fenix: true,
+    );
+    Get.lazyPut<BluebookPriceHistoryRepository>(
+      () => BluebookPriceHistoryRepository(
+        Get.find<BluebookPriceHistoryRemoteDataSource>(),
+      ),
       fenix: true,
     );
 

@@ -15,6 +15,7 @@ class CollectionRemoteDataSource {
   static const String _all = 'collection/all';
   static const String _chartData = 'collection/chart-data';
   static const String _add = 'collection/add';
+  static const String _deleteByUserBottle = 'collection/delete-by-user-bottle';
 
   Future<Map<String, dynamic>> add({
     required String bottleId,
@@ -23,6 +24,8 @@ class CollectionRemoteDataSource {
     int quantity = 1,
     int fill = 100,
     double pricePaid = 0,
+    String? notes,
+    String? dateAcquired,
     File? imageFile,
     String? image,
   }) async {
@@ -33,6 +36,9 @@ class CollectionRemoteDataSource {
       'quantity': quantity,
       'fill': fill,
       'price_paid': pricePaid,
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (dateAcquired != null && dateAcquired.trim().isNotEmpty)
+        'date_acquired': dateAcquired.trim(),
     };
 
     final form = FormData(body);
@@ -58,8 +64,30 @@ class CollectionRemoteDataSource {
     }
 
     final data = json['data'];
-    if (data is! Map) throw ApiException('Unexpected server response.');
-    return Map<String, dynamic>.from(data);
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    if (data is List) {
+      return <String, dynamic>{'result': data};
+    }
+    if (data == null) {
+      return const <String, dynamic>{};
+    }
+    return <String, dynamic>{'result': data};
+  }
+
+  Future<void> deleteByUserBottle({
+    required String bottleId,
+    required String userId,
+    CollectionType type = CollectionType.normal,
+  }) async {
+    final json = await _client.postJson(_deleteByUserBottle, {
+      'bottle_id': bottleId,
+      'user_id': userId,
+      'type': type.name,
+    });
+    final data = json['data'];
+    if (data == null) return;
   }
 
   Future<List<CollectionItemModel>> all({

@@ -8,6 +8,7 @@ class BluebookRemoteDataSource {
 
   static const String _getAll = 'bluebook/get-all-bluebooks';
   static const String _create = 'bluebook/create';
+  static const String _lastUpdate = 'bluebook/get-last-update';
 
   Future<List<BluebookModel>> getAll({
     required int page,
@@ -55,6 +56,23 @@ class BluebookRemoteDataSource {
     final data = json['data'];
     if (data is! Map) throw ApiException('Unexpected server response.');
     return BluebookModel.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  Future<String?> getLastUpdatedReadable() async {
+    final response = await _client.get(_lastUpdate);
+    if (response.statusCode != 200) {
+      throw ApiException('Internal server error.');
+    }
+
+    final json = response.body;
+    if (json is! Map) throw ApiException('Unexpected server response.');
+    if (json['code']?.toString() != 'OK') {
+      throw ApiException(json['data']?.toString() ?? 'Something went wrong.');
+    }
+
+    final data = json['data'];
+    if (data is! Map) return null;
+    return data['readable']?.toString();
   }
 }
 

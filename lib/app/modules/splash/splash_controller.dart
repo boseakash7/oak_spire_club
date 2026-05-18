@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../core/storage/app_storage.dart';
@@ -33,9 +34,15 @@ class SplashController extends GetxController {
     if (id == null || id.isEmpty) {
       return AppRoutes.signUp;
     }
+    if (kDebugMode) {
+      debugPrint('[Auth] Auto-login stored user_id=$id');
+    }
 
     try {
-      await _userRepo.refreshUserById(id);
+      final user = await _userRepo.refreshUserById(id);
+      if (kDebugMode) {
+        debugPrint('[Auth] Auto-login refreshed user_id=${user.id}');
+      }
       return AppRoutes.shell;
     } catch (_) {
       await AppStorage.clearUserId();

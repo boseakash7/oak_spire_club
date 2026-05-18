@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
+import '../../data/collection_value_calculator.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import '../../data/repositories/collection_repository.dart';
+import '../home/home_controller.dart';
 
 enum CollectionFilter { all, opened, notOpened, rareFind }
 
@@ -36,6 +40,14 @@ class CollectionController extends GetxController {
       final list = await _repo.fetchMyCollection(forceRefresh: forceRefresh);
       items.assignAll(list);
 
+      final fmt = NumberFormat.currency(
+        locale: 'en_US',
+        symbol: r'$',
+        decimalDigits: 0,
+      );
+      final localTotal =
+          CollectionValueCalculator.totalInvestedFromItems(list);
+
       final chart = await _repo.fetchChartData(
         lookBackDays: 90,
         forceRefresh: forceRefresh,
@@ -43,25 +55,71 @@ class CollectionController extends GetxController {
       if (chart != null) {
         final first = double.tryParse(chart['first_price']?.toString() ?? '');
         final last = double.tryParse(chart['last_price']?.toString() ?? '');
-        final fmt = NumberFormat.currency(
-          locale: 'en_US',
-          symbol: r'$',
-          decimalDigits: 0,
-        );
-        if (last != null) {
+        // Always reflect actual collection rows (price * qty) in this view.
+        if (localTotal > 0) {
+          valueText.value = fmt.format(localTotal);
+        } else if (last != null && last > 0) {
           valueText.value = fmt.format(last);
         }
         if (first != null && last != null && first != 0) {
           final pct = ((last - first) / first) * 100;
           trendShort.value =
               '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%';
+        } else {
+          final index = chart['index'];
+          final movement = (index is Map)
+              ? double.tryParse(index['movement']?.toString() ?? '')
+              : null;
+          final trend = (index is Map)
+              ? index['trend']?.toString().toLowerCase()
+              : null;
+          if (movement != null) {
+            final sign = trend == 'down'
+                ? '-'
+                : trend == 'up'
+                ? '+'
+                : movement < 0
+                ? ''
+                : '+';
+            trendShort.value = '$sign${movement.toStringAsFixed(1)}%';
+          } else {
+            trendShort.value = '—';
+          }
         }
+      } else {
+        _applyFallbackValue(list, fmt);
       }
+      _syncHomeAfterCollectionLoad();
     } catch (_) {
-      // Leave placeholders; optional: surface via snackbar on retry only.
+      _applyFallbackValue(
+        items,
+        NumberFormat.currency(
+          locale: 'en_US',
+          symbol: r'$',
+          decimalDigits: 0,
+        ),
+      );
     } finally {
       isLoading.value = false;
     }
+  }
+
+  void _syncHomeAfterCollectionLoad() {
+    if (!Get.isRegistered<HomeController>()) return;
+    unawaited(
+      Get.find<HomeController>().fetchHomeData(forceRefresh: false),
+    );
+  }
+
+  void _applyFallbackValue(
+    Iterable<CollectionItemModel> list,
+    NumberFormat formatter,
+  ) {
+    final total = CollectionValueCalculator.totalInvestedFromItems(list);
+    if (total > 0) {
+      valueText.value = formatter.format(total);
+    }
+    trendShort.value = '—';
   }
 
   Future<void> forceReload() => load(forceRefresh: true);
@@ -130,5 +188,37 @@ class CollectionController extends GetxController {
       case CollectionFilter.rareFind:
         return e.isRareFind;
     }
+  }
+
+  String resolveBottleId(CollectionItemModel item) {
+    final bbId = item.bluebook?['id']?.toString();
+    if (bbId != null && bbId.isNotEmpty && bbId != 'null') return bbId;
+    return item.id;
+  }
+
+  Future<void> increaseBottleQuantity(CollectionItemModel item, int quantity) async {
+    await _repo.addToCollection(
+      bottleId: resolveBottleId(item),
+      quantity: quantity,
+      fill: (item.fillRatio * 100).round().clamp(0, 100),
+      pricePaid: double.tryParse(item.pricePaid ?? '') ?? 0,
+      image: item.image,
+    );
+    await forceReload();
+  }
+
+  Future<void> decreaseBottleQuantity(CollectionItemModel item, int quantity) async {
+    if (quantity <= 0) {
+      await _repo.removeFromCollection(bottleId: resolveBottleId(item));
+    } else {
+      await _repo.addToCollection(
+        bottleId: resolveBottleId(item),
+        quantity: quantity,
+        fill: (item.fillRatio * 100).round().clamp(0, 100),
+        pricePaid: double.tryParse(item.pricePaid ?? '') ?? 0,
+        image: item.image,
+      );
+    }
+    await forceReload();
   }
 }

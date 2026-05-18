@@ -38,6 +38,20 @@ class CategoryBottleModel {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'bottle_name': bottleName,
+      'image': image,
+      'average': average,
+      'low': low,
+      'high': high,
+      'status': status,
+      'created_at': createdAt,
+      'category_added_at': categoryAddedAt,
+    };
+  }
+
   /// Best-effort bottle image URL using `upload_url` when available.
   String? get resolvedImageUrl {
     final raw0 = image?.trim();

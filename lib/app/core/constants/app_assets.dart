@@ -3,6 +3,9 @@ class AppAssets {
 
   static const String signInBackground = 'assets/images/signin_bg.png';
   static const String signUpBackground = 'assets/images/signup_bg.png';
+  static const String subscriptionBackground =
+      'assets/images/subscription_bg.png';
+  static const String subscriptionCheck = 'assets/icons/subscription_check.png';
 
   /// Brand mark for splash / about (same asset as launcher source).
   static const String appIc = 'assets/images/app_ic.png';
@@ -34,9 +37,22 @@ class AppAssets {
       'assets/icons/nav_collection_active.svg';
   static const String navProfileHead = 'assets/icons/nav_profile_1.svg';
   static const String navProfileBody = 'assets/icons/nav_profile_2.svg';
+  static const String navTaste = 'assets/icons/nav_collection_inactive.svg';
+  static const String navMarket = 'assets/icons/nav_market.svg';
 
   static const String navHome = 'assets/icons/nav_home.svg';
   static const String navCollection = 'assets/icons/nav_collection.svg';
 
   static const String iconArrowRight = 'assets/icons/arrow_right.svg';
+
+  /// Trend arrows from Figma (benchmark / bottle detail).
+  static const String iconArrowUp = 'assets/icons/up_arrow.svg';
+  static const String iconArrowDown = 'assets/icons/down_arrow.svg';
+
+  static const String star = 'assets/icons/star.svg';
+  static const String benchmarkTrend = 'assets/icons/benchmark_trend.svg';
+  static const String marketTrend = 'assets/icons/market_trend.svg';
+
+  /// Fill-level bottom sheet — wine glass (Figma `ph:wine`).
+  static const String phWine = 'assets/icons/ph_wine.svg';
 }

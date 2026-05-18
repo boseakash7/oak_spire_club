@@ -1,27 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
-import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_confirm_dialog.dart';
 import '../../core/widgets/common_primary_button.dart';
-import '../../modules/session/user_session_controller.dart';
-import '../../routes/app_routes.dart';
+import 'settings_popup.dart';
 
+/// Legacy full-screen profile (shell uses [showSettingsPopup] instead).
 class ProfileView extends StatelessWidget {
   const ProfileView({super.key});
-
-  Future<void> _logout() async {
-    await AppStorage.clearUserId();
-    await AppStorage.clearUser();
-
-    if (Get.isRegistered<UserSessionController>()) {
-      Get.find<UserSessionController>().loadFromStorage();
-    }
-
-    Get.offAllNamed(AppRoutes.signUp);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +21,7 @@ class ProfileView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Profile',
+              'Settings',
               style: AppTextStyles.heading32Bold().copyWith(fontSize: 18),
             ),
             const SizedBox(height: 18),
@@ -51,7 +38,7 @@ class ProfileView extends StatelessWidget {
                 );
                 if (!context.mounted) return;
                 if (confirmed == true) {
-                  await _logout();
+                  await settingsLogout();
                 }
               },
             ),
@@ -61,4 +48,3 @@ class ProfileView extends StatelessWidget {
     );
   }
 }
-

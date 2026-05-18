@@ -12,6 +12,20 @@ import '../modules/navigation/bottom_nav_binding.dart';
 import '../modules/navigation/bottom_nav_shell.dart';
 import '../modules/splash/splash_binding.dart';
 import '../modules/splash/splash_view.dart';
+import '../modules/taste/taste_binding.dart';
+import '../modules/taste/taste_view.dart';
+import '../modules/market/benchmark_detail_binding.dart';
+import '../modules/market/benchmark_detail_view.dart';
+import '../modules/subscription/subscription_view.dart';
+import '../modules/settings/account/account_binding.dart';
+import '../modules/settings/account/account_view.dart';
+import '../modules/settings/notifications/notifications_binding.dart';
+import '../modules/settings/notifications/notifications_view.dart';
+import '../modules/settings/privacy/privacy_binding.dart';
+import '../modules/settings/privacy/privacy_view.dart';
+import '../modules/settings/help/help_support_view.dart';
+import '../modules/settings/about/about_view.dart';
+import '../modules/settings/legal/legal_web_view.dart';
 import 'app_routes.dart';
 
 class AppPages {
@@ -48,6 +62,43 @@ class AppPages {
       page: () => const AddCollectionView(),
       binding: AddCollectionBinding(),
     ),
+    GetPage(
+      name: AppRoutes.tasteBottles,
+      page: () => const TasteView(),
+      binding: TasteBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.benchmarkDetail,
+      page: () => const BenchmarkDetailView(),
+      binding: BenchmarkDetailBinding(),
+    ),
+    GetPage(name: AppRoutes.subscription, page: () => const SubscriptionView()),
+    GetPage(
+      name: AppRoutes.settingsAccount,
+      page: () => const AccountView(),
+      binding: AccountBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.settingsNotifications,
+      page: () => const NotificationsView(),
+      binding: NotificationsBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.settingsPrivacy,
+      page: () => const PrivacyView(),
+      binding: PrivacyBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.settingsHelp,
+      page: () => const HelpSupportView(),
+    ),
+    GetPage(
+      name: AppRoutes.settingsAbout,
+      page: () => const AboutView(),
+    ),
+    GetPage(
+      name: AppRoutes.settingsLegalWeb,
+      page: () => const LegalWebView(),
+    ),
   ];
 }
-

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1078950606869",
+    "project_id": "oakspireclub",
+    "storage_bucket": "oakspireclub.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1078950606869:android:4d336f8ce94fc789e5761c",
+        "android_client_info": {
+          "package_name": "com.oak.spireclub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6qMLuAi2RGC9UxQjZhCqgMFodMzxQykA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1078950606869:android:0bae066b997fbb94e5761c",
+        "android_client_info": {
+          "package_name": "com.oakspire.club"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6qMLuAi2RGC9UxQjZhCqgMFodMzxQykA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

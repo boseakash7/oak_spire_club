@@ -44,4 +44,33 @@ class AuthRepository {
     _session().setUser(user);
     return user;
   }
+
+  Future<void> updateProfile({
+    required String userId,
+    required String name,
+    String? gender,
+    String? oldPassword,
+    String? password,
+  }) async {
+    await _remote.updateProfile(
+      userId: userId,
+      name: name,
+      gender: gender,
+      oldPassword: oldPassword,
+      password: password,
+    );
+
+    final stored = AppStorage.user;
+    if (stored != null) {
+      final updated = UserModel.fromJson(stored).copyWith(
+        name: name,
+        gender: gender,
+      );
+      await AppStorage.setUser(updated.toJson());
+      if (gender != null) {
+        await AppStorage.setUserGender(gender);
+      }
+      _session().setUser(updated);
+    }
+  }
 }

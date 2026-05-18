@@ -3,23 +3,32 @@ class CollectionItemModel {
     required this.id,
     required this.type,
     required this.createdAt,
+    this.quantity,
     this.fill,
     this.image,
     this.proof,
     this.pricePaid,
+    this.notes,
+    this.dateAcquired,
     this.bluebook,
+    this.priceMovement,
   });
 
   final String id;
   final String? type;
   final String? createdAt;
+  final String? quantity;
   final String? fill;
   /// Best-effort bottle art URL/path from API or nested `bluebook` (bourboneur CMS).
   final String? image;
   /// Proof / ABV from root or `bluebook` (e.g. `Proof 45` in UI).
   final String? proof;
   final String? pricePaid;
+  final String? notes;
+  final String? dateAcquired;
   final Map<String, dynamic>? bluebook;
+  /// From root or nested `bluebook` (`price_movement`).
+  final String? priceMovement;
 
   static const List<String> _imageKeys = [
     'image',
@@ -79,6 +88,21 @@ class CollectionItemModel {
     return null;
   }
 
+  static String? _coalescePriceMovement(
+    Map<String, dynamic> json,
+    Map<String, dynamic>? bluebook,
+  ) {
+    final root = json['price_movement']?.toString().trim();
+    if (root != null && root.isNotEmpty && root != 'null') return root;
+    if (bluebook != null) {
+      final fromBb = bluebook['price_movement']?.toString().trim();
+      if (fromBb != null && fromBb.isNotEmpty && fromBb != 'null') {
+        return fromBb;
+      }
+    }
+    return null;
+  }
+
   static String? _coalesceImagePath(
     Map<String, dynamic> json,
     Map<String, dynamic>? bluebook,
@@ -105,11 +129,15 @@ class CollectionItemModel {
       id: json['id'].toString(),
       type: json['type']?.toString(),
       createdAt: json['created_at']?.toString(),
+      quantity: json['quantity']?.toString(),
       fill: json['fill']?.toString(),
       image: _coalesceImagePath(json, bluebook),
       proof: _coalesceProof(json, bluebook),
       pricePaid: json['price_paid']?.toString(),
+      notes: json['notes']?.toString(),
+      dateAcquired: json['date_acquired']?.toString(),
       bluebook: bluebook,
+      priceMovement: _coalescePriceMovement(json, bluebook),
     );
   }
 
@@ -118,11 +146,15 @@ class CollectionItemModel {
       'id': id,
       'type': type,
       'created_at': createdAt,
+      'quantity': quantity,
       'fill': fill,
       'image': image,
       'proof': proof,
       'price_paid': pricePaid,
+      'notes': notes,
+      'date_acquired': dateAcquired,
       'bluebook': bluebook,
+      'price_movement': priceMovement,
     };
   }
 }

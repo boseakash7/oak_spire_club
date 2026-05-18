@@ -23,5 +23,15 @@ class CategoryModel {
       totalBottles: int.tryParse(json['total_bottles']?.toString() ?? '') ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'name': name,
+      'status': status,
+      'created_at': createdAt,
+      'total_bottles': totalBottles,
+    };
+  }
 }
 

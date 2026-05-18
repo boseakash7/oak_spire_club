@@ -1,13 +1,18 @@
+import 'dart:async';
+import 'dart:ui' show ImageFilter, lerpDouble;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
+import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/app_cache_manager.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_header.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import '../../routes/app_routes.dart';
@@ -19,6 +24,7 @@ const double _kFabSize = 60;
 const double _kFigmaCardW = 166;
 const double _kFigmaCardH = 211;
 const double _kFigmaBottleImage = 100;
+const Color _kPopupBackdropOverlay = Color.fromRGBO(49, 49, 49, 0.67);
 
 class CollectionView extends GetView<CollectionController> {
   const CollectionView({super.key});
@@ -43,7 +49,14 @@ class CollectionView extends GetView<CollectionController> {
               child: InkWell(
                 customBorder: const CircleBorder(),
                 onTap: () async {
-                  final res = await Get.toNamed(AppRoutes.addToCollection);
+                  if (Get.isRegistered<AppAnalyticsController>()) {
+                    unawaited(
+                      AppAnalyticsController.to.logTap(
+                        'collection_add_bottle_fab',
+                      ),
+                    );
+                  }
+                  final res = await Get.toNamed(AppRoutes.tasteBottles);
                   if (res == true) {
                     await controller.forceReload();
                   }
@@ -113,12 +126,24 @@ class _CollectionBody extends StatelessWidget {
             top: false,
             child: RefreshIndicator(
               color: AppColors.gold1,
-              onRefresh: controller.forceReload,
+              onRefresh: () async {
+                if (Get.isRegistered<AppAnalyticsController>()) {
+                  unawaited(
+                    AppAnalyticsController.to.logTap('collection_pull_refresh'),
+                  );
+                }
+                await controller.forceReload();
+              },
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(23, 108, 23, 0),
+                    padding: const EdgeInsets.fromLTRB(
+                      23,
+                      kShellTabBodyContentTopGap,
+                      23,
+                      0,
+                    ),
                     sliver: SliverToBoxAdapter(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,7 +188,10 @@ class _CollectionBody extends StatelessWidget {
                               childAspectRatio: _kFigmaCardW / _kFigmaCardH,
                             ),
                         delegate: SliverChildBuilderDelegate((context, index) {
-                          return _BottleCard(item: list[index]);
+                          return _BottleCard(
+                            item: list[index],
+                            controller: controller,
+                          );
                         }, childCount: list.length),
                       ),
                     );
@@ -204,18 +232,18 @@ class _ValueHeader extends StatelessWidget {
               const SizedBox(height: 8),
               Obx(
                 () => ShaderMask(
+                  blendMode: BlendMode.srcIn,
                   shaderCallback: (bounds) => const LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [AppColors.gold2, AppColors.gold1],
                     stops: [0.21591, 0.90909],
                   ).createShader(bounds),
-                  blendMode: BlendMode.srcIn,
                   child: Text(
                     controller.valueText.value,
                     style: AppTextStyles.button20Bold().copyWith(
                       fontSize: 28,
-                      height: 1.0,
+                      height: 1.12,
                     ),
                   ),
                 ),
@@ -356,7 +384,8 @@ class _FilterRowState extends State<_FilterRow> {
             child: Obx(
               () => ListView(
                 scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
+                // Prevent chips from painting over the fixed filter icon area.
+                clipBehavior: Clip.hardEdge,
                 padding: const EdgeInsets.only(right: 4),
                 children: [
                   _FilterChip(
@@ -429,12 +458,15 @@ class _SortMenu extends StatelessWidget {
           ],
         ),
         padding: const EdgeInsets.fromLTRB(7, 12, 6, 10),
-        child: Obx(
-          () => Column(
+        child: Obx(() {
+          final showSelected = controller.hasActiveSort;
+          return Column(
             children: [
               _SortMenuRow(
                 label: 'Name',
-                selected: controller.sort.value == CollectionSort.name,
+                selected:
+                    showSelected &&
+                    controller.sort.value == CollectionSort.name,
                 ascending: controller.sortAscending.value,
                 onTap: () {
                   controller.toggleSort(CollectionSort.name);
@@ -444,7 +476,9 @@ class _SortMenu extends StatelessWidget {
               const SizedBox(height: 5),
               _SortMenuRow(
                 label: 'Price',
-                selected: controller.sort.value == CollectionSort.price,
+                selected:
+                    showSelected &&
+                    controller.sort.value == CollectionSort.price,
                 ascending: controller.sortAscending.value,
                 onTap: () {
                   controller.toggleSort(CollectionSort.price);
@@ -454,7 +488,9 @@ class _SortMenu extends StatelessWidget {
               const SizedBox(height: 5),
               _SortMenuRow(
                 label: 'Fill Rate',
-                selected: controller.sort.value == CollectionSort.fillRate,
+                selected:
+                    showSelected &&
+                    controller.sort.value == CollectionSort.fillRate,
                 ascending: controller.sortAscending.value,
                 onTap: () {
                   controller.toggleSort(CollectionSort.fillRate);
@@ -463,7 +499,9 @@ class _SortMenu extends StatelessWidget {
               ),
               _SortMenuRow(
                 label: 'Added Time',
-                selected: controller.sort.value == CollectionSort.addedTime,
+                selected:
+                    showSelected &&
+                    controller.sort.value == CollectionSort.addedTime,
                 ascending: controller.sortAscending.value,
                 onTap: () {
                   controller.toggleSort(CollectionSort.addedTime);
@@ -471,8 +509,8 @@ class _SortMenu extends StatelessWidget {
                 },
               ),
             ],
-          ),
-        ),
+          );
+        }),
       ),
     );
   }
@@ -598,9 +636,10 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _BottleCard extends StatelessWidget {
-  const _BottleCard({required this.item});
+  const _BottleCard({required this.item, required this.controller});
 
   final CollectionItemModel item;
+  final CollectionController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -612,80 +651,88 @@ class _BottleCard extends StatelessWidget {
       gaplessPlayback: true,
     );
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(_kCollectionCardRadius),
-      child: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: AppColors.cardSurfaceGradient,
-        ),
-        child: LayoutBuilder(
-          builder: (context, c) {
-            final w = c.maxWidth;
-            final scale = w / _kFigmaCardW;
-            final imageSide = _kFigmaBottleImage * scale;
-            final padH = 15 * scale;
-            final topPad = 16 * scale;
-            final barW = 63 * scale;
-            final fillW = (barW * ratio).clamp(4.0, barW);
-            final radiusImg = 8 * scale;
+    return GestureDetector(
+      onTap: () async {
+        final box = context.findRenderObject() as RenderBox?;
+        final sourceRect = box == null
+            ? null
+            : (box.localToGlobal(Offset.zero) & box.size);
+        await showGeneralDialog<void>(
+          context: context,
+          barrierDismissible: true,
+          barrierLabel: 'Close',
+          barrierColor: Colors.transparent,
+          transitionDuration: const Duration(milliseconds: 320),
+          pageBuilder: (dialogContext, animation, secondaryAnimation) {
+            return _BottleQuickPopup(
+              item: item,
+              controller: controller,
+              sourceRect: sourceRect,
+            );
+          },
+        );
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_kCollectionCardRadius),
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: AppColors.cardSurfaceGradient,
+          ),
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final w = c.maxWidth;
+              final scale = w / _kFigmaCardW;
+              final imageSide = _kFigmaBottleImage * scale;
+              final padH = 15 * scale;
+              final topPad = 16 * scale;
+              final barW = 63 * scale;
+              final fillW = (barW * ratio).clamp(4.0, barW);
+              final radiusImg = 8 * scale;
 
-            return Padding(
-              padding: EdgeInsets.fromLTRB(padH, topPad, padH, 10 * scale),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Align(
-                    alignment: Alignment.topCenter,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(radiusImg),
-                      child: SizedBox(
-                        width: imageSide,
-                        height: imageSide,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            const DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: AppColors.bottleRadialGlow,
+              return Padding(
+                padding: EdgeInsets.fromLTRB(padH, topPad, padH, 10 * scale),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(radiusImg),
+                        child: SizedBox(
+                          width: imageSide,
+                          height: imageSide,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: AppColors.bottleRadialGlow,
+                                ),
                               ),
-                            ),
-                            if (urls.isNotEmpty)
-                              _NetworkImageWithFallback(
-                                urls: urls,
-                                fit: BoxFit.contain,
-                                placeholder: bottlePlaceholder(),
-                                cacheWidthPx:
-                                    (imageSide *
-                                            MediaQuery.devicePixelRatioOf(
-                                              context,
-                                            ))
-                                        .round(),
-                              ),
-                            if (urls.isEmpty) bottlePlaceholder(),
-                          ],
+                              if (urls.isNotEmpty)
+                                _NetworkImageWithFallback(
+                                  urls: urls,
+                                  fit: BoxFit.contain,
+                                  placeholder: bottlePlaceholder(),
+                                  cacheWidthPx:
+                                      (imageSide *
+                                              MediaQuery.devicePixelRatioOf(
+                                                context,
+                                              ))
+                                          .round(),
+                                ),
+                              if (urls.isEmpty) bottlePlaceholder(),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  SizedBox(height: 14 * scale),
-                  Text(
-                    item.lineTitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body16().copyWith(
-                      fontSize: 12,
-                      height: 1.2,
-                      color: AppColors.white,
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  if (item.lineSubtitle.isNotEmpty) ...[
+                    SizedBox(height: 14 * scale),
                     Text(
-                      item.lineSubtitle,
-                      maxLines: 1,
+                      item.lineTitle,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.body16().copyWith(
                         fontSize: 12,
@@ -695,75 +742,417 @@ class _BottleCard extends StatelessWidget {
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                  ],
-                  SizedBox(
-                    height: item.lineSubtitle.isEmpty ? 6 * scale : 4 * scale,
-                  ),
-                  Text(
-                    item.proofLabel,
-                    style: AppTextStyles.body16().copyWith(
-                      fontSize: 10,
-                      color: AppColors.textWolf,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                  const Spacer(),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.priceLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.body16().copyWith(
-                            fontSize: 12,
-                            color: AppColors.textCream,
-                            fontWeight: FontWeight.w500,
-                          ),
+                    if (item.lineSubtitle.isNotEmpty) ...[
+                      Text(
+                        item.lineSubtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body16().copyWith(
+                          fontSize: 12,
+                          height: 1.2,
+                          color: AppColors.white,
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          SizedBox(
-                            width: barW,
-                            height: 8 * scale,
-                            child: Stack(
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.fillBarTrack,
-                                    borderRadius: BorderRadius.circular(
-                                      27 * scale,
-                                    ),
-                                  ),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Container(
-                                    width: fillW,
-                                    height: 8 * scale,
+                    ],
+                    SizedBox(
+                      height: item.lineSubtitle.isEmpty ? 6 * scale : 4 * scale,
+                    ),
+                    Text(
+                      item.proofLabel,
+                      style: AppTextStyles.body16().copyWith(
+                        fontSize: 10,
+                        color: AppColors.textWolf,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.priceLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.body16().copyWith(
+                              fontSize: 12,
+                              color: AppColors.textCream,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            SizedBox(
+                              width: barW,
+                              height: 8 * scale,
+                              child: Stack(
+                                children: [
+                                  Container(
                                     decoration: BoxDecoration(
-                                      color: AppColors.goldRich,
+                                      color: AppColors.fillBarTrack,
                                       borderRadius: BorderRadius.circular(
                                         27 * scale,
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Container(
+                                      width: fillW,
+                                      height: 8 * scale,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.goldRich,
+                                        borderRadius: BorderRadius.circular(
+                                          27 * scale,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottleQuickPopup extends StatefulWidget {
+  const _BottleQuickPopup({
+    required this.item,
+    required this.controller,
+    this.sourceRect,
+  });
+
+  final CollectionItemModel item;
+  final CollectionController controller;
+  final Rect? sourceRect;
+
+  @override
+  State<_BottleQuickPopup> createState() => _BottleQuickPopupState();
+}
+
+class _BottleQuickPopupState extends State<_BottleQuickPopup> {
+  static const double _popupCardWidth = 196;
+  static const double _popupCardHeight = 226;
+
+  int _qty = 1;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final parsed = int.tryParse(widget.item.quantity ?? '');
+    _qty = (parsed == null || parsed <= 0) ? 1 : parsed;
+  }
+
+  Future<void> _inc() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final next = _qty + 1;
+      await widget.controller.increaseBottleQuantity(widget.item, next);
+      if (mounted) setState(() => _qty = next);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _decOrRemove() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final next = _qty - 1;
+      await widget.controller.decreaseBottleQuantity(widget.item, next);
+      if (!mounted) return;
+      if (next <= 0) {
+        Navigator.of(context).pop();
+      } else {
+        setState(() => _qty = next);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final urls = widget.item.resolvedImageCandidates;
+    final image = urls.isEmpty
+        ? Image.asset(
+            AppAssets.collectionBottlePlaceholder,
+            fit: BoxFit.contain,
+          )
+        : CachedNetworkImage(
+            imageUrl: urls.first,
+            cacheManager: AppCacheManager.images,
+            fit: BoxFit.contain,
+            placeholder: (context, _) => Image.asset(
+              AppAssets.collectionBottlePlaceholder,
+              fit: BoxFit.contain,
+            ),
+            errorWidget: (context, error, stackTrace) => Image.asset(
+              AppAssets.collectionBottlePlaceholder,
+              fit: BoxFit.contain,
+            ),
+          );
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Navigator.of(context).pop(),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 4.75, sigmaY: 4.75),
+              child: const ColoredBox(color: _kPopupBackdropOverlay),
+            ),
+          ),
+        ),
+        Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 36),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+            builder: (context, t, child) {
+              final source = widget.sourceRect;
+              final screenSize = MediaQuery.sizeOf(context);
+              final targetCenter = Offset(
+                screenSize.width / 2,
+                screenSize.height / 2 - 8,
+              );
+              final sourceCenter = source?.center ?? targetCenter;
+              final fromScale = source == null
+                  ? 0.92
+                  : (source.width / _popupCardWidth).clamp(0.65, 1.0);
+              final scale = lerpDouble(fromScale, 1.0, t)!;
+              final dx = (sourceCenter.dx - targetCenter.dx) * (1 - t);
+              final dy = (sourceCenter.dy - targetCenter.dy) * (1 - t);
+              return Transform.translate(
+                offset: Offset(dx, dy),
+                child: Transform.scale(scale: scale, child: child),
+              );
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: _popupCardWidth,
+                  height: _popupCardHeight,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(_kCollectionCardRadius),
+                    gradient: AppColors.cardSurfaceGradient,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(15, 16, 15, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Align(
+                          alignment: Alignment.topCenter,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              width: _kFigmaBottleImage,
+                              height: _kFigmaBottleImage,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  const DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: AppColors.bottleRadialGlow,
+                                    ),
+                                  ),
+                                  image,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          widget.item.lineTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.body16().copyWith(
+                            fontSize: 12,
+                            height: 1.2,
+                            color: AppColors.white,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        if (widget.item.lineSubtitle.isNotEmpty)
+                          Text(
+                            widget.item.lineSubtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.body16().copyWith(
+                              fontSize: 12,
+                              height: 1.2,
+                              color: AppColors.white,
+                              fontFamily: 'Inter',
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        SizedBox(
+                          height: widget.item.lineSubtitle.isEmpty ? 6 : 4,
+                        ),
+                        Text(
+                          widget.item.proofLabel,
+                          style: AppTextStyles.body16().copyWith(
+                            fontSize: 10,
+                            color: AppColors.textWolf,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${widget.item.priceLabel} ($_qty)',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.body16().copyWith(
+                                  fontSize: 12,
+                                  color: AppColors.textCream,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            SizedBox(
+                              width: 63,
+                              height: 8,
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: AppColors.fillBarTrack,
+                                      borderRadius: BorderRadius.circular(27),
+                                    ),
+                                  ),
+                                  Container(
+                                    width: (63 * widget.item.fillRatio).clamp(
+                                      4.0,
+                                      63.0,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.goldRich,
+                                      borderRadius: BorderRadius.circular(27),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: _popupCardWidth,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _CircleActionButton(
+                            icon: Icons.add,
+                            onTap: _busy ? null : _inc,
+                          ),
+                          const SizedBox(width: 10),
+                          _CircleActionButton(
+                            icon: _qty <= 1
+                                ? Icons.delete_outline
+                                : Icons.remove,
+                            onTap: _busy ? null : _decOrRemove,
                           ),
                         ],
                       ),
+                      _CircleActionButton(
+                        icon: Icons.visibility_outlined,
+                        onTap: _busy ? null : _openEdit,
+                      ),
                     ],
                   ),
-                ],
-              ),
-            );
-          },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openEdit() async {
+    final args = <String, dynamic>{
+      'editMode': true,
+      'originalBottleId': widget.controller.resolveBottleId(widget.item),
+      'prefill': <String, dynamic>{
+        'id': widget.controller.resolveBottleId(widget.item),
+        'name': widget.item.lineTitle,
+        'image': widget.item.image,
+        'average': widget.item.pricePaid,
+        'quantity': int.tryParse(widget.item.quantity ?? '') ?? _qty,
+        'fill': (widget.item.fillRatio * 100).round().clamp(1, 100),
+        'notes': widget.item.notes,
+        'date_acquired': widget.item.dateAcquired,
+      },
+    };
+
+    Navigator.of(context).pop();
+    final res = await Get.toNamed(AppRoutes.addToCollection, arguments: args);
+    if (res == true) {
+      await widget.controller.forceReload();
+    }
+  }
+}
+
+class _CircleActionButton extends StatelessWidget {
+  const _CircleActionButton({required this.icon, this.onTap});
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        width: 38,
+        height: 38,
+        decoration: const BoxDecoration(
+          color: AppColors.goldRich,
+          shape: BoxShape.circle,
+        ),
+        child: ClipOval(
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: Icon(icon, color: AppColors.white, size: 18),
+          ),
         ),
       ),
     );

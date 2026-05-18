@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_header.dart';
 import '../../core/widgets/shimmer_box.dart';
 
 class CollectionLoadingView extends StatelessWidget {
@@ -22,7 +23,12 @@ class CollectionLoadingView extends StatelessWidget {
           SafeArea(
             top: false,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(23, 108, 23, 120),
+              padding: const EdgeInsets.fromLTRB(
+                23,
+                kShellTabBodyContentTopGap,
+                23,
+                120,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

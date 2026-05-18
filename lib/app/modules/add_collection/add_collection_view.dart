@@ -1,10 +1,17 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../core/constants/app_assets.dart';
+import '../../core/network/app_cache_manager.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../data/models/bluebook_model.dart';
+import '../../core/utils/price_formatter.dart';
+import '../../core/widgets/common_primary_button.dart';
+import '../../data/models/category_bottle_model.dart';
 import 'add_collection_controller.dart';
+import 'fill_level_bottom_sheet.dart';
 
 class AddCollectionView extends GetView<AddCollectionController> {
   const AddCollectionView({super.key});
@@ -17,39 +24,95 @@ class AddCollectionView extends GetView<AddCollectionController> {
         backgroundColor: AppColors.surfaceDeep,
         elevation: 0,
         title: Text(
-          'Add to Collection',
+          'Add to collection',
           style: AppTextStyles.body16().copyWith(fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
       ),
       body: SafeArea(
         child: Obx(() {
-          final selected = controller.selected.value;
           return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: Column(
+            padding: const EdgeInsets.fromLTRB(23, 12, 23, 16),
+            child: ListView(
               children: [
-                _SearchField(
-                  controller: controller.searchCtrl,
-                  onClear: () => controller.searchCtrl.clear(),
+                _ImagePreview(
+                  previewImageUrl: controller.previewImageUrl.value,
                 ),
-                const SizedBox(height: 12),
-                if (selected == null) ...[
-                  Expanded(child: _ResultsList(onPick: controller.pick)),
-                ] else ...[
-                  _SelectedHeader(
-                    bottle: selected,
-                    onChange: controller.clearSelection,
-                  ),
-                  const SizedBox(height: 14),
-                  _FormCard(),
-                ],
-                const SizedBox(height: 12),
-                _BottomActions(
-                  hasSelection: selected != null,
-                  isSubmitting: controller.isSubmitting.value,
-                  onCreate: controller.createCustomBottle,
-                  onSubmit: controller.submit,
+                const SizedBox(height: 18),
+                _Field(
+                  controller: controller.bottleNameCtrl,
+                  hint: 'Bottle name',
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _Field(
+                        controller: controller.qtyCtrl,
+                        hint: 'Quantity',
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: _Field(
+                        controller: controller.priceCtrl,
+                        hint: 'Price',
+                        prefix: r'$ ',
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [ThousandsNumberInputFormatter()],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _DateField(
+                        controller: controller.dateAcquiredCtrl,
+                        onTap: () => controller.pickDate(Get.context!),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: _Field(
+                        controller: controller.fillCtrl,
+                        hint: 'Fill %',
+                        readOnly: true,
+                        onTap: () {
+                          FocusScope.of(context).unfocus();
+                          showFillLevelBottomSheet(
+                            context,
+                            fillController: controller.fillCtrl,
+                          );
+                        },
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          FillPercentInputFormatter(),
+                        ],
+                        prefixIcon: const Icon(
+                          Icons.percent,
+                          size: 18,
+                          color: AppColors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _Field(
+                  controller: controller.notesCtrl,
+                  hint: 'Notes / Tasting notes',
+                  minLines: 3,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 18),
+                CommonPrimaryButton(
+                  label: '+ Add to collection',
+                  isLoading: controller.isSubmitting.value,
+                  onPressed: controller.submit,
                 ),
               ],
             ),
@@ -60,291 +123,49 @@ class AddCollectionView extends GetView<AddCollectionController> {
   }
 }
 
-class _SearchField extends StatelessWidget {
-  const _SearchField({
-    required this.controller,
-    required this.onClear,
-  });
-
-  final TextEditingController controller;
-  final VoidCallback onClear;
+class _ImagePreview extends StatelessWidget {
+  const _ImagePreview({required this.previewImageUrl});
+  final String previewImageUrl;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      style: AppTextStyles.body16().copyWith(fontSize: 14),
-      decoration: InputDecoration(
-        hintText: 'Search bottles or add your own',
-        hintStyle: AppTextStyles.body16().copyWith(
-          fontSize: 14,
-          color: AppColors.textMuted,
-        ),
-        filled: true,
-        fillColor: AppColors.black.withValues(alpha: 0.25),
-        prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
-        suffixIcon: IconButton(
-          onPressed: onClear,
-          icon: const Icon(Icons.close, color: AppColors.textMuted),
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
-        ),
+    final placeholder = Container(
+      width: 195,
+      height: 195,
+      alignment: Alignment.center,
+      child: Image.asset(
+        AppAssets.collectionBottlePlaceholder,
+        width: 195,
+        height: 195,
+        fit: BoxFit.contain,
+        gaplessPlayback: true,
       ),
     );
-  }
-}
-
-class _ResultsList extends GetView<AddCollectionController> {
-  const _ResultsList({required this.onPick});
-
-  final ValueChanged<BluebookModel> onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (n) {
-        if (n.metrics.pixels >= n.metrics.maxScrollExtent - 220) {
-          controller.loadMore();
-        }
-        return false;
-      },
-      child: Obx(() {
-        final list = controller.results;
-        if (controller.isSearching.value && list.isEmpty) {
-          return const Center(
-            child: CircularProgressIndicator(color: AppColors.gold1),
-          );
-        }
-        if (list.isEmpty) {
-          return Center(
-            child: Text(
-              'No bottles found.\nType a name and set price, then tap Create.',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body16().copyWith(
-                fontSize: 13,
-                color: AppColors.textMuted,
-              ),
-            ),
-          );
-        }
-
-        return ListView.separated(
-          itemCount: list.length + 1,
-          separatorBuilder: (context, index) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            if (index == list.length) {
-              return Obx(() {
-                if (!controller.isSearching.value) {
-                  return const SizedBox(height: 10);
-                }
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 14),
-                  child: Center(
-                    child: CircularProgressIndicator(color: AppColors.gold1),
-                  ),
-                );
-              });
-            }
-            final b = list[index];
-            return _BottleResultTile(bottle: b, onTap: () => onPick(b));
-          },
-        );
-      }),
-    );
-  }
-}
-
-class _BottleResultTile extends StatelessWidget {
-  const _BottleResultTile({required this.bottle, required this.onTap});
-
-  final BluebookModel bottle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: AppColors.cardSurfaceGradient,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  bottle.bottleName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.body16().copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                bottle.average == null ? '' : '\$${bottle.average}',
-                style: AppTextStyles.body16().copyWith(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: AppColors.textMuted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SelectedHeader extends StatelessWidget {
-  const _SelectedHeader({required this.bottle, required this.onChange});
-
-  final BluebookModel bottle;
-  final VoidCallback onChange;
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      height: 235,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: AppColors.cardSurfaceGradient,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        color: const Color(0xFF10090B),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: const Color(0xFF414141)),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              bottle.bottleName,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.body16().copyWith(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+      child: Center(
+        child: previewImageUrl.isEmpty
+            ? placeholder
+            : CachedNetworkImage(
+                imageUrl:
+                    CategoryBottleModel(
+                      id: '',
+                      bottleName: '',
+                      image: previewImageUrl,
+                    ).resolvedImageUrl ??
+                    previewImageUrl,
+                cacheManager: AppCacheManager.images,
+                width: 195,
+                height: 195,
+                fit: BoxFit.contain,
+                placeholder: (context, _) => placeholder,
+                errorWidget: (context, error, stackTrace) => placeholder,
               ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          TextButton(
-            onPressed: onChange,
-            child: Text(
-              'Change',
-              style: AppTextStyles.body16().copyWith(
-                fontSize: 13,
-                color: AppColors.goldBright,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FormCard extends GetView<AddCollectionController> {
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: AppColors.cardSurfaceGradient,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Purchase Price',
-                style: AppTextStyles.body16().copyWith(
-                  fontSize: 13,
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _Field(
-                controller: controller.priceCtrl,
-                hint: '0.00',
-                prefix: '\$',
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Quantity',
-                style: AppTextStyles.body16().copyWith(
-                  fontSize: 13,
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _Field(
-                controller: controller.qtyCtrl,
-                hint: '1',
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Fill Level',
-                style: AppTextStyles.body16().copyWith(
-                  fontSize: 13,
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Obx(() {
-                final v = controller.fillPercent.value;
-                return SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    thumbColor: AppColors.goldBright,
-                    activeTrackColor: AppColors.goldBright,
-                    inactiveTrackColor: AppColors.fillBarTrack,
-                    trackHeight: 6,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 10),
-                    overlayColor: AppColors.goldBright.withValues(alpha: 0.2),
-                    valueIndicatorColor: AppColors.goldRich,
-                    valueIndicatorTextStyle:
-                        AppTextStyles.body16().copyWith(fontSize: 12),
-                  ),
-                  child: Slider(
-                    value: v.clamp(0, 100),
-                    min: 0,
-                    max: 100,
-                    divisions: 100,
-                    label: '${v.toStringAsFixed(0)}%',
-                    onChanged: (nv) => controller.fillPercent.value = nv,
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -356,92 +177,122 @@ class _Field extends StatelessWidget {
     required this.hint,
     this.prefix,
     this.keyboardType,
+    this.minLines = 1,
+    this.maxLines = 1,
+    this.readOnly = false,
+    this.onTap,
+    this.prefixIcon,
+    this.suffixIcon,
+    this.inputFormatters,
   });
 
   final TextEditingController controller;
   final String hint;
   final String? prefix;
   final TextInputType? keyboardType;
+  final int minLines;
+  final int maxLines;
+  final bool readOnly;
+  final VoidCallback? onTap;
+  final Widget? prefixIcon;
+  final Widget? suffixIcon;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      minLines: minLines,
+      maxLines: maxLines,
+      readOnly: readOnly,
+      onTap: onTap,
       style: AppTextStyles.body16().copyWith(fontSize: 14),
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
+        prefixIcon: prefixIcon,
         prefixText: prefix,
+        suffixIcon: suffixIcon,
         hintText: hint,
         hintStyle: AppTextStyles.body16().copyWith(
-          fontSize: 14,
-          color: AppColors.textMuted,
+          fontSize: 16,
+          color: AppColors.white,
         ),
         filled: true,
-        fillColor: AppColors.black.withValues(alpha: 0.18),
+        fillColor: const Color(0xFF10090B),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+          borderRadius: BorderRadius.circular(9),
+          borderSide: const BorderSide(color: Color(0xFF414141)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+          borderRadius: BorderRadius.circular(9),
+          borderSide: const BorderSide(color: Color(0xFF414141)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+          borderRadius: BorderRadius.circular(9),
+          borderSide: const BorderSide(color: Color(0xFF585858)),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
       ),
     );
   }
 }
 
-class _BottomActions extends StatelessWidget {
-  const _BottomActions({
-    required this.hasSelection,
-    required this.isSubmitting,
-    required this.onCreate,
-    required this.onSubmit,
-  });
+class _DateField extends StatelessWidget {
+  const _DateField({required this.controller, required this.onTap});
 
-  final bool hasSelection;
-  final bool isSubmitting;
-  final VoidCallback onCreate;
-  final VoidCallback onSubmit;
+  final TextEditingController controller;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 50,
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: isSubmitting
-            ? null
-            : hasSelection
-                ? onSubmit
-                : onCreate,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.goldRich,
-          foregroundColor: AppColors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-        child: isSubmitting
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.white,
-                ),
-              )
-            : Text(
-                hasSelection ? 'Submit' : 'Create',
-                style: AppTextStyles.body16().copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+    return _Field(
+      controller: controller,
+      hint: 'Date Acquired',
+      readOnly: true,
+      onTap: onTap,
+      suffixIcon: const Icon(
+        Icons.calendar_today,
+        size: 18,
+        color: AppColors.white,
       ),
     );
+  }
+}
+
+class ThousandsNumberInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final normalized = PriceFormatter.normalizeForApi(newValue.text);
+    if (normalized == null) {
+      return const TextEditingValue(text: '');
+    }
+    final formatted = PriceFormatter.format(normalized, withSymbol: false);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class FillPercentInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) return newValue;
+    final parsed = int.tryParse(text);
+    if (parsed == null) return oldValue;
+    if (parsed < 1 || parsed > 100) return oldValue;
+    return newValue;
   }
 }
 

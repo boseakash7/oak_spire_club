@@ -4,7 +4,9 @@ import 'package:get/get.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_header.dart';
 import '../../core/widgets/common_primary_button.dart';
+import '../../routes/app_routes.dart';
 import 'home_controller.dart';
 import 'home_filled_view.dart';
 import 'home_loading_view.dart';
@@ -22,13 +24,21 @@ class HomeView extends GetView<HomeController> {
         return const HomeFilledView();
       }
 
-      return _HomeEmptyView(key: key);
+      return _HomeEmptyView(
+        key: key,
+        controller: controller,
+      );
     });
   }
 }
 
 class _HomeEmptyView extends StatelessWidget {
-  const _HomeEmptyView({super.key});
+  const _HomeEmptyView({
+    super.key,
+    required this.controller,
+  });
+
+  final HomeController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +57,12 @@ class _HomeEmptyView extends StatelessWidget {
             top: false,
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 94, 0, 66),
+                padding: const EdgeInsets.fromLTRB(
+                  0,
+                  kShellTabBodyContentTopGap,
+                  0,
+                  66,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -93,7 +108,15 @@ class _HomeEmptyView extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 58),
                       child: CommonPrimaryButton(
                         label: 'Add Your First Bottle',
-                        onPressed: () {},
+                        onPressed: () async {
+                          final res = await Get.toNamed(
+                            AppRoutes.tasteBottles,
+                            arguments: {'autoCloseOnAdded': true},
+                          );
+                          if (res == true) {
+                            await controller.forceReload();
+                          }
+                        },
                       ),
                     ),
                   ],

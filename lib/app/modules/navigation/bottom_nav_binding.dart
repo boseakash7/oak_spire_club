@@ -4,6 +4,7 @@ import '../collection/collection_controller.dart';
 import '../home/home_controller.dart';
 import '../market/market_controller.dart';
 import 'bottom_nav_controller.dart';
+import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/categories_repository.dart';
 
 class BottomNavBinding extends Bindings {
@@ -13,7 +14,10 @@ class BottomNavBinding extends Bindings {
     Get.lazyPut<HomeController>(() => HomeController());
     Get.lazyPut<CollectionController>(() => CollectionController());
     Get.lazyPut<MarketController>(
-      () => MarketController(repo: Get.find<CategoriesRepository>()),
+      () => MarketController(
+        bluebookRepo: Get.find<BluebookRepository>(),
+        categoriesRepo: Get.find<CategoriesRepository>(),
+      ),
     );
   }
 }

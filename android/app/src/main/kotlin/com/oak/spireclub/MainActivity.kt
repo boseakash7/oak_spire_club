@@ -1,4 +1,4 @@
-package com.example.oakspire_club
+package com.oak.spireclub
 
 import io.flutter.embedding.android.FlutterActivity
 

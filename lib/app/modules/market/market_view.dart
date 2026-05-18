@@ -1,12 +1,23 @@
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
+import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/constants/app_assets.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/network/app_cache_manager.dart';
+import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../category_detail/category_detail_controller.dart';
-import '../category_detail/category_detail_view.dart';
-import '../../data/repositories/categories_repository.dart';
+import '../../core/utils/price_formatter.dart';
+import '../../core/widgets/app_header.dart';
+import '../../data/models/bluebook_model.dart';
+import '../../routes/app_routes.dart';
 import 'market_controller.dart';
+import 'market_loading_view.dart';
 
 class MarketView extends GetView<MarketController> {
   const MarketView({super.key});
@@ -15,23 +26,32 @@ class MarketView extends GetView<MarketController> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [AppColors.surfaceDeep, AppColors.surfaceDeep]),
+        gradient: LinearGradient(
+          colors: [AppColors.surfaceDeep, AppColors.surfaceDeep],
+        ),
       ),
       child: Stack(
         children: [
-          const Positioned.fill(child: ColoredBox(color: AppColors.overlayBlack20)),
+          const Positioned.fill(
+            child: ColoredBox(color: AppColors.overlayBlack20),
+          ),
           SafeArea(
             top: false,
             child: Obx(() {
               if (controller.isLoading.value) {
-                return const Center(
-                  child: CircularProgressIndicator(color: AppColors.gold1),
-                );
+                return const MarketLoadingView();
               }
 
               return RefreshIndicator(
                 color: AppColors.gold1,
-                onRefresh: controller.forceReload,
+                onRefresh: () async {
+                  if (Get.isRegistered<AppAnalyticsController>()) {
+                    unawaited(
+                      AppAnalyticsController.to.logTap('market_pull_refresh'),
+                    );
+                  }
+                  await controller.forceReload();
+                },
                 child: NotificationListener<ScrollNotification>(
                   onNotification: (n) {
                     if (n.metrics.pixels >= n.metrics.maxScrollExtent - 240) {
@@ -41,11 +61,21 @@ class MarketView extends GetView<MarketController> {
                   },
                   child: ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 108, 16, 24),
-                    itemCount: controller.categories.length + 1,
-                    separatorBuilder: (context, index) => const SizedBox(height: 10),
+                    padding: const EdgeInsets.fromLTRB(
+                      23,
+                      kShellTabBodyContentTopGap,
+                      23,
+                      24,
+                    ),
+                    itemCount: controller.visibleBottles.length + 2,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      if (index == controller.categories.length) {
+                      if (index == 0) {
+                        return _Header(controller: controller);
+                      }
+
+                      if (index == controller.visibleBottles.length + 1) {
                         return Obx(() {
                           if (!controller.isLoadingMore.value) {
                             return const SizedBox(height: 8);
@@ -66,77 +96,8 @@ class MarketView extends GetView<MarketController> {
                         });
                       }
 
-                      final c = controller.categories[index];
-                      return Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () {
-                            Get.to(
-                              () => const CategoryDetailView(),
-                              binding: BindingsBuilder(() {
-                                Get.lazyPut<CategoryDetailController>(
-                                  () => CategoryDetailController(
-                                    repo: Get.find<CategoriesRepository>(),
-                                    categoryId: c.id,
-                                    initialName: c.name,
-                                  ),
-                                );
-                              }),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 14,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              gradient: AppColors.cardSurfaceGradient,
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.06),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    c.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppTextStyles.body16().copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  '${c.totalBottles}',
-                                  style: AppTextStyles.body16().copyWith(
-                                    fontSize: 12,
-                                    color: AppColors.textMuted,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Bottles',
-                                  style: AppTextStyles.body16().copyWith(
-                                    fontSize: 12,
-                                    color: AppColors.textMuted,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Icon(
-                                  Icons.chevron_right,
-                                  color: AppColors.textMuted,
-                                  size: 20,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
+                      final b = controller.visibleBottles[index - 1];
+                      return _BenchmarkCard(bottle: b);
                     },
                   ),
                 ),
@@ -149,3 +110,342 @@ class MarketView extends GetView<MarketController> {
   }
 }
 
+class _Header extends StatelessWidget {
+  const _Header({required this.controller});
+  final MarketController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          onChanged: controller.onSearchChanged,
+          style: AppTextStyles.body16().copyWith(
+            fontSize: 16,
+            color: AppColors.white,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Search from 10000+ bottoles',
+            hintStyle: AppTextStyles.body16().copyWith(
+              fontSize: 16,
+              color: AppColors.white,
+            ),
+            prefixIcon: const Icon(
+              Icons.search,
+              color: AppColors.white,
+              size: 20,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            filled: true,
+            fillColor: AppColors.panel,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(9),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(9),
+              borderSide: const BorderSide(color: AppColors.inputBorderFocused),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _CategoryRow(controller: controller),
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+}
+
+class _CategoryRow extends StatelessWidget {
+  const _CategoryRow({required this.controller});
+  final MarketController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 34,
+      child: Obx(
+        () => ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: controller.categories.length + 1,
+          separatorBuilder: (context, index) => const SizedBox(width: 10),
+          itemBuilder: (context, index) {
+            final isAll = index == 0;
+            final label = isAll ? 'All' : controller.categories[index - 1].name;
+            final id = isAll ? '' : controller.categories[index - 1].id;
+            final selected = controller.selectedCategoryId.value == id;
+            return Center(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(42),
+                onTap: () {
+                  if (Get.isRegistered<AppAnalyticsController>()) {
+                    unawaited(
+                      AppAnalyticsController.to.logTap(
+                        'market_category_select',
+                        {'category_id': id},
+                      ),
+                    );
+                  }
+                  controller.selectCategory(id);
+                },
+                child: Container(
+                  height: 30,
+                  constraints: const BoxConstraints(minWidth: 92),
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(42),
+                    gradient: selected
+                        ? AppColors.goldGradient
+                        : AppColors.cardSurfaceGradient,
+                  ),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body16().copyWith(
+                      fontSize: 14,
+                      color: selected ? AppColors.white : AppColors.textCream,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _BenchmarkCard extends StatelessWidget {
+  const _BenchmarkCard({required this.bottle});
+  final BluebookModel bottle;
+
+  @override
+  Widget build(BuildContext context) {
+    final price = PriceFormatter.format(bottle.average);
+    final low = PriceFormatter.format(bottle.low);
+    final high = PriceFormatter.format(bottle.high);
+    final imageUrl = _resolveImageUrl(bottle.image);
+    final proofLabel = bottle.proof ?? '—';
+    final ratingLabel = bottle.rating ?? '—';
+    final movementLabel =
+        PriceFormatter.formatPriceMovementLabel(bottle.priceMovement);
+    final movementColor =
+        PriceFormatter.priceMovementColor(bottle.priceMovement);
+    return InkWell(
+      borderRadius: BorderRadius.circular(9),
+      onTap: () {
+        if (Get.isRegistered<AppAnalyticsController>()) {
+          unawaited(
+            AppAnalyticsController.to.logTap(
+              'market_benchmark_open',
+              {'bottle_id': bottle.id},
+            ),
+          );
+        }
+        Get.toNamed(
+          AppRoutes.benchmarkDetail,
+          arguments: {
+            'id': bottle.id,
+            'name': bottle.bottleName,
+            'image': bottle.image,
+            'average': bottle.average,
+            'low': bottle.low,
+            'high': bottle.high,
+            'proof': bottle.proof,
+            'description': bottle.description,
+            'rating': bottle.rating,
+            'price_movement': bottle.priceMovement,
+          },
+        );
+      },
+      child: Container(
+        height: 97.247,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(9),
+          gradient: AppColors.cardSurfaceGradient,
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 6.16,
+              top: 13.8,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 62.62,
+                  height: 62.62,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: AppColors.bottleRadialGlow,
+                        ),
+                      ),
+                      if (imageUrl != null)
+                        CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          cacheManager: AppCacheManager.images,
+                          fit: BoxFit.contain,
+                          placeholder: (context, _) => _placeholder(),
+                          errorWidget: (context, error, stackTrace) =>
+                              _placeholder(),
+                        )
+                      else
+                        _placeholder(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 72,
+              top: 14,
+              right: 58,
+              child: Text(
+                bottle.bottleName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body16().copyWith(
+                  fontSize: 14,
+                  color: AppColors.white,
+                ),
+              ),
+            ),
+            Positioned(
+              left: 72,
+              bottom: 14,
+              child: Row(
+                children: [
+                  Text(
+                    proofLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body16().copyWith(
+                      fontSize: 10,
+                      color: AppColors.textWolf,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SvgPicture.asset(
+                    AppAssets.star,
+                    width: 8,
+                    height: 8,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.textWolf,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    ratingLabel,
+                    style: AppTextStyles.body16().copyWith(
+                      fontSize: 10,
+                      color: AppColors.textWolf,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 12,
+              top: 48,
+              width: 132,
+              bottom: 10,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    price,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body16().copyWith(
+                      fontSize: 12,
+                      color: AppColors.textCream,
+                    ),
+                  ),
+                  const Spacer(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      SvgPicture.asset(
+                        AppAssets.marketTrend,
+                        width: 10,
+                        height: 10,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        movementLabel,
+                        style: AppTextStyles.body16().copyWith(
+                          fontSize: 12,
+                          color: movementColor,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          '$low - $high',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: AppTextStyles.body16().copyWith(
+                            fontSize: 10,
+                            color: AppColors.textWolf,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 12,
+              top: 14,
+              child: const Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: AppColors.iconNeutralLight,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return Image.asset(
+      AppAssets.collectionBottlePlaceholder,
+      fit: BoxFit.contain,
+      gaplessPlayback: true,
+    );
+  }
+
+  String? _resolveImageUrl(String? raw0) {
+    final raw = raw0?.trim();
+    if (raw == null || raw.isEmpty || raw == 'null') return null;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+
+    final uploadUrl = AppStorage.uploadUrl;
+    if (uploadUrl != null && uploadUrl.trim().isNotEmpty) {
+      return '${uploadUrl.trim().replaceAll(RegExp(r'/+$'), '')}/$raw';
+    }
+
+    final api = Uri.parse(AppConstants.apiBaseUrl);
+    return Uri(
+      scheme: api.scheme,
+      host: api.host,
+      port: api.hasPort ? api.port : null,
+      path: raw.startsWith('/') ? raw : '/$raw',
+    ).toString();
+  }
+}
