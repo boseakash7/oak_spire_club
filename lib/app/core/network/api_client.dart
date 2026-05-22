@@ -1,5 +1,6 @@
-import 'package:get/get.dart';
 import 'dart:convert';
+
+import 'package:get/get.dart';
 
 import '../constants/app_constants.dart';
 import 'api_exception.dart';
@@ -45,4 +46,3 @@ class ApiClient extends GetConnect {
     return Map<String, dynamic>.from(json);
   }
 }
-

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../animations/app_motion.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import 'show_app_dialog.dart';
 
 /// Styled confirmation dialog using app colors — use anywhere via [showAppConfirmDialog].
 Future<bool?> showAppConfirmDialog(
@@ -13,10 +15,11 @@ Future<bool?> showAppConfirmDialog(
   bool confirmIsDestructive = false,
   bool barrierDismissible = true,
 }) {
-  return showDialog<bool>(
+  return showAppAnimatedDialog<bool>(
     context: context,
     barrierDismissible: barrierDismissible,
     barrierColor: Colors.black.withValues(alpha: 0.78),
+    transitionDuration: AppMotion.dialog,
     builder: (ctx) => _AppConfirmDialogBody(
       title: title,
       message: message,

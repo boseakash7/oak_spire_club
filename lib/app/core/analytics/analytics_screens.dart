@@ -9,9 +9,9 @@ abstract final class AnalyticsScreens {
     return switch (index) {
       0 => 'main_home',
       1 => 'main_collection',
-      2 => 'main_taste',
-      3 => 'main_market',
-      4 => 'main_profile',
+      // 2 => 'main_taste',
+      2 => 'main_market',
+      3 => 'main_profile',
       _ => 'main_home',
     };
   }
@@ -37,12 +37,16 @@ abstract final class AnalyticsScreens {
         return 'benchmark_detail';
       case AppRoutes.subscription:
         return 'subscription';
+      case AppRoutes.subscriptionSkip:
+        return 'subscription_skip';
       case AppRoutes.settingsAccount:
         return 'settings_account';
       case AppRoutes.settingsNotifications:
         return 'settings_notifications';
       case AppRoutes.settingsPrivacy:
         return 'settings_privacy';
+      case AppRoutes.settingsDeleteAccount:
+        return 'settings_delete_account';
       case AppRoutes.settingsHelp:
         return 'settings_help';
       case AppRoutes.settingsAbout:

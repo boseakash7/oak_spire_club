@@ -4,14 +4,16 @@ import 'package:get/get.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/utils/greeting_formatter.dart';
 import '../../core/utils/price_formatter.dart';
+import '../../core/utils/proof_formatter.dart';
+import '../session/user_session_controller.dart';
 import '../../data/models/bluebook_price_history_chart_model.dart';
+import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import '../../data/repositories/bluebook_price_history_repository.dart';
 import '../../data/repositories/collection_repository.dart';
-import '../../routes/app_routes.dart';
-import '../collection/collection_controller.dart';
-import '../home/home_controller.dart';
+import '../add_collection/add_to_collection_launcher.dart';
 
 /// Payload passed via [Get.toNamed] / route `arguments` for benchmark bottle detail.
 class BenchmarkDetailRouteArgs {
@@ -135,17 +137,29 @@ class BenchmarkDetailController extends GetxController {
   late final String? ratingDisplay;
   late final String? priceMovementRaw;
 
-  final selectedChartRange = BenchmarkDetailChartRange.m1.obs;
+  final selectedChartRange = BenchmarkDetailChartRange.y1.obs;
   final chartLoading = false.obs;
   final chartError = RxnString();
   final chartPoints = <BluebookPriceChartPoint>[].obs;
   /// Y values for BSMI line (same length as [chartPoints] when loaded).
   final chartBsmiValues = <double>[].obs;
 
-  String get userFirstName {
-    final n = AppStorage.user?['first_name']?.toString().trim();
-    if (n == null || n.isEmpty) return 'User';
-    return n;
+  final collectionLoading = false.obs;
+  final hasInCollection = false.obs;
+  final collectionQuantity = 0.obs;
+  final collectionFillRatio = 0.0.obs;
+  final collectionPaidLabel = '—'.obs;
+  final collectionPriceMovementRaw = RxnString();
+  final collectionGainDollars = Rxn<double>();
+
+  String get greetingText {
+    if (Get.isRegistered<UserSessionController>()) {
+      return Get.find<UserSessionController>().greetingText;
+    }
+    final stored = AppStorage.user;
+    final name =
+        stored?['name']?.toString() ?? stored?['first_name']?.toString();
+    return GreetingFormatter.personalized(name, fallback: 'User');
   }
 
   @override
@@ -160,12 +174,85 @@ class BenchmarkDetailController extends GetxController {
     highFormatted = PriceFormatter.format(args.highRaw);
     imagePathOrUrl = args.imagePathOrUrl;
     imageUrl = resolveBenchmarkDetailImageUrl(args.imagePathOrUrl);
-    proofText = _nullableRouteString(args.proof);
+    proofText = ProofFormatter.formatLabel(_nullableRouteString(args.proof));
     descriptionText = _nullableRouteString(args.description);
     ratingDisplay = _nullableRouteString(args.rating);
     priceMovementRaw = _nullableRouteString(args.priceMovement);
     if (_canLoadPriceChart) {
       unawaited(fetchPriceChart());
+    }
+    unawaited(_loadCollectionOwnership());
+  }
+
+  Future<void> _loadCollectionOwnership() async {
+    collectionLoading.value = true;
+    try {
+      final matches = await _findCollectionMatches();
+      if (matches.isEmpty) {
+        hasInCollection.value = false;
+        collectionQuantity.value = 0;
+        collectionFillRatio.value = 0;
+        collectionPaidLabel.value = '—';
+        collectionPriceMovementRaw.value = null;
+        collectionGainDollars.value = null;
+        return;
+      }
+
+      hasInCollection.value = true;
+      var totalQty = 0;
+      var totalPaid = 0.0;
+      var fillSum = 0.0;
+      String? movement;
+
+      for (final item in matches) {
+        final qtyRaw = int.tryParse(item.quantity ?? '');
+        final qty = (qtyRaw == null || qtyRaw <= 0) ? 1 : qtyRaw;
+        totalQty += qty;
+        final unitPaid = double.tryParse(item.pricePaid ?? '') ?? 0;
+        totalPaid += unitPaid * qty;
+        fillSum += item.fillRatio;
+        movement ??= item.priceMovementRaw;
+      }
+
+      collectionQuantity.value = totalQty;
+      collectionFillRatio.value = (fillSum / matches.length).clamp(0.0, 1.0);
+      collectionPaidLabel.value = PriceFormatter.format(
+        totalPaid.round().toString(),
+      );
+      collectionPriceMovementRaw.value = movement ?? priceMovementRaw;
+
+      final marketUnit = double.tryParse(
+        (rawAverage ?? '').replaceAll(RegExp(r'[^\d.-]'), ''),
+      );
+      if (marketUnit != null && totalPaid > 0) {
+        collectionGainDollars.value =
+            (marketUnit * totalQty - totalPaid).roundToDouble();
+      } else {
+        collectionGainDollars.value = null;
+      }
+    } catch (_) {
+      hasInCollection.value = false;
+    } finally {
+      collectionLoading.value = false;
+    }
+  }
+
+  Future<List<CollectionItemModel>> _findCollectionMatches() async {
+    final selectedBottleId = bottleId;
+    if (selectedBottleId == null ||
+        selectedBottleId.isEmpty ||
+        selectedBottleId == 'null') {
+      return const [];
+    }
+    try {
+      final all = await _collectionRepo.fetchMyCollection(forceRefresh: false);
+      return all
+          .where(
+            (item) => _resolveCollectionBottleId(item) == selectedBottleId,
+          )
+          .toList();
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -245,99 +332,20 @@ class BenchmarkDetailController extends GetxController {
     return t;
   }
 
-  String _resolveCollectionBottleId(CollectionItemModel item) {
-    final bbId = item.bluebook?['id']?.toString();
-    if (bbId != null && bbId.isNotEmpty && bbId != 'null') return bbId;
-    return item.id;
+  static String _resolveCollectionBottleId(CollectionItemModel item) {
+    return item.bluebookBottleId ?? item.id;
   }
 
   Future<void> openAddToCollection() async {
-    final selectedBottleId = bottleId;
-    if (selectedBottleId == null ||
-        selectedBottleId.isEmpty ||
-        selectedBottleId == 'null') {
-      Get.toNamed(
-        AppRoutes.addToCollection,
-        arguments: {
-          'prefill': {
-            'name': productName,
-            'average': rawAverage,
-            'image': imagePathOrUrl,
-          },
-        },
-      );
-      return;
-    }
-
-    final prefill = <String, dynamic>{
-      'id': selectedBottleId,
-      'name': productName,
-      'average': rawAverage,
-      'image': imagePathOrUrl,
-    };
-
-    List<CollectionItemModel> matches = const <CollectionItemModel>[];
-    try {
-      final all = await _collectionRepo.fetchMyCollection(forceRefresh: true);
-      matches = all
-          .where((item) => _resolveCollectionBottleId(item) == selectedBottleId)
-          .toList();
-    } catch (_) {
-      matches = const <CollectionItemModel>[];
-    }
-
-    if (matches.isNotEmpty) {
-      int totalQty = 0;
-      double totalPrice = 0;
-      double totalFill = 0;
-      int fillCount = 0;
-      String? image;
-      String? notes;
-      String? dateAcquired;
-
-      for (final item in matches) {
-        final q = int.tryParse(item.quantity ?? '');
-        totalQty += (q == null || q <= 0) ? 1 : q;
-        totalPrice += double.tryParse(item.pricePaid ?? '') ?? 0;
-        final fill = int.tryParse(item.fill ?? '');
-        if (fill != null) {
-          totalFill += fill;
-          fillCount += 1;
-        }
-        image ??= item.image;
-        notes ??= item.notes;
-        dateAcquired ??= item.dateAcquired;
-      }
-
-      prefill['quantity'] = totalQty <= 0 ? 1 : totalQty;
-      prefill['average'] = (totalPrice / matches.length).toStringAsFixed(2);
-      if (fillCount > 0) {
-        prefill['fill'] = (totalFill / fillCount).round().clamp(1, 100);
-      }
-      if (image != null && image.isNotEmpty) prefill['image'] = image;
-      if (notes != null && notes.isNotEmpty) prefill['notes'] = notes;
-      if (dateAcquired != null && dateAcquired.isNotEmpty) {
-        prefill['date_acquired'] = dateAcquired;
-      }
-    }
-
-    final result = await Get.toNamed(
-      AppRoutes.addToCollection,
-      arguments: {
-        if (matches.isNotEmpty) 'editMode': true,
-        if (matches.isNotEmpty) 'originalBottleId': selectedBottleId,
-        'prefill': prefill,
-      },
+    final result = await AddToCollectionLauncher(_collectionRepo).open(
+      bottleId: bottleId,
+      name: productName,
+      imagePathOrUrl: imagePathOrUrl,
+      averageRaw: rawAverage,
+      popBenchmarkDetailOnSuccess: true,
     );
     if (result == true) {
-      if (Get.isRegistered<HomeController>()) {
-        unawaited(
-          Get.find<HomeController>().fetchHomeData(forceRefresh: false),
-        );
-      }
-      if (Get.isRegistered<CollectionController>()) {
-        unawaited(Get.find<CollectionController>().forceReload());
-      }
+      unawaited(_loadCollectionOwnership());
     }
   }
 }

@@ -1,12 +1,14 @@
 import '../../core/constants/app_constants.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/utils/price_formatter.dart';
+import '../../core/utils/proof_formatter.dart';
 import 'collection_item_model.dart';
 
 /// CMS static files usually live under `/v2/…`, not under `/v2/api/…`.
 Uri _cmsRootUri(Uri apiBase) {
-  final segs =
-      List<String>.from(apiBase.pathSegments.where((s) => s.isNotEmpty));
+  final segs = List<String>.from(
+    apiBase.pathSegments.where((s) => s.isNotEmpty),
+  );
   if (segs.isNotEmpty && segs.last.toLowerCase() == 'api') {
     segs.removeLast();
   }
@@ -35,7 +37,9 @@ extension CollectionItemDisplay on CollectionItemModel {
       // If someone accidentally returns `/v2/api/...` as an asset URL, try `/v2/...`.
       final p = uri.path;
       if (p.contains('/v2/api/')) {
-        out.add(uri.replace(path: p.replaceFirst('/v2/api/', '/v2/')).toString());
+        out.add(
+          uri.replace(path: p.replaceFirst('/v2/api/', '/v2/')).toString(),
+        );
       }
       return out.toSet().toList();
     }
@@ -110,10 +114,9 @@ extension CollectionItemDisplay on CollectionItemModel {
       PriceFormatter.parsePriceMovementValue(priceMovementRaw);
 
   /// Market / bluebook average for display (not user `price_paid`).
-  String get marketAverageLabel =>
-      PriceFormatter.format(
-        _pickBluebook(const ['average', 'avg', 'market_value', 'price']),
-      );
+  String get marketAverageLabel => PriceFormatter.format(
+    _pickBluebook(const ['average', 'avg', 'market_value', 'price']),
+  );
 
   /// Primary line (brand / expression name).
   String get lineTitle =>
@@ -125,35 +128,24 @@ extension CollectionItemDisplay on CollectionItemModel {
       _pickBluebook(const ['age', 'years', 'year', 'subtitle', 'variant']) ??
       '';
 
-  /// Proof line for collection cards. Falls back until API returns real values.
-  static const String _proofPlaceholder = 'Proof 45';
+  /// Proof line for collection cards ([CollectionItemModel.proof] from API).
+  String get proofLabel => ProofFormatter.formatLabelOrFallback(proof);
 
-  String get proofLabel {
-    final raw = proof?.trim();
-    final p = (raw != null && raw.isNotEmpty)
-        ? raw
-        : _pickBluebook(const [
-            'proof',
-            'abv',
-            'bottle_proof',
-            'alcohol_proof',
-            'proof_value',
-            'strength',
-          ]);
-    if (p == null || p.isEmpty) return _proofPlaceholder;
-    final lower = p.toLowerCase();
-    if (lower.contains('proof')) return p;
-    return 'Proof $p';
+  /// Bottle count for this row (default 1 when absent or invalid).
+  int get displayQuantity {
+    final qtyRaw = int.tryParse(quantity ?? '');
+    return (qtyRaw == null || qtyRaw <= 0) ? 1 : qtyRaw;
   }
 
   /// Total paid for this line: unit `price_paid` × bottle `quantity` (default 1 when absent).
   String get priceLabel {
     final unit = double.tryParse(pricePaid ?? '') ?? 0;
-    final qtyRaw = int.tryParse(quantity ?? '');
-    final normalizedQty = (qtyRaw == null || qtyRaw <= 0) ? 1 : qtyRaw;
-    final total = (unit * normalizedQty).round();
+    final total = (unit * displayQuantity).round();
     return PriceFormatter.format(total.toString());
   }
+
+  /// Price line for cards: total paid plus count, e.g. `$408 (2)`.
+  String get priceLabelWithQuantity => '$priceLabel ($displayQuantity)';
 
   /// How full the bottle is for the gold bar (0–1).
   double get fillRatio {
@@ -165,11 +157,46 @@ extension CollectionItemDisplay on CollectionItemModel {
 
   bool get isRareFind {
     final b = bluebook;
-    if (b == null) return false;
-    final r = b['rare_find'] ?? b['rare'];
-    if (r == true || r == 1 || r == '1') return true;
+    if (b != null) {
+      final isRare = b['is_rare'] ?? b['isRare'];
+      if (isRare != null) {
+        final s = isRare.toString().trim().toLowerCase();
+        if (s == '1' || s == 'true' || s == 'yes') return true;
+        if (s == '0' || s == 'false' || s == 'no') return false;
+      }
+      final r = b['rare_find'] ?? b['rare'];
+      if (r == true || r == 1 || r == '1') return true;
+    }
     final t = type?.toLowerCase() ?? '';
     return t == 'rare_find' || t == 'rare';
+  }
+
+  /// Route arguments for [AppRoutes.benchmarkDetail] (same shape as market list).
+  Map<String, dynamic> benchmarkDetailArguments(String bottleId) {
+    return {
+      'id': bottleId,
+      'name': lineTitle,
+      'image': image,
+      'average':
+          _pickBluebook(const ['average', 'avg', 'market_value', 'price']) ??
+          pricePaid,
+      'low': _pickBluebook(const ['low']),
+      'high': _pickBluebook(const ['high']),
+      'proof': proof,
+      'description': _pickBluebook(const ['description']),
+      'rating': _pickBluebook(const ['rating']),
+      'price_movement': priceMovementRaw,
+    };
+  }
+
+  /// Bottle has been opened / consumed when fill is below 100%.
+  bool get isDrunk {
+    final fillStr = fill?.trim();
+    if (fillStr == null || fillStr.isEmpty) return false;
+    final v = double.tryParse(fillStr);
+    if (v == null) return false;
+    if (v <= 1) return v < 1.0;
+    return v < 100;
   }
 
   bool get isOpenedHeuristic {

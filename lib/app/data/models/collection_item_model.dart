@@ -1,3 +1,5 @@
+import 'proof_json.dart';
+
 class CollectionItemModel {
   CollectionItemModel({
     required this.id,
@@ -21,7 +23,7 @@ class CollectionItemModel {
   final String? fill;
   /// Best-effort bottle art URL/path from API or nested `bluebook` (bourboneur CMS).
   final String? image;
-  /// Proof / ABV from root or `bluebook` (e.g. `Proof 45` in UI).
+  /// Proof / ABV from root or nested `bluebook`.
   final String? proof;
   final String? pricePaid;
   final String? notes;
@@ -47,43 +49,6 @@ class CollectionItemModel {
     for (final k in _imageKeys) {
       final v = map[k]?.toString().trim();
       if (v != null && v.isNotEmpty && v != 'null') return v;
-    }
-    return null;
-  }
-
-  static const List<String> _proofKeys = [
-    'proof',
-    'bottle_proof',
-    'alcohol_proof',
-    'abv',
-    'proof_value',
-    'strength',
-    'alcohol',
-  ];
-
-  static String? _firstProofInMap(Map<String, dynamic> map) {
-    for (final k in _proofKeys) {
-      final v = map[k];
-      if (v == null) continue;
-      final s = v.toString().trim();
-      if (s.isNotEmpty && s != 'null') return s;
-    }
-    return null;
-  }
-
-  static String? _coalesceProof(
-    Map<String, dynamic> json,
-    Map<String, dynamic>? bluebook,
-  ) {
-    final root = _firstProofInMap(json);
-    if (root != null) return root;
-    if (bluebook != null) {
-      final fromBb = _firstProofInMap(bluebook);
-      if (fromBb != null) return fromBb;
-      final product = bluebook['product'];
-      if (product is Map) {
-        return _firstProofInMap(Map<String, dynamic>.from(product));
-      }
     }
     return null;
   }
@@ -132,7 +97,7 @@ class CollectionItemModel {
       quantity: json['quantity']?.toString(),
       fill: json['fill']?.toString(),
       image: _coalesceImagePath(json, bluebook),
-      proof: _coalesceProof(json, bluebook),
+      proof: ProofJson.coalesce(json, bluebook: bluebook),
       pricePaid: json['price_paid']?.toString(),
       notes: json['notes']?.toString(),
       dateAcquired: json['date_acquired']?.toString(),

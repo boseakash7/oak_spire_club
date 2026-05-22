@@ -5,7 +5,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/utils/app_snackbar.dart';
 import '../../../core/utils/validators.dart';
 import '../../../data/repositories/auth_repository.dart';
-import '../../../routes/app_routes.dart';
+import '../../../routes/auth_navigation.dart';
 
 class SignUpController extends GetxController {
   final fullNameController = TextEditingController();
@@ -47,12 +47,12 @@ class SignUpController extends GetxController {
 
     isLoading.value = true;
     try {
-      await _repo.register(
+      final user = await _repo.register(
         fullName: fullName,
         email: email,
         password: passwordController.text,
       );
-      Get.offAllNamed(AppRoutes.shell);
+      AuthNavigation.completeSession(user);
     } on ApiException catch (e) {
       AppSnackbar.error(e.message);
     } catch (e, st) {

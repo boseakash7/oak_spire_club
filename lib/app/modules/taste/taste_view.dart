@@ -1,14 +1,21 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/network/app_cache_manager.dart';
+import '../../core/widgets/animated_list_entrance.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/price_formatter.dart';
+import '../../core/utils/proof_formatter.dart';
+import '../../core/widgets/app_filter_chip.dart';
 import '../../core/widgets/app_header.dart';
-import '../../data/models/category_bottle_model.dart';
+import '../../data/models/bluebook_model.dart';
+import '../collection/collection_controller.dart';
+import '../market/benchmark_detail_controller.dart';
 import '../home/home_controller.dart';
 import '../navigation/bottom_nav_controller.dart';
 import '../../routes/app_routes.dart';
@@ -19,15 +26,15 @@ class TasteView extends GetView<TasteController> {
   const TasteView({super.key});
 
   Future<void> _handleAddedSuccess() async {
-    final nav = Get.isRegistered<BottomNavController>()
-        ? Get.find<BottomNavController>()
-        : null;
-    nav?.setIndex(0);
-
-    if (Get.isRegistered<HomeController>()) {
-      await Get.find<HomeController>().forceReload();
+    if (Get.isRegistered<BottomNavController>()) {
+      Get.find<BottomNavController>().setIndex(1);
     }
-
+    if (Get.isRegistered<CollectionController>()) {
+      await Get.find<CollectionController>().forceReload();
+    }
+    if (Get.isRegistered<HomeController>()) {
+      unawaited(Get.find<HomeController>().forceReload());
+    }
     if (Get.key.currentState?.canPop() ?? false) {
       Get.back(result: true);
     }
@@ -47,7 +54,7 @@ class TasteView extends GetView<TasteController> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: const AppHeader(),
+      appBar: const AppHeader(showTitle: false),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -66,39 +73,86 @@ class TasteView extends GetView<TasteController> {
                   return const TasteLoadingView();
                 }
 
-                return RefreshIndicator(
-                  color: AppColors.gold1,
-                  onRefresh: controller.forceReload,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(23, 104, 23, 24),
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(23, 104, 23, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _SearchInput(controller: controller.searchCtrl),
+                      _SearchInput(
+                        controller: controller.searchCtrl,
+                        onChanged: controller.onSearchChanged,
+                      ),
                       const SizedBox(height: 16),
                       _CategoryRow(controller: controller),
                       const SizedBox(height: 16),
-                      ...controller.visibleBottles.map(
-                        (b) => Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: _BottleRow(
-                            bottle: b,
-                            onAdd: () => _openAddCollection(
-                              arguments: {
-                                'prefill': {
-                                  'id': b.id,
-                                  'name': b.bottleName,
-                                  'image': b.image,
-                                  'average': b.average,
-                                  'quantity': 1,
-                                  'fill': 100,
-                                },
-                              },
+                      Expanded(
+                        child: RefreshIndicator(
+                          color: AppColors.gold1,
+                          onRefresh: controller.forceReload,
+                          child: NotificationListener<ScrollNotification>(
+                            onNotification: (n) {
+                              if (n.metrics.pixels >=
+                                  n.metrics.maxScrollExtent - 240) {
+                                controller.loadMore();
+                              }
+                              return false;
+                            },
+                            child: Obx(
+                              () => ListView(
+                                physics:
+                                    const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.only(bottom: 24),
+                                children: [
+                                  ...controller.visibleBottles
+                                      .asMap()
+                                      .entries
+                                      .map(
+                                    (e) => Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 6),
+                                      child: AnimatedListEntrance(
+                                        index: e.key,
+                                        child: _BottleRow(
+                                          bottle: e.value,
+                                          onAdd: () async {
+                                            final res = await controller
+                                                .addBottleToCollection(
+                                              e.value,
+                                            );
+                                            if (res == true) {
+                                              await _handleAddedSuccess();
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (controller.isLoadingMore.value)
+                                    const Padding(
+                                      padding:
+                                          EdgeInsets.symmetric(vertical: 14),
+                                      child: Center(
+                                        child: SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppColors.gold1,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    const SizedBox(height: 6),
+                                  _AddOwnBottleRow(
+                                    onTap: () => _openAddCollection(),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      _AddOwnBottleRow(onTap: () => _openAddCollection()),
                     ],
                   ),
                 );
@@ -112,8 +166,13 @@ class TasteView extends GetView<TasteController> {
 }
 
 class _SearchInput extends StatelessWidget {
-  const _SearchInput({required this.controller});
+  const _SearchInput({
+    required this.controller,
+    required this.onChanged,
+  });
+
   final TextEditingController controller;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +180,7 @@ class _SearchInput extends StatelessWidget {
       height: 45,
       child: TextField(
         controller: controller,
+        onChanged: onChanged,
         style: AppTextStyles.body16().copyWith(
           fontSize: 16,
           color: AppColors.white,
@@ -159,51 +219,23 @@ class _CategoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 27,
+      height: 34,
       child: Obx(
         () => ListView.separated(
           scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.hardEdge,
+          padding: const EdgeInsets.only(right: 4),
           itemCount: controller.categories.length + 1,
-          separatorBuilder: (context, index) => const SizedBox(width: 8),
+          separatorBuilder: (context, index) => const SizedBox(width: 10),
           itemBuilder: (context, index) {
             final isAll = index == 0;
             final label = isAll ? 'All' : controller.categories[index - 1].name;
             final id = isAll ? '' : controller.categories[index - 1].id;
             final selected = controller.selectedCategoryId.value == id;
-            return InkWell(
-              borderRadius: BorderRadius.circular(42),
+            return AppFilterChip(
+              label: label,
+              selected: selected,
               onTap: () => controller.selectCategory(id),
-              child: Container(
-                height: 27,
-                constraints: const BoxConstraints(minWidth: 78),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(42),
-                  gradient: selected
-                      ? const LinearGradient(
-                          colors: [
-                            AppColors.goldBright,
-                            AppColors.goldRich,
-                            AppColors.goldBright,
-                          ],
-                        )
-                      : const LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0xFF271C16), Color(0xFF201512)],
-                        ),
-                ),
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.body16().copyWith(
-                    fontSize: 14,
-                    color: selected ? AppColors.white : AppColors.textCream,
-                  ),
-                ),
-              ),
             );
           },
         ),
@@ -214,15 +246,16 @@ class _CategoryRow extends StatelessWidget {
 
 class _BottleRow extends StatelessWidget {
   const _BottleRow({required this.bottle, required this.onAdd});
-  final CategoryBottleModel bottle;
+  final BluebookModel bottle;
   final VoidCallback onAdd;
+
+  String? get _imageUrl => resolveBenchmarkDetailImageUrl(bottle.image);
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = bottle.resolvedImageUrl;
+    final imageUrl = _imageUrl;
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.black,
         border: Border(top: BorderSide(color: Color(0xFF3C3B3B))),
       ),
       child: Row(
@@ -271,7 +304,7 @@ class _BottleRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Proof 45',
+                    ProofFormatter.formatLabelOrFallback(bottle.proof),
                     style: AppTextStyles.body16().copyWith(
                       fontSize: 10,
                       color: const Color(0xFF89746D),
@@ -302,6 +335,7 @@ class _BottleRow extends StatelessWidget {
                   PriceFormatter.format(bottle.average),
                   style: AppTextStyles.body16().copyWith(
                     fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textCream,
                   ),
                 ),
@@ -343,7 +377,6 @@ class _AddOwnBottleRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: const BoxDecoration(
-          color: AppColors.black,
           border: Border(top: BorderSide(color: Color(0xFF3C3B3B))),
         ),
         child: Row(

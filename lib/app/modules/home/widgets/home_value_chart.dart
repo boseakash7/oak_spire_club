@@ -3,16 +3,16 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../core/animations/app_motion.dart';
 import '../../../core/widgets/chart_plot_dashed_frame.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../home_controller.dart';
 
-/// Plot insets inside the card. Horizontal margins are tighter so the plot
-/// lines up with home body content (scroll uses 23 + section `right: 23`).
-/// Left keeps space for compact Y tick labels; bottom for X labels.
-const double _kChartPlotLeft = 32;
-const double _kChartPlotRight = 6;
+/// Home chart layout: dedicated Y-axis band (fits `15k` on one line) + equal
+/// right plot inset.
+const double _kChartYAxisWidth = 26;
+const double _kChartPlotRight = 8;
 const double _kChartPlotTop = 21;
 const double _kChartPlotBottom = 30;
 
@@ -86,114 +86,21 @@ class _HomeChartVerticalGridPainter extends CustomPainter {
   }
 }
 
-class HomeValueChart extends StatelessWidget {
-  const HomeValueChart({super.key});
-
-  static const List<double> _fallbackMainK = [
-    4.8,
-    6.5,
-    5.8,
-    12.0,
-    8.2,
-    8.0,
-    7.6,
-    7.9,
-    12.0,
-  ];
+/// Legend row below the home chart — uses standard screen horizontal padding.
+class HomeChartLegend extends StatelessWidget {
+  const HomeChartLegend({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final home = Get.find<HomeController>();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          height: 223,
-          width: double.infinity,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              children: [
-                const Positioned.fill(
-                  child: ColoredBox(color: AppColors.chartPlotBackground),
-                ),
-                Positioned.fill(
-                  child: Obx(() {
-                    final home = Get.find<HomeController>();
-                    final n = home.chartSeriesK.isEmpty
-                        ? 9
-                        : home.chartSeriesK.length;
-                    return IgnorePointer(
-                      child: CustomPaint(
-                        painter: _HomeChartVerticalGridPainter(
-                          plotInsets: const EdgeInsets.fromLTRB(
-                            _kChartPlotLeft,
-                            _kChartPlotTop,
-                            _kChartPlotRight,
-                            _kChartPlotBottom,
-                          ),
-                          columnCount: n,
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-                Positioned.fill(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      _kChartPlotLeft,
-                      _kChartPlotTop,
-                      _kChartPlotRight,
-                      _kChartPlotBottom,
-                    ),
-                    child: Obx(
-                      () => LineChart(
-                        _lineData(
-                          seriesK: home.chartSeriesK,
-                          bsmiK: home.chartBsmiSeriesK,
-                          maxYk: home.chartMaxYk.value,
-                        ),
-                        duration: Duration.zero,
-                      ),
-                    ),
-                  ),
-                ),
-                const Positioned.fill(
-                  child: ChartPlotDashedFrameOverlay(
-                    plotInsets: EdgeInsets.fromLTRB(
-                      _kChartPlotLeft,
-                      _kChartPlotTop,
-                      _kChartPlotRight,
-                      _kChartPlotBottom,
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Obx(
-                    () => _AxisLabels(
-                      maxYk: home.chartMaxYk.value,
-                      maxX: home.chartSeriesK.isEmpty
-                          ? 9
-                          : home.chartSeriesK.length,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _legendSwatch(
+          color: AppColors.chartLineMarketValue,
+          label: 'Market Value',
         ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _legendSwatch(
-              color: AppColors.chartLineMarketValue,
-              label: 'Market Value',
-            ),
-            const SizedBox(width: 36),
-            _legendSwatch(color: AppColors.chartLineBsmi, label: 'BSMI'),
-          ],
-        ),
+        const SizedBox(width: 22),
+        _legendSwatch(color: AppColors.chartLineBsmi, label: 'BSMI'),
       ],
     );
   }
@@ -221,27 +128,177 @@ class HomeValueChart extends StatelessWidget {
       ],
     );
   }
+}
+
+class HomeValueChart extends StatefulWidget {
+  const HomeValueChart({super.key});
+
+  @override
+  State<HomeValueChart> createState() => _HomeValueChartState();
+}
+
+class _HomeValueChartState extends State<HomeValueChart> {
+  var _chartVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _chartVisible = true);
+    });
+  }
+
+  /// Default column count for grid when there are no data points.
+  static const int _kEmptyChartColumnCount = 9;
+
+  @override
+  Widget build(BuildContext context) {
+    final home = Get.find<HomeController>();
+    return AnimatedOpacity(
+      opacity: _chartVisible ? 1 : 0,
+      duration: AppMotion.medium,
+      curve: AppMotion.enter,
+      child: SizedBox(
+        height: 223,
+        width: double.infinity,
+        child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                const Positioned.fill(
+                  child: ColoredBox(color: AppColors.chartPlotBackground),
+                ),
+                Positioned.fill(
+                  child: Obx(() {
+                    final home = Get.find<HomeController>();
+                    final n = home.chartSeriesK.isEmpty
+                        ? _kEmptyChartColumnCount
+                        : home.chartSeriesK.length;
+                    return IgnorePointer(
+                      child: CustomPaint(
+                        painter: _HomeChartVerticalGridPainter(
+                          plotInsets: const EdgeInsets.fromLTRB(
+                            _kChartYAxisWidth,
+                            _kChartPlotTop,
+                            _kChartPlotRight,
+                            _kChartPlotBottom,
+                          ),
+                          columnCount: n,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      _kChartYAxisWidth,
+                      _kChartPlotTop,
+                      _kChartPlotRight,
+                      _kChartPlotBottom,
+                    ),
+                    child: Obx(
+                      () {
+                        final seriesK = home.chartSeriesK;
+                        final maxYk = _effectiveMaxYk(
+                          seriesK,
+                          home.chartMaxYk.value,
+                        );
+                        return LineChart(
+                          _lineData(
+                            seriesK: seriesK,
+                            bsmiK: home.chartBsmiSeriesK,
+                            maxYk: maxYk,
+                          ),
+                        duration: _chartVisible
+                            ? AppMotion.chartDraw
+                            : Duration.zero,
+                          curve: AppMotion.chart,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const Positioned.fill(
+                  child: ChartPlotDashedFrameOverlay(
+                    plotInsets: EdgeInsets.fromLTRB(
+                      _kChartYAxisWidth,
+                      _kChartPlotTop,
+                      _kChartPlotRight,
+                      _kChartPlotBottom,
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: Obx(
+                    () {
+                      final seriesK = home.chartSeriesK;
+                      return _AxisLabels(
+                        maxYk: _effectiveMaxYk(
+                          seriesK,
+                          home.chartMaxYk.value,
+                        ),
+                        maxX: seriesK.isEmpty
+                            ? _kEmptyChartColumnCount
+                            : seriesK.length,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+    );
+  }
+
+  double _effectiveMaxYk(List<double> seriesK, double controllerMaxYk) {
+    if (seriesK.isEmpty) return HomeController.emptyChartMaxYk;
+    return controllerMaxYk;
+  }
 
   LineChartData _lineData({
     required List<double> seriesK,
     required List<double> bsmiK,
     required double maxYk,
   }) {
-    final bool hasReal = seriesK.isNotEmpty;
-    final used = hasReal ? seriesK : _fallbackMainK;
-    final usedBsmi = hasReal && bsmiK.length == used.length
+    final maxX = seriesK.isEmpty
+        ? _kEmptyChartColumnCount.toDouble()
+        : seriesK.length.toDouble();
+    final hInterval = maxYk > 0 ? maxYk / 4 : 1.0;
+
+    final grid = FlGridData(
+      show: true,
+      drawVerticalLine: false,
+      drawHorizontalLine: true,
+      horizontalInterval: hInterval > 0 ? hInterval : 1,
+      getDrawingHorizontalLine: _homeDottedHorizontalGrid,
+    );
+
+    if (seriesK.isEmpty) {
+      return LineChartData(
+        minX: 1,
+        maxX: maxX,
+        minY: 0,
+        maxY: maxYk,
+        clipData: const FlClipData.all(),
+        gridData: grid,
+        titlesData: const FlTitlesData(show: false),
+        borderData: FlBorderData(show: false),
+        lineBarsData: const [],
+      );
+    }
+
+    final usedBsmi = bsmiK.length == seriesK.length
         ? bsmiK
-        : _smoothSeriesK(used);
+        : _smoothSeriesK(seriesK);
 
     final spots = <FlSpot>[
-      for (var i = 0; i < used.length; i++) FlSpot(i + 1, used[i]),
+      for (var i = 0; i < seriesK.length; i++) FlSpot(i + 1, seriesK[i]),
     ];
     final bsmiSpots = <FlSpot>[
       for (var i = 0; i < usedBsmi.length; i++) FlSpot(i + 1, usedBsmi[i]),
     ];
-
-    final maxX = used.length.toDouble();
-    final hInterval = maxYk > 0 ? maxYk / 4 : 1.0;
 
     return LineChartData(
       minX: 1,
@@ -249,26 +306,18 @@ class HomeValueChart extends StatelessWidget {
       minY: 0,
       maxY: maxYk,
       clipData: const FlClipData.all(),
-      gridData: FlGridData(
-        show: true,
-        // Vertical column guides are painted by [_HomeChartVerticalGridPainter]
-        // under this chart so they stay visible (fl_chart grid was not showing reliably).
-        drawVerticalLine: false,
-        drawHorizontalLine: true,
-        horizontalInterval: hInterval > 0 ? hInterval : 1,
-        getDrawingHorizontalLine: _homeDottedHorizontalGrid,
-      ),
+      gridData: grid,
       titlesData: const FlTitlesData(show: false),
       borderData: FlBorderData(show: false),
       lineBarsData: [
         LineChartBarData(
           spots: spots,
-          isCurved: used.length > 2,
+          isCurved: seriesK.length > 2,
           curveSmoothness: 0.25,
           color: AppColors.chartLineMarketValue,
           barWidth: 2,
           dotData: FlDotData(
-            show: used.length <= 9,
+            show: seriesK.length <= 9,
             getDotPainter: (spot, percent, bar, index) {
               final isLast = index == spots.length - 1;
               return FlDotCirclePainter(
@@ -325,7 +374,7 @@ class _AxisLabels extends StatelessWidget {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
 
-        const leftInset = _kChartPlotLeft;
+        const leftInset = _kChartYAxisWidth;
         const rightInset = _kChartPlotRight;
         const topInset = _kChartPlotTop;
         const bottomInset = _kChartPlotBottom;
@@ -340,11 +389,17 @@ class _AxisLabels extends StatelessWidget {
             top -= 11;
           }
           return Positioned(
-            left: 6,
+            left: 0,
             top: top,
-            child: SizedBox(
-              width: leftInset - 10,
-              child: Text(text, textAlign: TextAlign.right, style: style),
+            width: leftInset,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                text,
+                maxLines: 1,
+                softWrap: false,
+                style: style,
+              ),
             ),
           );
         }
@@ -365,18 +420,23 @@ class _AxisLabels extends StatelessWidget {
         }
 
         final nx = maxX < 1 ? 1 : maxX;
-        final yTicks = <double>[
-          0,
-          maxYk * (5 / 15),
-          maxYk * (8 / 15),
-          maxYk * (10 / 15),
-          maxYk * (12 / 15),
-          maxYk,
-        ];
-        String fmtTick(double v) {
-          final n = (v).round();
-          if (n == 0) return '0';
-          return '${n}k';
+        const tickCount = 5;
+        final yTicks = List<double>.generate(
+          tickCount,
+          (i) => maxYk * i / (tickCount - 1),
+        );
+        String fmtTick(double vK) {
+          if (vK.abs() < 0.001) return '0';
+          if (maxYk < 2) {
+            final dollars = (vK * 1000).round();
+            if (dollars >= 1000) {
+              return '${(dollars / 1000).toStringAsFixed(1)}k';
+            }
+            return '$dollars';
+          }
+          final rounded = vK.round();
+          if (rounded == 0) return '0';
+          return '${rounded}k';
         }
 
         return Stack(

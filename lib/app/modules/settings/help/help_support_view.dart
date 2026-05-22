@@ -7,18 +7,19 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/app_snackbar.dart';
+import '../../../core/widgets/animated_list_entrance.dart';
 import '../widgets/settings_scaffold.dart';
 
 class HelpSupportView extends StatelessWidget {
   const HelpSupportView({super.key});
 
-  Future<void> _openWhatsApp() async {
-    final phone = AppConstants.supportWhatsApp.replaceAll(RegExp(r'\D'), '');
-    final uri = Uri.parse('https://wa.me/$phone');
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      await AppSnackbar.error('Could not open WhatsApp.');
-    }
-  }
+  // Future<void> _openWhatsApp() async {
+  //   final phone = AppConstants.supportWhatsApp.replaceAll(RegExp(r'\D'), '');
+  //   final uri = Uri.parse('https://wa.me/$phone');
+  //   if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+  //     await AppSnackbar.error('Could not open WhatsApp.');
+  //   }
+  // }
 
   Future<void> _openEmail() async {
     final subject = Uri.encodeComponent('${AppConstants.appName} — Help');
@@ -43,7 +44,7 @@ class HelpSupportView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Reach our team by WhatsApp or email. We typically reply within one business day.',
+            'Reach our team by email. We typically reply within one business day.',
             style: AppTextStyles.body16().copyWith(
               fontSize: 14,
               color: AppColors.textMuted,
@@ -51,22 +52,28 @@ class HelpSupportView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          _ContactCard(
-            icon: Icons.chat_rounded,
-            iconColor: const Color(0xFF25D366),
-            title: 'WhatsApp',
-            subtitle: 'Chat with support',
-            detail: '+${AppConstants.supportWhatsApp}',
-            onTap: _openWhatsApp,
-          ),
-          const SizedBox(height: 14),
-          _ContactCard(
-            icon: Icons.mail_outline_rounded,
-            iconColor: AppColors.goldBright,
-            title: 'Email',
-            subtitle: 'Send us a message',
-            detail: AppConstants.supportEmail,
-            onTap: _openEmail,
+          // AnimatedListEntrance(
+          //   index: 0,
+          //   child: _ContactCard(
+          //     icon: Icons.chat_rounded,
+          //     iconColor: const Color(0xFF25D366),
+          //     title: 'WhatsApp',
+          //     subtitle: 'Chat with support',
+          //     detail: '+${AppConstants.supportWhatsApp}',
+          //     onTap: _openWhatsApp,
+          //   ),
+          // ),
+          // const SizedBox(height: 14),
+          AnimatedListEntrance(
+            index: 0,
+            child: _ContactCard(
+              icon: Icons.mail_outline_rounded,
+              iconColor: AppColors.goldBright,
+              title: 'Email',
+              subtitle: 'Send us a message',
+              detail: AppConstants.supportEmail,
+              onTap: _openEmail,
+            ),
           ),
         ],
       ),

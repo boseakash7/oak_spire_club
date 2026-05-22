@@ -29,24 +29,37 @@ class CollectionRemoteDataSource {
     File? imageFile,
     String? image,
   }) async {
-    final body = <String, dynamic>{
+    final fields = <String, String>{
       'bottle_id': bottleId,
       'user_id': userId,
       'type': type.name,
-      'quantity': quantity,
-      'fill': fill,
-      'price_paid': pricePaid,
+      'quantity': quantity.toString(),
+      'fill': fill.toString(),
+      'price_paid': pricePaid.toString(),
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
       if (dateAcquired != null && dateAcquired.trim().isNotEmpty)
         'date_acquired': dateAcquired.trim(),
     };
 
-    final form = FormData(body);
+    final form = FormData(fields);
     if (imageFile != null) {
+      if (!await imageFile.exists()) {
+        throw ApiException('Selected image file is missing.');
+      }
       final bytes = await imageFile.readAsBytes();
+      if (bytes.isEmpty) {
+        throw ApiException('Selected image file is empty.');
+      }
       final filename = imageFile.path.split(Platform.pathSeparator).last;
       form.files.add(
-        MapEntry('image', MultipartFile(bytes, filename: filename)),
+        MapEntry(
+          'image',
+          MultipartFile(
+            bytes,
+            filename: filename.isNotEmpty ? filename : 'bottle_image.jpg',
+            contentType: _imageContentType(filename),
+          ),
+        ),
       );
     } else if (image != null && image.trim().isNotEmpty) {
       form.fields.add(MapEntry('image', image.trim()));
@@ -74,6 +87,17 @@ class CollectionRemoteDataSource {
       return const <String, dynamic>{};
     }
     return <String, dynamic>{'result': data};
+  }
+
+  static String _imageContentType(String filename) {
+    final lower = filename.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    if (lower.endsWith('.heic') || lower.endsWith('.heif')) {
+      return 'image/heic';
+    }
+    return 'image/jpeg';
   }
 
   Future<void> deleteByUserBottle({
@@ -118,8 +142,9 @@ class CollectionRemoteDataSource {
         .toList();
   }
 
-  /// Returns the raw chart-data payload. Reference app expects:
-  /// { data: [...], first_price: "...", last_price: "..." }
+  /// Returns the raw chart-data payload. Expects:
+  /// `data` (market value series), `index_data` (BSMI), `first_price`,
+  /// `last_price`, `index`, `invested_value`, etc.
   Future<Map<String, dynamic>> chartData({
     required String userId,
     required int lookBackDays,

@@ -1,15 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/get.dart';
 
 import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/constants/app_assets.dart';
-import '../../core/constants/app_constants.dart';
-import '../../core/widgets/app_header.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_header.dart';
+import '../../core/widgets/exit_app_bottom_sheet.dart';
 import '../collection/collection_view.dart';
 import '../home/home_view.dart';
 import '../market/market_view.dart';
@@ -24,127 +25,155 @@ class BottomNavShell extends GetView<BottomNavController> {
     final pages = <Widget>[
       const HomeView(),
       const CollectionView(),
-      const _PlaceholderTab(label: 'Taste'),
+      // const _PlaceholderTab(label: 'Taste'),
       const MarketView(),
     ];
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_onShellBackPressed(context));
+      },
+      child: Scaffold(
       extendBodyBehindAppBar: false,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kShellAppBarHeight),
-        child: Obx(
-          () => AppHeader(
-            title: controller.index.value == 3
-                ? 'Benchmark'
-                : AppConstants.appName,
-          ),
+        child: GetX<BottomNavController>(
+          builder: (c) => AppHeader(title: c.headerTitle),
         ),
       ),
       body: Obx(() => pages[controller.index.value]),
-      bottomNavigationBar: Obx(
-        () {
-          final selected = controller.index.value;
-          return Container(
-            decoration: const BoxDecoration(
-              color: AppColors.navBarBackground,
-              border: Border(
-                top: BorderSide(color: AppColors.navBarBorder),
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              left: false,
-              right: false,
-              minimum: EdgeInsets.zero,
-              maintainBottomViewPadding: true,
-              child: SizedBox(
-                height: 54,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _NavItem(
-                      label: 'Home',
-                      asset: AppAssets.navHomeFilled,
-                      selected: selected == 0,
+      bottomNavigationBar: Obx(() {
+        final selected = controller.index.value;
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.navBarBackground,
+            border: Border(top: BorderSide(color: AppColors.navBarBorder)),
+          ),
+          child: SafeArea(
+            top: false,
+            left: false,
+            right: false,
+            minimum: EdgeInsets.zero,
+            maintainBottomViewPadding: true,
+            child: SizedBox(
+              height: 54,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _NavItem(
+                    label: 'Home',
+                    asset: AppAssets.navHomeFilled,
+                    selected: selected == 0,
+                    onTap: () {
+                      if (Get.isRegistered<AppAnalyticsController>()) {
+                        unawaited(
+                          AppAnalyticsController.to.logTap('bottom_nav_home'),
+                        );
+                      }
+                      controller.setIndex(0);
+                    },
+                  ),
+                  _NavItem(
+                    label: 'Collection',
+                    asset: AppAssets.navCollectionActive,
+                    selected: selected == 1,
+                    onTap: () {
+                      if (Get.isRegistered<AppAnalyticsController>()) {
+                        unawaited(
+                          AppAnalyticsController.to.logTap(
+                            'bottom_nav_collection',
+                          ),
+                        );
+                      }
+                      controller.setIndex(1);
+                    },
+                  ),
+                  // _NavItem(
+                  //   label: 'Taste',
+                  //   asset: AppAssets.navTaste,
+                  //   selected: selected == 2,
+                  //   onTap: () {
+                  //     if (Get.isRegistered<AppAnalyticsController>()) {
+                  //       unawaited(
+                  //         AppAnalyticsController.to.logTap('bottom_nav_taste'),
+                  //       );
+                  //     }
+                  //     controller.setIndex(2);
+                  //   },
+                  // ),
+                  _NavItem(
+                    label: 'Benchmark',
+                    asset: AppAssets.navMarket,
+                    selected: selected == 2,
+                    iconSize: 22,
+                    onTap: () {
+                      if (Get.isRegistered<AppAnalyticsController>()) {
+                        unawaited(
+                          AppAnalyticsController.to.logTap('bottom_nav_market'),
+                        );
+                      }
+                      controller.setIndex(2);
+                    },
+                  ),
+                  Obx(
+                    () => _NavItem(
+                      label: 'Settings',
+                      asset: '',
+                      selected: controller.settingsMenuOpen.value,
                       onTap: () {
                         if (Get.isRegistered<AppAnalyticsController>()) {
                           unawaited(
-                            AppAnalyticsController.to.logTap('bottom_nav_home'),
+                            AppAnalyticsController.to.logTap(
+                              'bottom_nav_settings',
+                            ),
                           );
                         }
-                        controller.setIndex(0);
+                        unawaited(showSettingsPopup(context));
                       },
-                    ),
-                    _NavItem(
-                      label: 'Collection',
-                      asset: AppAssets.navCollectionActive,
-                      selected: selected == 1,
-                      onTap: () {
-                        if (Get.isRegistered<AppAnalyticsController>()) {
-                          unawaited(
-                            AppAnalyticsController.to
-                                .logTap('bottom_nav_collection'),
-                          );
-                        }
-                        controller.setIndex(1);
-                      },
-                    ),
-                    _NavItem(
-                      label: 'Taste',
-                      asset: AppAssets.navTaste,
-                      selected: selected == 2,
-                      onTap: () {
-                        if (Get.isRegistered<AppAnalyticsController>()) {
-                          unawaited(
-                            AppAnalyticsController.to.logTap('bottom_nav_taste'),
-                          );
-                        }
-                        controller.setIndex(2);
-                      },
-                    ),
-                    _NavItem(
-                      label: 'Market',
-                      asset: AppAssets.navMarket,
-                      selected: selected == 3,
-                      iconSize: 22,
-                      onTap: () {
-                        if (Get.isRegistered<AppAnalyticsController>()) {
-                          unawaited(
-                            AppAnalyticsController.to.logTap('bottom_nav_market'),
-                          );
-                        }
-                        controller.setIndex(3);
-                      },
-                    ),
-                    Obx(
-                      () => _NavItem(
-                        label: 'Settings',
-                        asset: '',
+                      iconOverride: _SettingsNavIcon(
                         selected: controller.settingsMenuOpen.value,
-                        onTap: () {
-                          if (Get.isRegistered<AppAnalyticsController>()) {
-                            unawaited(
-                              AppAnalyticsController.to.logTap(
-                                'bottom_nav_settings',
-                              ),
-                            );
-                          }
-                          unawaited(showSettingsPopup(context));
-                        },
-                        iconOverride: _SettingsNavIcon(
-                          selected: controller.settingsMenuOpen.value,
-                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      }),
+    ),
     );
+  }
+
+  Future<void> _onShellBackPressed(BuildContext context) async {
+    if (controller.settingsMenuOpen.value) {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    if (controller.index.value != 0) {
+      controller.setIndex(0);
+      return;
+    }
+
+    if (Get.isRegistered<AppAnalyticsController>()) {
+      unawaited(AppAnalyticsController.to.logTap('exit_app_prompt'));
+    }
+
+    final shouldExit = await showExitAppBottomSheet(context);
+    if (!context.mounted) return;
+
+    if (shouldExit) {
+      if (Get.isRegistered<AppAnalyticsController>()) {
+        unawaited(AppAnalyticsController.to.logTap('exit_app_confirm'));
+      }
+      await SystemNavigator.pop();
+    }
   }
 }
 
@@ -169,8 +198,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        selected ? AppColors.textCream : AppColors.textMuted;
+    final color = selected ? AppColors.textCream : AppColors.textMuted;
 
     return Expanded(
       child: InkResponse(
@@ -226,20 +254,19 @@ class _SettingsNavIcon extends StatelessWidget {
   }
 }
 
-class _PlaceholderTab extends StatelessWidget {
-  const _PlaceholderTab({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.black,
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        style: AppTextStyles.heading32Bold().copyWith(fontSize: 18),
-      ),
-    );
-  }
-}
-
+// class _PlaceholderTab extends StatelessWidget {
+//   const _PlaceholderTab({required this.label});
+//   final String label;
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       color: AppColors.black,
+//       alignment: Alignment.center,
+//       child: Text(
+//         label,
+//         style: AppTextStyles.heading32Bold().copyWith(fontSize: 18),
+//       ),
+//     );
+//   }
+// }

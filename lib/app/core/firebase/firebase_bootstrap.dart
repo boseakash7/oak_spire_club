@@ -6,10 +6,13 @@ import 'package:flutter/widgets.dart';
 import 'package:oakspire_club/firebase_options.dart';
 
 import '../analytics/app_analytics_nav_observer.dart';
+import 'firebase_push_notifications.dart';
 
 /// Initializes Firebase Core, Analytics, Crashlytics, and Performance (Performance starts with Core).
 Future<void> bootstrapFirebase() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await FirebasePushNotifications.initialize();
 
   await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
 

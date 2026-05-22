@@ -93,6 +93,7 @@ class AppBinding extends Bindings {
       () => UserRepository(Get.find<UserRemoteDataSource>()),
       fenix: true,
     );
+
   }
 }
 

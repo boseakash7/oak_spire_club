@@ -9,10 +9,14 @@ import '../../core/utils/price_formatter.dart';
 import '../../core/widgets/app_header.dart';
 import '../../data/models/collection_item_display.dart';
 import 'home_controller.dart';
+import 'widgets/home_chart_footer.dart';
 import 'widgets/home_value_chart.dart';
 
 /// Space between section heading and horizontal cards (Top moved / Quick Stats).
 const double _kHomeHeadingToCardsGap = 20;
+
+/// Space between Top moved bottles row and Quick Stats section.
+const double _kTopMovedToQuickStatsGap = 14;
 
 class HomeFilledView extends StatelessWidget {
   const HomeFilledView({super.key});
@@ -33,14 +37,18 @@ class HomeFilledView extends StatelessWidget {
           ),
           SafeArea(
             top: false,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                23,
-                kShellTabBodyContentTopGap,
-                0,
-                96,
-              ),
-              child: Column(
+            child: RefreshIndicator(
+              color: AppColors.gold1,
+              onRefresh: home.forceReload,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  23,
+                  kShellTabBodyContentTopGap,
+                  0,
+                  96,
+                ),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
@@ -91,7 +99,7 @@ class HomeFilledView extends StatelessWidget {
                       ),
                     );
                   }),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: _kTopMovedToQuickStatsGap),
                   Padding(
                     padding: const EdgeInsets.only(right: 23),
                     child: _SectionHeader(title: 'Quick Stats', onTap: () {}),
@@ -108,36 +116,67 @@ class HomeFilledView extends StatelessWidget {
                           const SizedBox(width: 14),
                       itemBuilder: (context, index) {
                         if (index == 2) {
-                          return const _StatCardRating(
-                            label: 'Collection\nRating',
-                            value: '4.5',
+                          return Obx(
+                            () => _StatCardRating(
+                              label: 'Collection\nRating',
+                              value: home.collectionRatingText.value,
+                            ),
                           );
                         }
                         final label = switch (index) {
                           0 => 'Total\nCollection',
                           1 => 'Total\nDrunk',
+                          3 => 'Rare\nBottles',
                           _ => 'Total\nCollection',
                         };
-                        if (index == 0 || index == 3) {
-                          return Obx(
-                            () => _StatCard(
-                              label: label,
-                              value: home.totalCollectionCount.value.toString(),
-                            ),
-                          );
-                        }
-                        const value = '12';
-                        return _StatCard(label: label, value: value);
+                        return Obx(
+                          () => _StatCard(
+                            label: label,
+                            value: switch (index) {
+                              0 => home.totalCollectionCount.value,
+                              1 => home.totalDrunkCount.value,
+                              3 => home.totalRareCount.value,
+                              _ => home.totalCollectionCount.value,
+                            }.toString(),
+                          ),
+                        );
                       },
                     ),
                   ),
-                  const SizedBox(height: 34),
+                  const SizedBox(height: 18),
+                  // Chart: wider bleed layout (separate from content padding below).
                   Padding(
                     padding: const EdgeInsets.only(right: 23),
-                    child: const HomeValueChart(),
+                    child: LayoutBuilder(
+                      builder: (context, _) {
+                        const outer = 4.0;
+                        final w =
+                            MediaQuery.sizeOf(context).width - outer * 2;
+                        return Transform.translate(
+                          offset: const Offset(-7, 0),
+                          child: SizedBox(
+                            width: w,
+                            child: const HomeValueChart(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  // Legend + range chips: align with Collection Value (23px).
+                  const Padding(
+                    padding: EdgeInsets.only(right: 23),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: 14),
+                        HomeChartLegend(),
+                        HomeChartFooter(),
+                      ],
+                    ),
                   ),
                 ],
               ),
+            ),
             ),
           ),
         ],
@@ -188,6 +227,8 @@ class _CollectionValue extends StatelessWidget {
           () => Text(
             home.movedText.value,
             style: AppTextStyles.body16().copyWith(
+              fontSize: 12,
+              height: 1.25,
               color: const Color(0xFF9D9C9C),
             ),
           ),

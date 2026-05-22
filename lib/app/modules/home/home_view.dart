@@ -55,17 +55,28 @@ class _HomeEmptyView extends StatelessWidget {
           ),
           SafeArea(
             top: false,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  0,
-                  kShellTabBodyContentTopGap,
-                  0,
-                  66,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+            child: RefreshIndicator(
+              color: AppColors.gold1,
+              onRefresh: controller.forceReload,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: MediaQuery.sizeOf(context).height -
+                        MediaQuery.paddingOf(context).top -
+                        MediaQuery.paddingOf(context).bottom,
+                  ),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        0,
+                        kShellTabBodyContentTopGap,
+                        0,
+                        66,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                     SizedBox(
                       height: 270,
                       width: 270,
@@ -119,7 +130,10 @@ class _HomeEmptyView extends StatelessWidget {
                         },
                       ),
                     ),
-                  ],
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

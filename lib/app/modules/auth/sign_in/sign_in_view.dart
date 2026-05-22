@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -88,37 +87,39 @@ class SignInView extends GetView<SignInController> {
                   ),
                   const SizedBox(height: 18),
                   Center(
-                    child: Text.rich(
-                      TextSpan(
-                        text: "Don't have an account? ",
-                        style: AppTextStyles.body16().copyWith(
-                          color: AppColors.white,
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          "Don't have an account? ",
+                          style: AppTextStyles.body16().copyWith(
+                            color: AppColors.white,
+                          ),
                         ),
-                        children: [
-                          TextSpan(
-                            text: 'Sign up',
+                        GestureDetector(
+                          onTap: () {
+                            if (Get.isRegistered<AppAnalyticsController>()) {
+                              unawaited(
+                                AppAnalyticsController.to
+                                    .logTap('sign_in_go_sign_up'),
+                              );
+                            }
+                            if (Navigator.of(context).canPop()) {
+                              Get.back();
+                            } else {
+                              Get.offNamed(AppRoutes.signUp);
+                            }
+                          },
+                          child: Text(
+                            'Sign up',
                             style: AppTextStyles.body16().copyWith(
                               color: const Color(0xFFCCA230),
                               fontWeight: FontWeight.w700,
                             ),
-                            recognizer: TapGestureRecognizer()
-                              ..onTap = () {
-                                if (Get.isRegistered<AppAnalyticsController>()) {
-                                  unawaited(
-                                    AppAnalyticsController.to
-                                        .logTap('sign_in_go_sign_up'),
-                                  );
-                                }
-                                if (Navigator.of(context).canPop()) {
-                                  Get.back();
-                                } else {
-                                  Get.offNamed(AppRoutes.signUp);
-                                }
-                              },
                           ),
-                        ],
-                      ),
-                      textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ),
                 ],

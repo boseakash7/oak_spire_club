@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/storage/app_storage.dart';
 import '../../core/utils/app_snackbar.dart';
 import '../../core/utils/price_formatter.dart';
+import '../../core/utils/validators.dart';
 import '../../data/models/bluebook_model.dart';
 import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/collection_repository.dart';
@@ -29,10 +33,25 @@ class AddCollectionController extends GetxController {
   final selected = Rxn<BluebookModel>();
   final isEditMode = false.obs;
 
+  final bottleNameError = RxnString();
+  final qtyError = RxnString();
+  final priceError = RxnString();
+  final dateAcquiredError = RxnString();
+  final fillError = RxnString();
+
   final previewImageUrl = ''.obs;
+  final customImageFile = Rxn<File>();
 
   DateTime? dateAcquired;
   String? _originalBottleId;
+
+  /// Set from route prefill — stays true for own-bottle flow even after bluebook create.
+  bool _isCustomBottleFlow = true;
+
+  static final _imagePicker = ImagePicker();
+
+  /// True when adding a user-defined bottle (not picked from catalog/list).
+  bool get isCustomBottle => _isCustomBottleFlow;
 
   @override
   void onInit() {
@@ -97,6 +116,7 @@ class AddCollectionController extends GetxController {
     }
 
     if (id != null && id.isNotEmpty && id != 'null') {
+      _isCustomBottleFlow = false;
       selected.value = BluebookModel(
         id: id,
         bottleName: name,
@@ -130,6 +150,20 @@ class AddCollectionController extends GetxController {
     return PriceFormatter.normalizeForApi(value) ?? '';
   }
 
+  Future<void> pickCustomImage() async {
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        imageQuality: 88,
+      );
+      if (picked == null) return;
+      customImageFile.value = File(picked.path);
+    } catch (e) {
+      await AppSnackbar.error('Could not pick image. Please try again.');
+    }
+  }
+
   Future<void> pickDate(BuildContext context) async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -141,6 +175,30 @@ class AddCollectionController extends GetxController {
     if (picked == null) return;
     dateAcquired = picked;
     dateAcquiredCtrl.text = _formatDate(picked);
+    dateAcquiredError.value = null;
+  }
+
+  void clearBottleNameError(String _) => bottleNameError.value = null;
+  void clearQtyError(String _) => qtyError.value = null;
+  void clearPriceError(String _) => priceError.value = null;
+  void clearDateAcquiredError(String _) => dateAcquiredError.value = null;
+  void clearFillError(String _) => fillError.value = null;
+
+  bool _validateForm() {
+    bottleNameError.value = Validators.requiredText(
+      bottleNameCtrl.text,
+      message: 'Enter bottle name.',
+    );
+    qtyError.value = Validators.positiveQuantity(qtyCtrl.text);
+    priceError.value = Validators.positivePrice(priceCtrl.text);
+    dateAcquiredError.value = Validators.dateAcquired(dateAcquiredCtrl.text);
+    fillError.value = Validators.fillPercent(fillCtrl.text);
+
+    return bottleNameError.value == null &&
+        qtyError.value == null &&
+        priceError.value == null &&
+        dateAcquiredError.value == null &&
+        fillError.value == null;
   }
 
   Future<void> submit() async {
@@ -150,20 +208,26 @@ class AddCollectionController extends GetxController {
       return;
     }
 
-    final name = bottleNameCtrl.text.trim();
-    if (name.isEmpty) {
-      await AppSnackbar.error('Enter bottle name.');
+    if (!_validateForm()) {
+      await AppSnackbar.error('Please fix the highlighted fields.');
       return;
     }
 
-    final qty = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+    final name = bottleNameCtrl.text.trim();
+    final qty = int.parse(qtyCtrl.text.trim());
     final priceRaw = _digitsOnly(priceCtrl.text.trim());
-    final price = double.tryParse(priceRaw) ?? 0;
-    final fill = int.tryParse(fillCtrl.text.trim()) ?? 100;
+    final price = double.parse(priceRaw);
+    final fill = int.parse(fillCtrl.text.trim());
     final normalizedFill = fill.clamp(1, 100);
 
     isSubmitting.value = true;
     try {
+      // Capture before bluebook create — [isCustomBottle] would flip false once id exists.
+      final imageFile = _isCustomBottleFlow ? customImageFile.value : null;
+      final imageUrlForCatalog = imageFile == null && !_isCustomBottleFlow
+          ? selected.value?.image
+          : null;
+
       var b = selected.value;
       if (b == null) {
         final created = await _bluebookRepo.create(
@@ -176,6 +240,10 @@ class AddCollectionController extends GetxController {
       }
 
       final resolvedQty = qty <= 0 ? 1 : qty;
+      final imageUrl = imageFile == null
+          ? (imageUrlForCatalog ?? b.image)
+          : null;
+
       if (isEditMode.value &&
           _originalBottleId != null &&
           _originalBottleId!.isNotEmpty) {
@@ -185,7 +253,8 @@ class AddCollectionController extends GetxController {
           quantity: resolvedQty,
           fill: normalizedFill,
           pricePaid: price,
-          image: b.image,
+          imageFile: imageFile,
+          image: imageUrl,
           notes: notesCtrl.text.trim(),
           dateAcquired: dateAcquiredCtrl.text.trim(),
         );
@@ -195,7 +264,8 @@ class AddCollectionController extends GetxController {
           quantity: resolvedQty,
           fill: normalizedFill,
           pricePaid: price,
-          image: b.image,
+          imageFile: imageFile,
+          image: imageUrl,
           notes: notesCtrl.text.trim(),
           dateAcquired: dateAcquiredCtrl.text.trim(),
         );

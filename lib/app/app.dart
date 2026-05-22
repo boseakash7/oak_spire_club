@@ -6,6 +6,8 @@ import 'app_binding.dart';
 import 'core/firebase/firebase_bootstrap.dart';
 import 'core/constants/app_constants.dart';
 import 'core/theme/app_colors.dart';
+import 'core/animations/app_motion.dart';
+import 'core/animations/app_page_transition.dart';
 import 'core/theme/app_theme.dart';
 import 'routes/app_pages.dart';
 import 'routes/app_routes.dart';
@@ -19,8 +21,9 @@ class OakSpireApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: AppConstants.appName,
       theme: AppTheme.dark,
-      defaultTransition: Transition.cupertino,
-      transitionDuration: const Duration(milliseconds: 300),
+      defaultTransition: Transition.fade,
+      customTransition: AppFadeSlideTransition(),
+      transitionDuration: AppMotion.page,
       navigatorObservers: firebaseAnalyticsNavObservers(),
       initialBinding: AppBinding(),
       initialRoute: AppRoutes.splash,

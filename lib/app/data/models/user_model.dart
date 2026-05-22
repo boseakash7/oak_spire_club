@@ -31,6 +31,17 @@ class UserModel {
   final String? subscriptionStatus;
   final String? isFree;
 
+  /// No paid package — show subscription offer after auth.
+  bool get needsSubscriptionOffer {
+    final pkg = packageId?.trim();
+    if (pkg != null && pkg.isNotEmpty && pkg != 'null') return false;
+    final sub = subscriptionStatus?.trim().toLowerCase();
+    if (sub == 'active' || sub == 'subscribed' || sub == 'paid') {
+      return false;
+    }
+    return true;
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'].toString(),

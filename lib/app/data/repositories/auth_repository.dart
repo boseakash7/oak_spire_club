@@ -73,4 +73,10 @@ class AuthRepository {
       _session().setUser(updated);
     }
   }
+
+  Future<void> deleteAccount({required String userId}) async {
+    await _remote.deleteAccount(userId: userId);
+    await AppStorage.clearSession();
+    _session().loadFromStorage();
+  }
 }

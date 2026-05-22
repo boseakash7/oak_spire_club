@@ -16,11 +16,14 @@ import '../modules/taste/taste_binding.dart';
 import '../modules/taste/taste_view.dart';
 import '../modules/market/benchmark_detail_binding.dart';
 import '../modules/market/benchmark_detail_view.dart';
+import '../modules/subscription/subscription_skip_view.dart';
 import '../modules/subscription/subscription_view.dart';
 import '../modules/settings/account/account_binding.dart';
 import '../modules/settings/account/account_view.dart';
 import '../modules/settings/notifications/notifications_binding.dart';
 import '../modules/settings/notifications/notifications_view.dart';
+import '../modules/settings/delete_account/delete_account_binding.dart';
+import '../modules/settings/delete_account/delete_account_view.dart';
 import '../modules/settings/privacy/privacy_binding.dart';
 import '../modules/settings/privacy/privacy_view.dart';
 import '../modules/settings/help/help_support_view.dart';
@@ -74,6 +77,10 @@ class AppPages {
     ),
     GetPage(name: AppRoutes.subscription, page: () => const SubscriptionView()),
     GetPage(
+      name: AppRoutes.subscriptionSkip,
+      page: () => const SubscriptionSkipView(),
+    ),
+    GetPage(
       name: AppRoutes.settingsAccount,
       page: () => const AccountView(),
       binding: AccountBinding(),
@@ -87,6 +94,11 @@ class AppPages {
       name: AppRoutes.settingsPrivacy,
       page: () => const PrivacyView(),
       binding: PrivacyBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.settingsDeleteAccount,
+      page: () => const DeleteAccountView(),
+      binding: DeleteAccountBinding(),
     ),
     GetPage(
       name: AppRoutes.settingsHelp,

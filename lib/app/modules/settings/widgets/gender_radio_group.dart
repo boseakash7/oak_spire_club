@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
-/// Gender options stored as API/local string values.
+/// Gender values accepted by `POST auth/update` (form: gender=male|female|other|prefer not to say).
 abstract final class GenderOption {
   static const male = 'male';
   static const female = 'female';
   static const other = 'other';
-  static const preferNotToSay = 'prefer_not_to_say';
+  static const preferNotToSay = 'prefer not to say';
 
   static const labels = <String, String>{
     male: 'Male',
@@ -18,6 +18,27 @@ abstract final class GenderOption {
   };
 
   static const values = [male, female, other, preferNotToSay];
+
+  /// Maps API / legacy stored values to a canonical option for the UI.
+  static String? normalize(String? raw) {
+    if (raw == null) return null;
+    final s = raw.trim().toLowerCase();
+    if (s.isEmpty) return null;
+    switch (s) {
+      case male:
+        return male;
+      case female:
+        return female;
+      case other:
+        return other;
+      case 'prefer not to say':
+      case 'prefer_not_to_say':
+      case 'prefer-not-to-say':
+        return preferNotToSay;
+      default:
+        return values.contains(s) ? s : null;
+    }
+  }
 }
 
 class GenderRadioGroup extends StatelessWidget {

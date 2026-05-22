@@ -8,6 +8,17 @@ import 'models/collection_item_model.dart';
 class CollectionValueCalculator {
   CollectionValueCalculator._();
 
+  /// Change % from chart-data `first_price` / `last_price` (bourboneur home).
+  ///
+  /// `100 - (first / last) * 100` — same as `(last - first) / last * 100`.
+  static double? movedPercentFromFirstLast({
+    required double? first,
+    required double? last,
+  }) {
+    if (first == null || last == null || last == 0) return null;
+    return 100 - (first / last) * 100;
+  }
+
   static double totalInvestedFromItems(Iterable<CollectionItemModel> items) {
     var sum = 0.0;
     for (final item in items) {

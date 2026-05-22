@@ -1,3 +1,5 @@
+import 'proof_json.dart';
+
 class BluebookModel {
   BluebookModel({
     required this.id,
@@ -38,7 +40,7 @@ class BluebookModel {
       high: _nullableString(json['high']),
       status: _nullableString(json['status']),
       image: _nullableString(json['image']),
-      proof: _nullableString(json['proof']),
+      proof: ProofJson.fromMap(json),
       description: _nullableString(json['description']),
       rating: _nullableString(json['rating']),
       priceMovement: _nullableString(json['price_movement']),

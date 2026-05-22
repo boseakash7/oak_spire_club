@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/show_app_dialog.dart';
 
 /// Leading width for [ph:wine] icon; gap matches Figma before the track.
 const double _kWineIconSize = 28;
@@ -20,12 +21,8 @@ Future<void> showFillLevelBottomSheet(
   final initial =
       (int.tryParse(fillController.text.trim()) ?? 100).clamp(1, 100);
 
-  return showModalBottomSheet<void>(
+  return showAppAnimatedBottomSheet<void>(
     context: context,
-    backgroundColor: Colors.transparent,
-    barrierColor: const Color(0x66000000),
-    isScrollControlled: true,
-    showDragHandle: false,
     builder: (ctx) {
       final bottomInset = MediaQuery.paddingOf(ctx).bottom;
       return _FillLevelBottomSheetBody(

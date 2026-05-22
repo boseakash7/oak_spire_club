@@ -55,16 +55,20 @@ class CollectionController extends GetxController {
       if (chart != null) {
         final first = double.tryParse(chart['first_price']?.toString() ?? '');
         final last = double.tryParse(chart['last_price']?.toString() ?? '');
-        // Always reflect actual collection rows (price * qty) in this view.
         if (localTotal > 0) {
           valueText.value = fmt.format(localTotal);
-        } else if (last != null && last > 0) {
-          valueText.value = fmt.format(last);
+        } else {
+          valueText.value = r'$ —';
         }
-        if (first != null && last != null && first != 0) {
-          final pct = ((last - first) / first) * 100;
+        if (list.isEmpty) {
+          trendShort.value = '—';
+        } else if (first != null && last != null && last != 0) {
+          final pct = CollectionValueCalculator.movedPercentFromFirstLast(
+            first: first,
+            last: last,
+          )!;
           trendShort.value =
-              '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%';
+              '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%';
         } else {
           final index = chart['index'];
           final movement = (index is Map)
@@ -116,9 +120,8 @@ class CollectionController extends GetxController {
     NumberFormat formatter,
   ) {
     final total = CollectionValueCalculator.totalInvestedFromItems(list);
-    if (total > 0) {
-      valueText.value = formatter.format(total);
-    }
+    valueText.value =
+        total > 0 ? formatter.format(total) : r'$ —';
     trendShort.value = '—';
   }
 
@@ -196,7 +199,11 @@ class CollectionController extends GetxController {
     return item.id;
   }
 
-  Future<void> increaseBottleQuantity(CollectionItemModel item, int quantity) async {
+  Future<void> increaseBottleQuantity(
+    CollectionItemModel item,
+    int quantity, {
+    bool reloadList = true,
+  }) async {
     await _repo.addToCollection(
       bottleId: resolveBottleId(item),
       quantity: quantity,
@@ -204,10 +211,14 @@ class CollectionController extends GetxController {
       pricePaid: double.tryParse(item.pricePaid ?? '') ?? 0,
       image: item.image,
     );
-    await forceReload();
+    if (reloadList) await forceReload();
   }
 
-  Future<void> decreaseBottleQuantity(CollectionItemModel item, int quantity) async {
+  Future<void> decreaseBottleQuantity(
+    CollectionItemModel item,
+    int quantity, {
+    bool reloadList = true,
+  }) async {
     if (quantity <= 0) {
       await _repo.removeFromCollection(bottleId: resolveBottleId(item));
     } else {
@@ -219,6 +230,6 @@ class CollectionController extends GetxController {
         image: item.image,
       );
     }
-    await forceReload();
+    if (reloadList) await forceReload();
   }
 }

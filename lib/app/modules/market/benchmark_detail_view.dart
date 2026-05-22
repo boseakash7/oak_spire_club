@@ -7,11 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
+import '../../core/animations/app_motion.dart';
 import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/app_cache_manager.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_back_button.dart';
 import '../../core/utils/price_formatter.dart';
 import 'benchmark_detail_controller.dart';
 
@@ -53,6 +55,93 @@ Widget _chartRangeChip(
   );
 }
 
+List<Widget> _collectionTrendWidgets({
+  required String? movementRaw,
+  required String movementLabel,
+  required Color movementColor,
+  required double? gainDollars,
+}) {
+  final widgets = <Widget>[];
+
+  if (gainDollars != null) {
+    final gainColor = gainDollars >= 0
+        ? AppColors.trendPositive
+        : AppColors.marketTrendDown;
+    widgets.add(
+      Text(
+        PriceFormatter.format(gainDollars.abs().round().toString()),
+        style: AppTextStyles.body16().copyWith(
+          fontSize: 12,
+          color: gainColor,
+        ),
+      ),
+    );
+  }
+
+  if (movementLabel == '—') {
+    if (widgets.isEmpty) {
+      widgets.add(
+        Text(
+          '—',
+          style: AppTextStyles.body16().copyWith(
+            fontSize: 12,
+            color: AppColors.textWolf,
+          ),
+        ),
+      );
+    }
+    return widgets;
+  }
+
+  if (widgets.isNotEmpty) {
+    widgets.add(const SizedBox(width: 4));
+    widgets.add(
+      Text(
+        '($movementLabel)',
+        style: AppTextStyles.body16().copyWith(
+          fontSize: 12,
+          color: movementColor,
+        ),
+      ),
+    );
+    return widgets;
+  }
+
+  final kind = PriceFormatter.priceMovementArrowKind(movementRaw);
+  if (kind == 'up') {
+    widgets.add(
+      SvgPicture.asset(
+        AppAssets.iconArrowUp,
+        width: 10,
+        height: 10,
+        colorFilter: ColorFilter.mode(movementColor, BlendMode.srcIn),
+      ),
+    );
+  } else if (kind == 'down') {
+    widgets.add(
+      SvgPicture.asset(
+        AppAssets.iconArrowDown,
+        width: 10,
+        height: 10,
+        colorFilter: ColorFilter.mode(movementColor, BlendMode.srcIn),
+      ),
+    );
+  } else {
+    widgets.add(Icon(Icons.horizontal_rule, size: 12, color: movementColor));
+  }
+  widgets.add(const SizedBox(width: 4));
+  widgets.add(
+    Text(
+      movementLabel,
+      style: AppTextStyles.body16().copyWith(
+        fontSize: 12,
+        color: movementColor,
+      ),
+    ),
+  );
+  return widgets;
+}
+
 class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
   const BenchmarkDetailView({super.key});
 
@@ -81,7 +170,12 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                       padding: const EdgeInsets.fromLTRB(5, 10, 23, 0),
                       child: Row(
                         children: [
-                          IconButton(
+                          AppBackButton(
+                            color: AppColors.white,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 30,
+                              height: 30,
+                            ),
                             onPressed: () {
                               if (Get.isRegistered<AppAnalyticsController>()) {
                                 unawaited(
@@ -90,22 +184,12 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                                   ),
                                 );
                               }
-                              Get.back();
+                              Get.back<void>();
                             },
-                            icon: const Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              color: AppColors.white,
-                              size: 20,
-                            ),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 30,
-                              height: 30,
-                            ),
                           ),
                           const Spacer(),
                           Text(
-                            'Good morning, ${controller.userFirstName}',
+                            controller.greetingText,
                             style: AppTextStyles.body16().copyWith(
                               fontSize: 14,
                               color: AppColors.textGreeting,
@@ -220,12 +304,16 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                                     borderRadius: BorderRadius.circular(6),
                                     gradient: AppColors.goldGradient,
                                   ),
-                                  child: Text(
-                                    '+ Add to collection',
-                                    style: AppTextStyles.body16().copyWith(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.black,
+                                  child: Obx(
+                                    () => Text(
+                                      controller.hasInCollection.value
+                                          ? '+ Add more'
+                                          : '+ Add to collection',
+                                      style: AppTextStyles.body16().copyWith(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.black,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -291,74 +379,93 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                                       : AppColors.textWolf,
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'You have this',
-                                style: AppTextStyles.body16().copyWith(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Text(
-                                    'Bought at',
-                                    style: AppTextStyles.body16().copyWith(
-                                      fontSize: 12,
-                                      color: AppColors.textOwnedLabel,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '${controller.avgFormatted} (6)',
-                                    style: AppTextStyles.body16().copyWith(
-                                      fontSize: 12,
-                                      color: AppColors.textCream,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  SvgPicture.asset(
-                                    AppAssets.iconArrowUp,
-                                    width: 10,
-                                    height: 10,
-                                    colorFilter: const ColorFilter.mode(
-                                      AppColors.trendPositive,
-                                      BlendMode.srcIn,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    r'$ 100 (+10.9%)',
-                                    style: AppTextStyles.body16().copyWith(
-                                      fontSize: 12,
-                                      color: AppColors.trendPositive,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Container(
-                                    width: 110,
-                                    height: 9,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.fillBarTrack,
-                                      borderRadius: BorderRadius.circular(27),
-                                    ),
-                                    child: Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Container(
-                                        width: 68,
-                                        height: 9,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.goldRich,
-                                          borderRadius: BorderRadius.circular(
-                                            27,
-                                          ),
-                                        ),
+                              Obx(() {
+                                if (!controller.hasInCollection.value) {
+                                  return const SizedBox.shrink();
+                                }
+                                const fillBarWidth = 110.0;
+                                final fillW =
+                                    (fillBarWidth * controller.collectionFillRatio.value)
+                                        .clamp(4.0, fillBarWidth);
+                                final movementRaw =
+                                    controller.collectionPriceMovementRaw.value;
+                                final movementColor =
+                                    PriceFormatter.priceMovementColor(
+                                  movementRaw,
+                                );
+                                final movementLabel =
+                                    PriceFormatter.formatPriceMovementLabel(
+                                  movementRaw,
+                                );
+                                final gain =
+                                    controller.collectionGainDollars.value;
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'You have this',
+                                      style: AppTextStyles.body16().copyWith(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Bought at',
+                                          style: AppTextStyles.body16()
+                                              .copyWith(
+                                                fontSize: 12,
+                                                color:
+                                                    AppColors.textOwnedLabel,
+                                              ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '${controller.collectionPaidLabel.value} (${controller.collectionQuantity.value})',
+                                          style: AppTextStyles.body16()
+                                              .copyWith(
+                                                fontSize: 12,
+                                                color: AppColors.textCream,
+                                              ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        ..._collectionTrendWidgets(
+                                          movementRaw: movementRaw,
+                                          movementLabel: movementLabel,
+                                          movementColor: movementColor,
+                                          gainDollars: gain,
+                                        ),
+                                        const Spacer(),
+                                        Container(
+                                          width: fillBarWidth,
+                                          height: 9,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.fillBarTrack,
+                                            borderRadius:
+                                                BorderRadius.circular(27),
+                                          ),
+                                          child: Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Container(
+                                              width: fillW,
+                                              height: 9,
+                                              decoration: BoxDecoration(
+                                                color: AppColors.goldRich,
+                                                borderRadius:
+                                                    BorderRadius.circular(27),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              }),
                             ],
                           ),
                         ),
@@ -544,6 +651,8 @@ class _BenchmarkPriceChart extends GetView<BenchmarkDetailController> {
             ],
             backgroundColor: AppColors.chartPlotBackground,
           ),
+          duration: AppMotion.chartDraw,
+          curve: AppMotion.chart,
         );
       }),
     );

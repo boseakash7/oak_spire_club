@@ -10,9 +10,12 @@ import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/network/app_cache_manager.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/widgets/animated_list_entrance.dart';
+import '../../core/widgets/app_filter_chip.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/price_formatter.dart';
+import '../../core/utils/proof_formatter.dart';
 import '../../core/widgets/app_header.dart';
 import '../../data/models/bluebook_model.dart';
 import '../../routes/app_routes.dart';
@@ -97,7 +100,10 @@ class MarketView extends GetView<MarketController> {
                       }
 
                       final b = controller.visibleBottles[index - 1];
-                      return _BenchmarkCard(bottle: b);
+                      return AnimatedListEntrance(
+                        index: index - 1,
+                        child: _BenchmarkCard(bottle: b),
+                      );
                     },
                   ),
                 ),
@@ -171,6 +177,8 @@ class _CategoryRow extends StatelessWidget {
       child: Obx(
         () => ListView.separated(
           scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.hardEdge,
+          padding: const EdgeInsets.only(right: 4),
           itemCount: controller.categories.length + 1,
           separatorBuilder: (context, index) => const SizedBox(width: 10),
           itemBuilder: (context, index) {
@@ -178,42 +186,20 @@ class _CategoryRow extends StatelessWidget {
             final label = isAll ? 'All' : controller.categories[index - 1].name;
             final id = isAll ? '' : controller.categories[index - 1].id;
             final selected = controller.selectedCategoryId.value == id;
-            return Center(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(42),
-                onTap: () {
-                  if (Get.isRegistered<AppAnalyticsController>()) {
-                    unawaited(
-                      AppAnalyticsController.to.logTap(
-                        'market_category_select',
-                        {'category_id': id},
-                      ),
-                    );
-                  }
-                  controller.selectCategory(id);
-                },
-                child: Container(
-                  height: 30,
-                  constraints: const BoxConstraints(minWidth: 92),
-                  padding: const EdgeInsets.symmetric(horizontal: 22),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(42),
-                    gradient: selected
-                        ? AppColors.goldGradient
-                        : AppColors.cardSurfaceGradient,
-                  ),
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body16().copyWith(
-                      fontSize: 14,
-                      color: selected ? AppColors.white : AppColors.textCream,
+            return AppFilterChip(
+              label: label,
+              selected: selected,
+              onTap: () {
+                if (Get.isRegistered<AppAnalyticsController>()) {
+                  unawaited(
+                    AppAnalyticsController.to.logTap(
+                      'market_category_select',
+                      {'category_id': id},
                     ),
-                  ),
-                ),
-              ),
+                  );
+                }
+                controller.selectCategory(id);
+              },
             );
           },
         ),
@@ -232,7 +218,7 @@ class _BenchmarkCard extends StatelessWidget {
     final low = PriceFormatter.format(bottle.low);
     final high = PriceFormatter.format(bottle.high);
     final imageUrl = _resolveImageUrl(bottle.image);
-    final proofLabel = bottle.proof ?? '—';
+    final proofLabel = ProofFormatter.formatLabelOrFallback(bottle.proof);
     final ratingLabel = bottle.rating ?? '—';
     final movementLabel =
         PriceFormatter.formatPriceMovementLabel(bottle.priceMovement);
@@ -314,7 +300,7 @@ class _BenchmarkCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body16().copyWith(
-                  fontSize: 14,
+                  fontSize: 15,
                   color: AppColors.white,
                 ),
               ),
@@ -368,6 +354,7 @@ class _BenchmarkCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.body16().copyWith(
                       fontSize: 12,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.textCream,
                     ),
                   ),

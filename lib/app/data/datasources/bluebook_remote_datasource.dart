@@ -14,11 +14,14 @@ class BluebookRemoteDataSource {
     required int page,
     required int limit,
     String? keyword,
+    String? categoryId,
   }) async {
     final response = await _client.get(_getAll, query: {
       'page': page.toString(),
       'limit': limit.toString(),
       if (keyword != null && keyword.trim().isNotEmpty) 'keyword': keyword.trim(),
+      if (categoryId != null && categoryId.trim().isNotEmpty)
+        'category_id': categoryId.trim(),
     });
 
     if (response.statusCode != 200) {

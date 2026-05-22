@@ -8,6 +8,35 @@ import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import '../../data/repositories/collection_repository.dart';
 
+/// Collection value chart lookback (Figma home — 1M / 3M / 6M / 1Y chips).
+enum HomeChartRange {
+  m1,
+  m3,
+  m6,
+  y1;
+
+  String get label => switch (this) {
+        HomeChartRange.m1 => '1M',
+        HomeChartRange.m3 => '3M',
+        HomeChartRange.m6 => '6M',
+        HomeChartRange.y1 => '1Y',
+      };
+
+  int get lookBackDays => switch (this) {
+        HomeChartRange.m1 => 30,
+        HomeChartRange.m3 => 90,
+        HomeChartRange.m6 => 182,
+        HomeChartRange.y1 => 365,
+      };
+
+  String get movedPeriodLabel => switch (this) {
+        HomeChartRange.m1 => 'last month',
+        HomeChartRange.m3 => 'last 3 months',
+        HomeChartRange.m6 => 'last 6 months',
+        HomeChartRange.y1 => 'last year',
+      };
+}
+
 class HomeController extends GetxController {
   final hasCollection = false.obs;
 
@@ -15,15 +44,21 @@ class HomeController extends GetxController {
   final movedText = 'Moved — in last 3 months'.obs;
 
   final totalCollectionCount = 0.obs;
+  final totalDrunkCount = 0.obs;
+  final totalRareCount = 0.obs;
+
+  /// From `collection/chart-data` → `collection_rating_percentage`.
+  final collectionRatingText = '—'.obs;
 
   /// Up to 10 collection bottles with highest `price_movement` (from `collection/all`).
   final topMovedBottles = <CollectionItemModel>[].obs;
 
-  /// Chart series (last 9 points) in "k" units for display — market value.
+  /// Chart series (last 9 points) in "k" units for display — market value (`data`).
   final chartSeriesK = <double>[].obs;
-  /// BSMI / secondary series in "k" units (API `bsmi` or smoothed from price).
+  /// BSMI series in "k" units (`index_data`, or legacy per-point / smoothed fallback).
   final chartBsmiSeriesK = <double>[].obs;
   final chartMaxYk = 15.0.obs;
+  final selectedChartRange = HomeChartRange.m3.obs;
 
   final isLoading = false.obs;
 
@@ -45,6 +80,8 @@ class HomeController extends GetxController {
         ..addAll(fetched);
       hasCollection.value = fetched.isNotEmpty;
       totalCollectionCount.value = fetched.length;
+      totalDrunkCount.value = fetched.where((item) => item.isDrunk).length;
+      totalRareCount.value = fetched.where((item) => item.isRareFind).length;
       topMovedBottles.assignAll(_pickTopMovedByPriceMovement(fetched));
 
       final formatter = NumberFormat.currency(
@@ -56,108 +93,18 @@ class HomeController extends GetxController {
       final localTotal =
           CollectionValueCalculator.totalInvestedFromItems(fetched);
 
-      final chart = await _repo.fetchChartData(
-        lookBackDays: 90,
-        forceRefresh: forceRefresh,
-      );
-      if (chart != null) {
-        final series = chart['data'];
-        if (series is List && series.isNotEmpty) {
-          final points = <Map<String, dynamic>>[];
-          for (final item in series) {
-            if (item is Map && item['price'] != null) {
-              final p = double.tryParse(item['price'].toString());
-              if (p != null) {
-                points.add(Map<String, dynamic>.from(item));
-              }
-            }
-          }
-          if (points.isNotEmpty) {
-            final lastPoints = points.length > 9
-                ? points.sublist(points.length - 9)
-                : points;
-            final prices = lastPoints
-                .map((e) => double.parse(e['price'].toString()))
-                .toList();
-            final k = prices.map((e) => e / 1000.0).toList();
-            chartSeriesK.assignAll(k);
-
-            final bsmiFromApi = <double>[];
-            var allHaveBsmi = true;
-            for (final e in lastPoints) {
-              final raw = e['bsmi'] ?? e['BSMI'] ?? e['secondary'];
-              final v = double.tryParse(raw?.toString() ?? '');
-              if (v == null) {
-                allHaveBsmi = false;
-                break;
-              }
-              bsmiFromApi.add(v / 1000.0);
-            }
-            if (allHaveBsmi && bsmiFromApi.length == k.length) {
-              chartBsmiSeriesK.assignAll(bsmiFromApi);
-            } else {
-              chartBsmiSeriesK.assignAll(_smoothSeriesK(k));
-            }
-
-            final maxMain = k.reduce((a, b) => a > b ? a : b);
-            final maxBsmi = chartBsmiSeriesK.isEmpty
-                ? maxMain
-                : chartBsmiSeriesK.reduce((a, b) => a > b ? a : b);
-            final maxK = math.max(maxMain, maxBsmi);
-            final rounded = ((maxK / 5).ceil() * 5).toDouble();
-            chartMaxYk.value = rounded < 15 ? 15 : rounded;
-          } else {
-            chartSeriesK.clear();
-            chartBsmiSeriesK.clear();
-          }
-        } else {
-          chartSeriesK.clear();
-          chartBsmiSeriesK.clear();
-        }
-
-        final first = double.tryParse(chart['first_price']?.toString() ?? '');
-        final last = double.tryParse(chart['last_price']?.toString() ?? '');
-        // Same rule as [CollectionController]: actual rows first; chart is fallback only.
-        if (localTotal > 0) {
-          collectionValueText.value = formatter.format(localTotal);
-        } else if (last != null && last > 0) {
-          collectionValueText.value = formatter.format(last);
-        }
-        if (first != null && last != null && first != 0) {
-          final percent = ((last - first) / first) * 100;
-          movedText.value =
-              'Moved ${percent >= 0 ? '+' : ''}${percent.toStringAsFixed(0)}% in last 3 months';
-        } else {
-          final index = chart['index'];
-          final movement = (index is Map)
-              ? double.tryParse(index['movement']?.toString() ?? '')
-              : null;
-          final trend = (index is Map)
-              ? index['trend']?.toString().toLowerCase()
-              : null;
-          if (movement != null) {
-            final sign = trend == 'down'
-                ? '-'
-                : trend == 'up'
-                ? '+'
-                : movement < 0
-                ? ''
-                : '+';
-            movedText.value =
-                'Moved $sign${movement.toStringAsFixed(1)}% in last 3 months';
-          } else {
-            movedText.value = 'Moved — in last 3 months';
-          }
-        }
+      if (localTotal > 0) {
+        collectionValueText.value = formatter.format(localTotal);
       } else {
-        chartSeriesK.clear();
-        chartBsmiSeriesK.clear();
-        _applyFallbackValue(fetched, formatter);
+        collectionValueText.value = r'$ —';
       }
+
+      await _loadChart(formatter: formatter, forceRefresh: forceRefresh);
     } catch (_) {
       topMovedBottles.clear();
-      chartSeriesK.clear();
-      chartBsmiSeriesK.clear();
+      totalDrunkCount.value = list.where((item) => item.isDrunk).length;
+      totalRareCount.value = list.where((item) => item.isRareFind).length;
+      _clearChartSeries();
       _applyFallbackValue(
         list,
         NumberFormat.currency(
@@ -200,16 +147,249 @@ class HomeController extends GetxController {
     NumberFormat formatter,
   ) {
     topMovedBottles.assignAll(_pickTopMovedByPriceMovement(list));
-    chartSeriesK.clear();
-    chartBsmiSeriesK.clear();
+    totalDrunkCount.value = list.where((item) => item.isDrunk).length;
+    totalRareCount.value = list.where((item) => item.isRareFind).length;
+    _clearChartSeries();
     final total = CollectionValueCalculator.totalInvestedFromItems(list);
-    if (total > 0) {
-      collectionValueText.value = formatter.format(total);
-    }
+    collectionValueText.value =
+        total > 0 ? formatter.format(total) : r'$ —';
     movedText.value = 'Moved — in last 3 months';
   }
 
+  /// Y-axis max when API returns no chart points (grid only, no lines).
+  static const double emptyChartMaxYk = 15;
+
+  void _clearChartSeries() {
+    chartSeriesK.clear();
+    chartBsmiSeriesK.clear();
+    chartMaxYk.value = emptyChartMaxYk;
+  }
+
+  Future<void> setChartRange(HomeChartRange range) async {
+    if (selectedChartRange.value == range) return;
+    selectedChartRange.value = range;
+    final formatter = NumberFormat.currency(
+      locale: 'en_US',
+      symbol: r'$',
+      decimalDigits: 0,
+    );
+    await _loadChart(formatter: formatter, forceRefresh: true);
+  }
+
+  Future<void> _loadChart({
+    required NumberFormat formatter,
+    required bool forceRefresh,
+  }) async {
+    final range = selectedChartRange.value;
+    final chart = await _repo.fetchChartData(
+      lookBackDays: range.lookBackDays,
+      forceRefresh: forceRefresh,
+    );
+    if (chart == null) {
+      _clearChartSeries();
+      if (!hasCollection.value) {
+        movedText.value = 'Moved — in ${range.movedPeriodLabel}';
+      }
+      return;
+    }
+
+    _applyChartQuickStats(chart);
+
+    final marketPoints = _parseChartPriceSeries(chart['data']);
+    if (marketPoints.isNotEmpty) {
+      final lastMarket = _lastChartPoints(marketPoints);
+      final k = _pricesToK(lastMarket);
+      chartSeriesK.assignAll(k);
+
+      final indexPoints = _parseChartPriceSeries(chart['index_data']);
+      final bsmiK = _bsmiSeriesK(
+        marketPoints: lastMarket,
+        indexPoints: indexPoints,
+      );
+      if (bsmiK != null && bsmiK.length == k.length) {
+        chartBsmiSeriesK.assignAll(bsmiK);
+      } else {
+        chartBsmiSeriesK.assignAll(_smoothSeriesK(k));
+      }
+
+      final maxMain = k.reduce((a, b) => a > b ? a : b);
+      final maxBsmi = chartBsmiSeriesK.isEmpty
+          ? maxMain
+          : chartBsmiSeriesK.reduce((a, b) => a > b ? a : b);
+      final maxK = math.max(maxMain, maxBsmi);
+      chartMaxYk.value = niceChartMaxK(maxK);
+    } else {
+      _clearChartSeries();
+    }
+
+    final first = double.tryParse(chart['first_price']?.toString() ?? '');
+    final last = double.tryParse(chart['last_price']?.toString() ?? '');
+    final period = range.movedPeriodLabel;
+    if (!hasCollection.value) {
+      movedText.value = 'Moved — in $period';
+    } else if (first != null && last != null && last != 0) {
+      final percent = CollectionValueCalculator.movedPercentFromFirstLast(
+        first: first,
+        last: last,
+      )!;
+      movedText.value =
+          'Moved ${percent >= 0 ? '+' : ''}${percent.toStringAsFixed(2)}% in $period';
+    } else {
+      final index = chart['index'];
+      final movement = (index is Map)
+          ? double.tryParse(index['movement']?.toString() ?? '')
+          : null;
+      final trend =
+          (index is Map) ? index['trend']?.toString().toLowerCase() : null;
+      if (movement != null) {
+        final sign = trend == 'down'
+            ? '-'
+            : trend == 'up'
+            ? '+'
+            : movement < 0
+            ? ''
+            : '+';
+        movedText.value =
+            'Moved $sign${movement.toStringAsFixed(1)}% in $period';
+      } else {
+        movedText.value = 'Moved — in $period';
+      }
+    }
+  }
+
   Future<void> forceReload() => fetchHomeData(forceRefresh: true);
+
+  void _applyChartQuickStats(Map<String, dynamic> chart) {
+    final rareRaw = chart['rare_bottles_count'];
+    if (rareRaw != null) {
+      final rare = int.tryParse(rareRaw.toString());
+      if (rare != null) totalRareCount.value = rare;
+    }
+
+    collectionRatingText.value = _formatCollectionRating(
+      chart['collection_rating_percentage'],
+    );
+  }
+
+  /// `collection_rating_percentage` is 0–100; Quick Stats shows a 0–5 value with star.
+  static String _formatCollectionRating(dynamic raw) {
+    final v = double.tryParse(raw?.toString() ?? '');
+    if (v == null) return '—';
+
+    final double onFiveScale;
+    if (v <= 5) {
+      onFiveScale = v;
+    } else {
+      onFiveScale = (v / 100) * 5;
+    }
+
+    if (onFiveScale == onFiveScale.roundToDouble()) {
+      return onFiveScale.toInt().toString();
+    }
+    return onFiveScale.toStringAsFixed(1);
+  }
+}
+
+const int _kChartPointLimit = 9;
+
+List<Map<String, dynamic>> _parseChartPriceSeries(dynamic raw) {
+  if (raw is! List) return [];
+  final points = <Map<String, dynamic>>[];
+  for (final item in raw) {
+    if (item is Map && item['price'] != null) {
+      final p = double.tryParse(item['price'].toString());
+      if (p != null) {
+        points.add(Map<String, dynamic>.from(item));
+      }
+    }
+  }
+  return points;
+}
+
+List<Map<String, dynamic>> _lastChartPoints(
+  List<Map<String, dynamic>> points, {
+  int maxPoints = _kChartPointLimit,
+}) {
+  if (points.length <= maxPoints) return points;
+  return points.sublist(points.length - maxPoints);
+}
+
+List<double> _pricesToK(List<Map<String, dynamic>> points) {
+  return points
+      .map((e) => double.parse(e['price'].toString()) / 1000.0)
+      .toList();
+}
+
+/// BSMI from `index_data`, aligned to market-value dates when possible.
+List<double>? _bsmiSeriesK({
+  required List<Map<String, dynamic>> marketPoints,
+  required List<Map<String, dynamic>> indexPoints,
+}) {
+  if (indexPoints.isNotEmpty) {
+    final indexByDate = <String, double>{};
+    for (final p in indexPoints) {
+      final date = p['date']?.toString();
+      if (date == null || date.isEmpty) continue;
+      final price = double.tryParse(p['price']?.toString() ?? '');
+      if (price != null) indexByDate[date] = price;
+    }
+
+    final byDate = <double>[];
+    for (final m in marketPoints) {
+      final date = m['date']?.toString();
+      final price = date != null ? indexByDate[date] : null;
+      if (price == null) break;
+      byDate.add(price / 1000.0);
+    }
+    if (byDate.length == marketPoints.length) return byDate;
+
+    final n = marketPoints.length;
+    final positional = indexPoints.length > n
+        ? indexPoints.sublist(indexPoints.length - n)
+        : indexPoints;
+    if (positional.length == n) return _pricesToK(positional);
+  }
+
+  final embedded = <double>[];
+  var allHaveEmbedded = true;
+  for (final e in marketPoints) {
+    final raw = e['bsmi'] ?? e['BSMI'] ?? e['secondary'];
+    final v = double.tryParse(raw?.toString() ?? '');
+    if (v == null) {
+      allHaveEmbedded = false;
+      break;
+    }
+    embedded.add(v / 1000.0);
+  }
+  if (allHaveEmbedded && embedded.length == marketPoints.length) {
+    return embedded;
+  }
+
+  return null;
+}
+
+/// Rounds up to a readable Y-axis max (e.g. 1.0 → 2, 12 → 15).
+double niceChartMaxK(double maxValueK) {
+  if (maxValueK <= 0) return 1;
+  final padded = maxValueK * 1.1;
+  if (padded <= 1) return 1;
+
+  final exp = (math.log(padded) / math.ln10).floor();
+  final magnitude = math.pow(10, exp).toDouble();
+  final fraction = padded / magnitude;
+
+  final double niceFraction;
+  if (fraction <= 1) {
+    niceFraction = 1;
+  } else if (fraction <= 2) {
+    niceFraction = 2;
+  } else if (fraction <= 5) {
+    niceFraction = 5;
+  } else {
+    niceFraction = 10;
+  }
+
+  return niceFraction * magnitude;
 }
 
 /// 3-point moving average for a BSMI-style smoother from the same price series.

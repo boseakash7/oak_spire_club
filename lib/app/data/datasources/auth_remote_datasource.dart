@@ -9,6 +9,7 @@ class AuthRemoteDataSource {
   static const String _register = 'auth/register';
   static const String _login = 'auth/login';
   static const String _update = 'auth/update';
+  static const String _delete = 'auth/delete';
 
   Future<UserModel> login({
     required String email,
@@ -68,6 +69,10 @@ class AuthRemoteDataSource {
     }
 
     await _client.postJson(_update, body);
+  }
+
+  Future<void> deleteAccount({required String userId}) async {
+    await _client.postJson(_delete, {'id': userId});
   }
 }
 

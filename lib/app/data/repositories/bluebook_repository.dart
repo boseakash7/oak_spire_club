@@ -13,8 +13,14 @@ class BluebookRepository {
     required int page,
     required int limit,
     String? keyword,
+    String? categoryId,
   }) =>
-      _remote.getAll(page: page, limit: limit, keyword: keyword);
+      _remote.getAll(
+        page: page,
+        limit: limit,
+        keyword: keyword,
+        categoryId: categoryId,
+      );
 
   Future<BluebookModel> create({
     required String bottleName,

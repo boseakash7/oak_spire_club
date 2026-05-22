@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/app_back_button.dart';
 import '../../../core/widgets/gradient_text.dart';
 
 const Color kSettingsCardBorder = Color(0xFF4A342E);
@@ -37,19 +38,7 @@ class SettingsScaffold extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   child: Row(
                     children: [
-                      IconButton(
-                        onPressed: () => Get.back(),
-                        icon: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: AppColors.textGreeting,
-                          size: 20,
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 34,
-                          height: 34,
-                        ),
-                      ),
+                      AppBackButton(onPressed: () => Get.back<void>()),
                       const SizedBox(width: 6),
                       Expanded(
                         child: GradientText(

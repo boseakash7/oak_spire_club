@@ -8,10 +8,15 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
 import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/animations/app_dialog_transitions.dart';
+import '../../core/animations/app_motion.dart';
+import '../../core/animations/app_overlay_entrance.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/app_cache_manager.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/animated_list_entrance.dart';
+import '../../core/widgets/app_filter_chip.dart';
 import '../../core/widgets/app_header.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
@@ -188,9 +193,12 @@ class _CollectionBody extends StatelessWidget {
                               childAspectRatio: _kFigmaCardW / _kFigmaCardH,
                             ),
                         delegate: SliverChildBuilderDelegate((context, index) {
-                          return _BottleCard(
-                            item: list[index],
-                            controller: controller,
+                          return AnimatedListEntrance(
+                            index: index,
+                            child: _BottleCard(
+                              item: list[index],
+                              controller: controller,
+                            ),
                           );
                         }, childCount: list.length),
                       ),
@@ -290,45 +298,100 @@ class _FilterRow extends StatefulWidget {
   State<_FilterRow> createState() => _FilterRowState();
 }
 
-class _FilterRowState extends State<_FilterRow> {
+class _FilterRowState extends State<_FilterRow>
+    with SingleTickerProviderStateMixin {
   final _link = LayerLink();
+  late final AnimationController _menuController;
+  late final CurvedAnimation _menuCurve;
   OverlayEntry? _entry;
-  bool _open = false;
+  bool _menuOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _menuController = AnimationController(
+      vsync: this,
+      duration: AppMotion.dropdown,
+      reverseDuration: AppMotion.fast,
+    );
+    _menuCurve = CurvedAnimation(
+      parent: _menuController,
+      curve: AppMotion.dropdownEnter,
+      reverseCurve: AppMotion.dropdownExit,
+    );
+    _menuController.addStatusListener(_onMenuAnimationStatus);
+    _menuCurve.addListener(_rebuildOverlay);
+  }
 
   @override
   void dispose() {
-    _hide();
+    _menuCurve.removeListener(_rebuildOverlay);
+    _menuController.removeStatusListener(_onMenuAnimationStatus);
+    _removeOverlay();
+    _menuCurve.dispose();
+    _menuController.dispose();
     super.dispose();
   }
 
-  void _hide() {
-    _entry?.remove();
-    _entry = null;
-    if (_open) setState(() => _open = false);
+  void _rebuildOverlay() => _entry?.markNeedsBuild();
+
+  void _onMenuAnimationStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed && _menuOpen) {
+      _removeOverlay();
+    }
   }
 
-  void _toggle() {
-    if (_entry != null) {
-      _hide();
-      return;
+  void _removeOverlay() {
+    _entry?.remove();
+    _entry = null;
+    if (mounted) {
+      if (_menuOpen) setState(() => _menuOpen = false);
+    } else {
+      _menuOpen = false;
     }
+  }
 
-    setState(() => _open = true);
+  void _closeMenu({bool animated = true}) {
+    if (!_menuOpen) return;
+
+    if (animated) {
+      _menuController.reverse();
+    } else {
+      _menuController.value = 0;
+      _removeOverlay();
+    }
+  }
+
+  void _openMenu() {
+    if (_menuOpen) return;
+
+    _menuOpen = true;
+    setState(() {});
+
     _entry = OverlayEntry(
       builder: (ctx) {
         return Stack(
           children: [
             Positioned.fill(
-              child: GestureDetector(
-                onTap: _hide,
-                behavior: HitTestBehavior.translucent,
+              child: appOverlayScrim(
+                animation: _menuCurve,
+                onDismiss: _closeMenu,
               ),
             ),
             CompositedTransformFollower(
               link: _link,
               showWhenUnlinked: false,
               offset: const Offset(41, 0),
-              child: _SortMenu(controller: widget.controller, onClose: _hide),
+              child: RepaintBoundary(
+                child: appOverlayDropdownEntrance(
+                  animation: _menuCurve,
+                  scaleAlignment: Alignment.topLeft,
+                  child: _SortMenu(
+                    controller: widget.controller,
+                    onClose: _closeMenu,
+                  ),
+                ),
+              ),
             ),
           ],
         );
@@ -336,6 +399,15 @@ class _FilterRowState extends State<_FilterRow> {
     );
 
     Overlay.of(context).insert(_entry!);
+    _menuController.forward(from: 0);
+  }
+
+  void _toggle() {
+    if (_menuOpen) {
+      _closeMenu();
+    } else {
+      _openMenu();
+    }
   }
 
   @override
@@ -346,19 +418,19 @@ class _FilterRowState extends State<_FilterRow> {
         children: [
           CompositedTransformTarget(
             link: _link,
-            child: Obx(
-              () => InkResponse(
-                onTap: _toggle,
-                radius: 24,
-                child: Stack(
+            child: InkResponse(
+              onTap: _toggle,
+              radius: 24,
+              child: Obx(
+                () => Stack(
                   clipBehavior: Clip.none,
                   children: [
                     SvgPicture.asset(
                       AppAssets.collectionFilterIcon,
                       width: 18,
                       height: 18,
-                      colorFilter: const ColorFilter.mode(
-                        AppColors.textMuted,
+                      colorFilter: ColorFilter.mode(
+                        _menuOpen ? AppColors.goldBright : AppColors.textMuted,
                         BlendMode.srcIn,
                       ),
                     ),
@@ -388,7 +460,7 @@ class _FilterRowState extends State<_FilterRow> {
                 clipBehavior: Clip.hardEdge,
                 padding: const EdgeInsets.only(right: 4),
                 children: [
-                  _FilterChip(
+                  AppFilterChip(
                     label: 'All',
                     selected:
                         widget.controller.filter.value == CollectionFilter.all,
@@ -396,7 +468,7 @@ class _FilterRowState extends State<_FilterRow> {
                         widget.controller.setFilter(CollectionFilter.all),
                   ),
                   const SizedBox(width: 10),
-                  _FilterChip(
+                  AppFilterChip(
                     label: 'Opened',
                     selected:
                         widget.controller.filter.value ==
@@ -405,7 +477,7 @@ class _FilterRowState extends State<_FilterRow> {
                         widget.controller.setFilter(CollectionFilter.opened),
                   ),
                   const SizedBox(width: 10),
-                  _FilterChip(
+                  AppFilterChip(
                     label: 'Not opened',
                     selected:
                         widget.controller.filter.value ==
@@ -414,7 +486,7 @@ class _FilterRowState extends State<_FilterRow> {
                         widget.controller.setFilter(CollectionFilter.notOpened),
                   ),
                   const SizedBox(width: 10),
-                  _FilterChip(
+                  AppFilterChip(
                     label: 'Rare Find',
                     selected:
                         widget.controller.filter.value ==
@@ -590,51 +662,6 @@ class _SortMenuRow extends StatelessWidget {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(42),
-        child: Container(
-          height: 28,
-          constraints: const BoxConstraints(minWidth: 92),
-          padding: const EdgeInsets.symmetric(horizontal: 22),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(42),
-            gradient: selected
-                ? AppColors.goldGradient
-                : AppColors.cardSurfaceGradient,
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: AppTextStyles.body16().copyWith(
-              fontSize: 14,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w400,
-              color: selected ? AppColors.white : AppColors.textCream,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _BottleCard extends StatelessWidget {
   const _BottleCard({required this.item, required this.controller});
 
@@ -657,12 +684,13 @@ class _BottleCard extends StatelessWidget {
         final sourceRect = box == null
             ? null
             : (box.localToGlobal(Offset.zero) & box.size);
-        await showGeneralDialog<void>(
+        final changed = await showGeneralDialog<bool>(
           context: context,
-          barrierDismissible: true,
+          barrierDismissible: false,
           barrierLabel: 'Close',
           barrierColor: Colors.transparent,
-          transitionDuration: const Duration(milliseconds: 320),
+          transitionDuration: AppMotion.dialog,
+          transitionBuilder: appDialogScaleFadeTransition,
           pageBuilder: (dialogContext, animation, secondaryAnimation) {
             return _BottleQuickPopup(
               item: item,
@@ -671,6 +699,9 @@ class _BottleCard extends StatelessWidget {
             );
           },
         );
+        if (changed == true) {
+          await controller.forceReload();
+        }
       },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(_kCollectionCardRadius),
@@ -773,7 +804,7 @@ class _BottleCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            item.priceLabel,
+                            item.priceLabelWithQuantity,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppTextStyles.body16().copyWith(
@@ -852,6 +883,7 @@ class _BottleQuickPopupState extends State<_BottleQuickPopup> {
 
   int _qty = 1;
   bool _busy = false;
+  bool _collectionChanged = false;
 
   @override
   void initState() {
@@ -860,13 +892,26 @@ class _BottleQuickPopupState extends State<_BottleQuickPopup> {
     _qty = (parsed == null || parsed <= 0) ? 1 : parsed;
   }
 
+  void _closePopup() {
+    Navigator.of(context).pop(_collectionChanged);
+  }
+
   Future<void> _inc() async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
       final next = _qty + 1;
-      await widget.controller.increaseBottleQuantity(widget.item, next);
-      if (mounted) setState(() => _qty = next);
+      await widget.controller.increaseBottleQuantity(
+        widget.item,
+        next,
+        reloadList: false,
+      );
+      if (mounted) {
+        setState(() {
+          _qty = next;
+          _collectionChanged = true;
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -877,10 +922,15 @@ class _BottleQuickPopupState extends State<_BottleQuickPopup> {
     setState(() => _busy = true);
     try {
       final next = _qty - 1;
-      await widget.controller.decreaseBottleQuantity(widget.item, next);
+      await widget.controller.decreaseBottleQuantity(
+        widget.item,
+        next,
+        reloadList: false,
+      );
       if (!mounted) return;
+      _collectionChanged = true;
       if (next <= 0) {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true);
       } else {
         setState(() => _qty = next);
       }
@@ -911,97 +961,92 @@ class _BottleQuickPopupState extends State<_BottleQuickPopup> {
             ),
           );
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.of(context).pop(),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 4.75, sigmaY: 4.75),
-              child: const ColoredBox(color: _kPopupBackdropOverlay),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.of(context).pop(_collectionChanged);
+      },
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _closePopup,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 4.75, sigmaY: 4.75),
+                child: const ColoredBox(color: _kPopupBackdropOverlay),
+              ),
             ),
           ),
-        ),
-        Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 36),
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: 1),
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeOutCubic,
-            builder: (context, t, child) {
-              final source = widget.sourceRect;
-              final screenSize = MediaQuery.sizeOf(context);
-              final targetCenter = Offset(
-                screenSize.width / 2,
-                screenSize.height / 2 - 8,
-              );
-              final sourceCenter = source?.center ?? targetCenter;
-              final fromScale = source == null
-                  ? 0.92
-                  : (source.width / _popupCardWidth).clamp(0.65, 1.0);
-              final scale = lerpDouble(fromScale, 1.0, t)!;
-              final dx = (sourceCenter.dx - targetCenter.dx) * (1 - t);
-              final dy = (sourceCenter.dy - targetCenter.dy) * (1 - t);
-              return Transform.translate(
-                offset: Offset(dx, dy),
-                child: Transform.scale(scale: scale, child: child),
-              );
-            },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: _popupCardWidth,
-                  height: _popupCardHeight,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(_kCollectionCardRadius),
-                    gradient: AppColors.cardSurfaceGradient,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(15, 16, 15, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Align(
-                          alignment: Alignment.topCenter,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: SizedBox(
-                              width: _kFigmaBottleImage,
-                              height: _kFigmaBottleImage,
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  const DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: AppColors.bottleRadialGlow,
+          Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 36),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              builder: (context, t, child) {
+                final source = widget.sourceRect;
+                final screenSize = MediaQuery.sizeOf(context);
+                final targetCenter = Offset(
+                  screenSize.width / 2,
+                  screenSize.height / 2 - 8,
+                );
+                final sourceCenter = source?.center ?? targetCenter;
+                final fromScale = source == null
+                    ? 0.92
+                    : (source.width / _popupCardWidth).clamp(0.65, 1.0);
+                final scale = lerpDouble(fromScale, 1.0, t)!;
+                final dx = (sourceCenter.dx - targetCenter.dx) * (1 - t);
+                final dy = (sourceCenter.dy - targetCenter.dy) * (1 - t);
+                return Transform.translate(
+                  offset: Offset(dx, dy),
+                  child: Transform.scale(scale: scale, child: child),
+                );
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: _popupCardWidth,
+                    height: _popupCardHeight,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(
+                        _kCollectionCardRadius,
+                      ),
+                      gradient: AppColors.cardSurfaceGradient,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(15, 16, 15, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Align(
+                            alignment: Alignment.topCenter,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: SizedBox(
+                                width: _kFigmaBottleImage,
+                                height: _kFigmaBottleImage,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    const DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        gradient: AppColors.bottleRadialGlow,
+                                      ),
                                     ),
-                                  ),
-                                  image,
-                                ],
+                                    image,
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          widget.item.lineTitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.body16().copyWith(
-                            fontSize: 12,
-                            height: 1.2,
-                            color: AppColors.white,
-                            fontFamily: 'Inter',
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        if (widget.item.lineSubtitle.isNotEmpty)
+                          const SizedBox(height: 14),
                           Text(
-                            widget.item.lineSubtitle,
-                            maxLines: 1,
+                            widget.item.lineTitle,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: AppTextStyles.body16().copyWith(
                               fontSize: 12,
@@ -1011,120 +1056,123 @@ class _BottleQuickPopupState extends State<_BottleQuickPopup> {
                               fontWeight: FontWeight.w400,
                             ),
                           ),
-                        SizedBox(
-                          height: widget.item.lineSubtitle.isEmpty ? 6 : 4,
-                        ),
-                        Text(
-                          widget.item.proofLabel,
-                          style: AppTextStyles.body16().copyWith(
-                            fontSize: 10,
-                            color: AppColors.textWolf,
-                            fontFamily: 'Inter',
+                          if (widget.item.lineSubtitle.isNotEmpty)
+                            Text(
+                              widget.item.lineSubtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.body16().copyWith(
+                                fontSize: 12,
+                                height: 1.2,
+                                color: AppColors.white,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          SizedBox(
+                            height: widget.item.lineSubtitle.isEmpty ? 6 : 4,
                           ),
-                        ),
-                        const Spacer(),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                '${widget.item.priceLabel} ($_qty)',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTextStyles.body16().copyWith(
-                                  fontSize: 12,
-                                  color: AppColors.textCream,
-                                  fontWeight: FontWeight.w500,
+                          Text(
+                            widget.item.proofLabel,
+                            style: AppTextStyles.body16().copyWith(
+                              fontSize: 10,
+                              color: AppColors.textWolf,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                          const Spacer(),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${widget.item.priceLabel} ($_qty)',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.body16().copyWith(
+                                    fontSize: 12,
+                                    color: AppColors.textCream,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            SizedBox(
-                              width: 63,
-                              height: 8,
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: AppColors.fillBarTrack,
-                                      borderRadius: BorderRadius.circular(27),
+                              const SizedBox(width: 6),
+                              SizedBox(
+                                width: 63,
+                                height: 8,
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: AppColors.fillBarTrack,
+                                        borderRadius: BorderRadius.circular(27),
+                                      ),
                                     ),
-                                  ),
-                                  Container(
-                                    width: (63 * widget.item.fillRatio).clamp(
-                                      4.0,
-                                      63.0,
+                                    Container(
+                                      width: (63 * widget.item.fillRatio).clamp(
+                                        4.0,
+                                        63.0,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.goldRich,
+                                        borderRadius: BorderRadius.circular(27),
+                                      ),
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.goldRich,
-                                      borderRadius: BorderRadius.circular(27),
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: _popupCardWidth,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _CircleActionButton(
+                              icon: Icons.add,
+                              onTap: _busy ? null : _inc,
+                            ),
+                            const SizedBox(width: 10),
+                            _CircleActionButton(
+                              icon: _qty <= 1 ? Icons.delete : Icons.remove,
+                              onTap: _busy ? null : _decOrRemove,
                             ),
                           ],
+                        ),
+                        _CircleActionButton(
+                          icon: Icons.visibility,
+                          onTap: _busy ? null : _openBenchmarkDetail,
                         ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: _popupCardWidth,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _CircleActionButton(
-                            icon: Icons.add,
-                            onTap: _busy ? null : _inc,
-                          ),
-                          const SizedBox(width: 10),
-                          _CircleActionButton(
-                            icon: _qty <= 1
-                                ? Icons.delete_outline
-                                : Icons.remove,
-                            onTap: _busy ? null : _decOrRemove,
-                          ),
-                        ],
-                      ),
-                      _CircleActionButton(
-                        icon: Icons.visibility_outlined,
-                        onTap: _busy ? null : _openEdit,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Future<void> _openEdit() async {
-    final args = <String, dynamic>{
-      'editMode': true,
-      'originalBottleId': widget.controller.resolveBottleId(widget.item),
-      'prefill': <String, dynamic>{
-        'id': widget.controller.resolveBottleId(widget.item),
-        'name': widget.item.lineTitle,
-        'image': widget.item.image,
-        'average': widget.item.pricePaid,
-        'quantity': int.tryParse(widget.item.quantity ?? '') ?? _qty,
-        'fill': (widget.item.fillRatio * 100).round().clamp(1, 100),
-        'notes': widget.item.notes,
-        'date_acquired': widget.item.dateAcquired,
-      },
-    };
-
-    Navigator.of(context).pop();
-    final res = await Get.toNamed(AppRoutes.addToCollection, arguments: args);
-    if (res == true) {
+  Future<void> _openBenchmarkDetail() async {
+    final hadChanges = _collectionChanged;
+    Navigator.of(context).pop(hadChanges);
+    await Get.toNamed(
+      AppRoutes.benchmarkDetail,
+      arguments: widget.item.benchmarkDetailArguments(
+        widget.controller.resolveBottleId(widget.item),
+      ),
+    );
+    if (hadChanges) {
       await widget.controller.forceReload();
     }
   }
@@ -1132,27 +1180,28 @@ class _BottleQuickPopupState extends State<_BottleQuickPopup> {
 
 class _CircleActionButton extends StatelessWidget {
   const _CircleActionButton({required this.icon, this.onTap});
+
+  static const double _size = 38;
+
   final IconData icon;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    // Same Ink + circle pattern as the collection FAB (renders clean on web).
     return Material(
       color: Colors.transparent,
-      child: Ink(
-        width: 38,
-        height: 38,
-        decoration: const BoxDecoration(
-          color: AppColors.goldRich,
-          shape: BoxShape.circle,
-        ),
-        child: ClipOval(
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            customBorder: const CircleBorder(),
-            child: Icon(icon, color: AppColors.white, size: 18),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Ink(
+          width: _size,
+          height: _size,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.goldRich,
           ),
+          child: Center(child: Icon(icon, color: AppColors.white, size: 16)),
         ),
       ),
     );

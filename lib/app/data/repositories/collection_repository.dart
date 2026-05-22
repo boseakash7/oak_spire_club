@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 
 import '../../core/cache/app_cache.dart';
@@ -18,7 +20,9 @@ class CollectionRepository {
     return item.id;
   }
 
-  List<CollectionItemModel> _groupCollectionItems(List<CollectionItemModel> raw) {
+  List<CollectionItemModel> _groupCollectionItems(
+    List<CollectionItemModel> raw,
+  ) {
     if (raw.isEmpty) return raw;
 
     final byBottle = <String, List<CollectionItemModel>>{};
@@ -44,6 +48,7 @@ class CollectionRepository {
       String? image = base.image;
       String? notes = base.notes;
       String? dateAcquired = base.dateAcquired;
+      String? proof = base.proof;
 
       for (final e in entries) {
         final q = int.tryParse(e.quantity ?? '');
@@ -61,10 +66,16 @@ class CollectionRepository {
           fillCount += 1;
         }
 
-        if ((image == null || image.isEmpty) && (e.image?.isNotEmpty ?? false)) {
+        if ((proof == null || proof.isEmpty) &&
+            (e.proof?.isNotEmpty ?? false)) {
+          proof = e.proof;
+        }
+        if ((image == null || image.isEmpty) &&
+            (e.image?.isNotEmpty ?? false)) {
           image = e.image;
         }
-        if ((notes == null || notes.isEmpty) && (e.notes?.isNotEmpty ?? false)) {
+        if ((notes == null || notes.isEmpty) &&
+            (e.notes?.isNotEmpty ?? false)) {
           notes = e.notes;
         }
         if ((dateAcquired == null || dateAcquired.isEmpty) &&
@@ -88,7 +99,7 @@ class CollectionRepository {
               ? base.fill
               : (totalFill / fillCount).round().toString(),
           image: image,
-          proof: base.proof,
+          proof: proof,
           pricePaid: priceCount == 0
               ? base.pricePaid
               : (totalPrice / priceCount).toStringAsFixed(2),
@@ -107,6 +118,7 @@ class CollectionRepository {
     int quantity = 1,
     int fill = 100,
     double pricePaid = 0,
+    File? imageFile,
     String? image,
     String? notes,
     String? dateAcquired,
@@ -121,6 +133,7 @@ class CollectionRepository {
       quantity: quantity,
       fill: fill,
       pricePaid: pricePaid,
+      imageFile: imageFile,
       image: image,
       notes: notes,
       dateAcquired: dateAcquired,
@@ -156,6 +169,7 @@ class CollectionRepository {
     int quantity = 1,
     int fill = 100,
     double pricePaid = 0,
+    File? imageFile,
     String? image,
     String? notes,
     String? dateAcquired,
@@ -167,6 +181,7 @@ class CollectionRepository {
         quantity: quantity,
         fill: fill,
         pricePaid: pricePaid,
+        imageFile: imageFile,
         image: image,
         notes: notes,
         dateAcquired: dateAcquired,
@@ -179,6 +194,7 @@ class CollectionRepository {
       quantity: quantity,
       fill: fill,
       pricePaid: pricePaid,
+      imageFile: imageFile,
       image: image,
       notes: notes,
       dateAcquired: dateAcquired,
@@ -197,7 +213,10 @@ class CollectionRepository {
       ttl: _ttl,
       forceRefresh: forceRefresh,
       fetch: () async {
-        final raw = await _remote.all(userId: userId, type: CollectionType.normal);
+        final raw = await _remote.all(
+          userId: userId,
+          type: CollectionType.normal,
+        );
         return _groupCollectionItems(raw);
       },
       encode: (list) => list.map((e) => e.toJson()).toList(),

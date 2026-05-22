@@ -30,8 +30,6 @@ class MarketController extends GetxController {
   final selectedCategoryId = ''.obs;
   final lastUpdatedText = 'Loading...'.obs;
 
-  final _categoryBottleIdsByCategory = <String, Set<String>>{};
-
   int _page = 1;
   Timer? _debounce;
 
@@ -80,6 +78,7 @@ class MarketController extends GetxController {
         page: _page,
         limit: _limit,
         keyword: keyword.value.trim().isEmpty ? null : keyword.value.trim(),
+        categoryId: _apiCategoryId,
       );
       if (reset) {
         bottles.assignAll(res);
@@ -127,23 +126,6 @@ class MarketController extends GetxController {
         forceRefresh: forceRefresh,
       );
       categories.assignAll(page.items);
-
-      final details = await Future.wait(
-        page.items.map(
-          (c) => _categoriesRepo.detail(
-            categoryId: c.id,
-            forceRefresh: forceRefresh,
-          ),
-        ),
-      );
-
-      final mapped = <String, Set<String>>{};
-      for (final detail in details) {
-        mapped[detail.category.id] = detail.bottles.map((e) => e.id).toSet();
-      }
-      _categoryBottleIdsByCategory
-        ..clear()
-        ..addAll(mapped);
     } catch (_) {
       // Keep benchmark usable even if categories fail.
     } finally {
@@ -166,14 +148,19 @@ class MarketController extends GetxController {
     }
   }
 
-  void selectCategory(String id) => selectedCategoryId.value = id;
-
-  List<BluebookModel> get visibleBottles {
-    final selected = selectedCategoryId.value;
-    if (selected.isEmpty) return bottles.toList(growable: false);
-    final ids = _categoryBottleIdsByCategory[selected];
-    if (ids == null || ids.isEmpty) return const <BluebookModel>[];
-    return bottles.where((b) => ids.contains(b.id)).toList(growable: false);
+  void selectCategory(String id) {
+    if (selectedCategoryId.value == id) return;
+    selectedCategoryId.value = id;
+    unawaited(load(reset: true, showFullLoader: false));
   }
+
+  /// Sent as query `category_id` on `bluebook/get-all-bluebooks` when not All.
+  String? get _apiCategoryId {
+    final id = selectedCategoryId.value.trim();
+    return id.isEmpty ? null : id;
+  }
+
+  List<BluebookModel> get visibleBottles =>
+      bottles.toList(growable: false);
 }
 

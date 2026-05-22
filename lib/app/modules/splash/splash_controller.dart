@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../core/storage/app_storage.dart';
+import '../../data/models/user_model.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../routes/app_routes.dart';
+import '../../routes/auth_navigation.dart';
 
 class SplashController extends GetxController {
   final isChecking = true.obs;
@@ -20,19 +22,23 @@ class SplashController extends GetxController {
   }
 
   Future<void> _boot() async {
-    final routeFuture = _resolveRoute();
+    final userFuture = _resolveUser();
 
     await Future.delayed(_minSplashVisible);
-    final route = await routeFuture;
+    final user = await userFuture;
 
     isChecking.value = false;
-    Get.offAllNamed(route);
+    if (user == null) {
+      Get.offAllNamed(AppRoutes.signUp);
+    } else {
+      AuthNavigation.completeSession(user);
+    }
   }
 
-  Future<String> _resolveRoute() async {
+  Future<UserModel?> _resolveUser() async {
     final id = AppStorage.userId;
     if (id == null || id.isEmpty) {
-      return AppRoutes.signUp;
+      return null;
     }
     if (kDebugMode) {
       debugPrint('[Auth] Auto-login stored user_id=$id');
@@ -43,12 +49,11 @@ class SplashController extends GetxController {
       if (kDebugMode) {
         debugPrint('[Auth] Auto-login refreshed user_id=${user.id}');
       }
-      return AppRoutes.shell;
+      return user;
     } catch (_) {
       await AppStorage.clearUserId();
       await AppStorage.clearUser();
-      return AppRoutes.signUp;
+      return null;
     }
   }
 }
-

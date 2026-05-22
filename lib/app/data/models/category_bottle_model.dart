@@ -1,5 +1,6 @@
 import '../../core/constants/app_constants.dart';
 import '../../core/storage/app_storage.dart';
+import 'proof_json.dart';
 
 class CategoryBottleModel {
   CategoryBottleModel({
@@ -9,6 +10,7 @@ class CategoryBottleModel {
     this.average,
     this.low,
     this.high,
+    this.proof,
     this.status,
     this.createdAt,
     this.categoryAddedAt,
@@ -20,6 +22,7 @@ class CategoryBottleModel {
   final String? average;
   final String? low;
   final String? high;
+  final String? proof;
   final String? status;
   final String? createdAt;
   final String? categoryAddedAt;
@@ -32,6 +35,7 @@ class CategoryBottleModel {
       average: json['average']?.toString(),
       low: json['low']?.toString(),
       high: json['high']?.toString(),
+      proof: ProofJson.fromMap(json),
       status: json['status']?.toString(),
       createdAt: json['created_at']?.toString(),
       categoryAddedAt: json['category_added_at']?.toString(),
@@ -46,6 +50,7 @@ class CategoryBottleModel {
       'average': average,
       'low': low,
       'high': high,
+      'proof': proof,
       'status': status,
       'created_at': createdAt,
       'category_added_at': categoryAddedAt,

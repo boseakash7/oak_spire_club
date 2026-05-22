@@ -18,9 +18,11 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   const AppHeader({
     super.key,
     this.title = AppConstants.appName,
+    this.showTitle = true,
   });
 
   final String title;
+  final bool showTitle;
 
   @override
   Size get preferredSize => const Size.fromHeight(kShellAppBarHeight);
@@ -31,58 +33,45 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
       Get.put<UserSessionController>(UserSessionController(), permanent: true);
     }
     final session = Get.find<UserSessionController>();
+
     return AppBar(
       backgroundColor: AppColors.surfaceDeep,
       surfaceTintColor: AppColors.surfaceDeep,
       elevation: 0,
       centerTitle: false,
       titleSpacing: 0,
+      toolbarHeight: kShellAppBarHeight,
       title: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 23),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Flexible(
-              flex: 5,
-              fit: FlexFit.loose,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: ShaderMask(
-                  shaderCallback: (bounds) =>
-                      AppColors.goldGradient.createShader(bounds),
-                  blendMode: BlendMode.srcIn,
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    style: AppTextStyles.heading32Bold().copyWith(
-                      fontSize: 18,
-                      height: 1.0,
-                    ),
+            if (showTitle) ...[
+              Flexible(
+                flex: 5,
+                fit: FlexFit.loose,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: _TitleText(title: title),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              flex: 4,
-              child: Obx(
-                () => Text(
-                  'Good morning, ${session.displayName}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
-                  style: AppTextStyles.body16().copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    height: 1.0,
-                    color: const Color(0xFFF5F5F5),
-                  ),
+              const SizedBox(width: 8),
+            ] else
+              const Spacer(),
+            if (showTitle)
+              Flexible(
+                flex: 4,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: _GreetingText(session: session),
                 ),
-              ),
-            ),
+              )
+            else
+              _GreetingText(session: session),
           ],
         ),
       ),
@@ -90,3 +79,48 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
+class _GreetingText extends StatelessWidget {
+  const _GreetingText({required this.session});
+
+  final UserSessionController session;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(
+      () => Text(
+        session.greetingText,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.right,
+        style: AppTextStyles.body16().copyWith(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          height: 1.0,
+          color: const Color(0xFFF5F5F5),
+        ),
+      ),
+    );
+  }
+}
+
+class _TitleText extends StatelessWidget {
+  const _TitleText({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      shaderCallback: (bounds) => AppColors.goldGradient.createShader(bounds),
+      blendMode: BlendMode.srcIn,
+      child: Text(
+        title,
+        maxLines: 1,
+        style: AppTextStyles.heading32Bold().copyWith(
+          fontSize: 18,
+          height: 1.0,
+        ),
+      ),
+    );
+  }
+}

@@ -9,7 +9,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/utils/app_snackbar.dart';
 import '../../../core/utils/validators.dart';
 import '../../../data/repositories/auth_repository.dart';
-import '../../../routes/app_routes.dart';
+import '../../../routes/auth_navigation.dart';
 
 class SignInController extends GetxController {
   final emailController = TextEditingController();
@@ -41,7 +41,7 @@ class SignInController extends GetxController {
       if (kDebugMode) {
         debugPrint('[Auth] Login success user_id=${user.id}');
       }
-      Get.offAllNamed(AppRoutes.shell);
+      AuthNavigation.completeSession(user);
     } on ApiException catch (e) {
       AppSnackbar.error(e.message);
     } catch (e, st) {

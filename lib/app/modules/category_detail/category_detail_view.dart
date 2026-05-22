@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/network/app_cache_manager.dart';
+import '../../core/widgets/animated_list_entrance.dart';
+import '../../core/widgets/app_back_button.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/models/category_bottle_model.dart';
@@ -15,10 +17,7 @@ class CategoryDetailView extends GetView<CategoryDetailController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceDeep,
-      appBar: AppBar(
-        backgroundColor: AppColors.surfaceDeep,
-        elevation: 0,
-        centerTitle: true,
+      appBar: AppScreenAppBar(
         title: Obx(() {
           final name = controller.detail.value?.category.name ??
               controller.initialName ??
@@ -82,7 +81,10 @@ class CategoryDetailView extends GetView<CategoryDetailController> {
                               const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final b = d.bottles[index];
-                            return _BottleRow(bottle: b);
+                            return AnimatedListEntrance(
+                              index: index,
+                              child: _BottleRow(bottle: b),
+                            );
                           },
                         ),
                       ),

@@ -31,6 +31,10 @@ abstract final class AppTheme {
         colorScheme: colorScheme,
         appBarTheme: const AppBarTheme(
           systemOverlayStyle: AppTheme.systemUiOverlayStyle,
+          iconTheme: IconThemeData(
+            color: AppColors.textGreeting,
+            size: 20,
+          ),
         ),
         pageTransitionsTheme: const PageTransitionsTheme(
           builders: {

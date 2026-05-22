@@ -5,6 +5,7 @@ import '../../../core/storage/app_storage.dart';
 import '../../../core/utils/app_snackbar.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/repositories/user_repository.dart';
+import '../widgets/gender_radio_group.dart';
 import '../../session/user_session_controller.dart';
 class AccountController extends GetxController {
   final nameController = TextEditingController();
@@ -25,10 +26,10 @@ class AccountController extends GetxController {
     final user = Get.find<UserSessionController>().user.value;
     nameController.text = user?.name?.trim() ?? '';
     emailController.text = user?.email?.trim() ?? '';
-    final gender =
-        user?.gender?.trim() ?? AppStorage.userGender?.trim();
-    if (gender != null && gender.isNotEmpty) {
-      selectedGender.value = gender;
+    final raw = user?.gender?.trim() ?? AppStorage.userGender?.trim();
+    final normalized = GenderOption.normalize(raw);
+    if (normalized != null) {
+      selectedGender.value = normalized;
     }
   }
 
@@ -38,8 +39,8 @@ class AccountController extends GetxController {
       await AppSnackbar.error('Please enter your name.');
       return;
     }
-    final gender = selectedGender.value;
-    if (gender == null || gender.isEmpty) {
+    final gender = GenderOption.normalize(selectedGender.value);
+    if (gender == null || !GenderOption.values.contains(gender)) {
       await AppSnackbar.error('Please select a gender.');
       return;
     }

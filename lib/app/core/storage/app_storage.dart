@@ -22,6 +22,14 @@ class AppStorage {
       _box.write(_keyUser, value);
   static Future<void> clearUser() => _box.remove(_keyUser);
 
+  /// Clears signed-in user data (logout / delete account).
+  static Future<void> clearSession() async {
+    await clearUserId();
+    await clearUser();
+    await _box.remove(_keyUserGender);
+    await _box.remove(_keyNotificationPrefs);
+  }
+
   static String? get uploadUrl => _box.read<String>(_keyUploadUrl);
   static Future<void> setUploadUrl(String value) =>
       _box.write(_keyUploadUrl, value);
