@@ -305,16 +305,34 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                                     gradient: AppColors.goldGradient,
                                   ),
                                   child: Obx(
-                                    () => Text(
-                                      controller.hasInCollection.value
-                                          ? '+ Add more'
-                                          : '+ Add to collection',
-                                      style: AppTextStyles.body16().copyWith(
+                                    () {
+                                      final inCollection =
+                                          controller.hasInCollection.value;
+                                      final label = inCollection
+                                          ? 'Edit collection'
+                                          : '+ Add to collection';
+                                      final textStyle =
+                                          AppTextStyles.body16().copyWith(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
                                         color: AppColors.black,
-                                      ),
-                                    ),
+                                      );
+                                      if (!inCollection) {
+                                        return Text(label, style: textStyle);
+                                      }
+                                      return Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.edit_outlined,
+                                            size: 14,
+                                            color: AppColors.black,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(label, style: textStyle),
+                                        ],
+                                      );
+                                    },
                                   ),
                                 ),
                               ),

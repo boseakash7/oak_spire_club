@@ -942,24 +942,14 @@ class _BottleQuickPopupState extends State<_BottleQuickPopup> {
   @override
   Widget build(BuildContext context) {
     final urls = widget.item.resolvedImageCandidates;
-    final image = urls.isEmpty
-        ? Image.asset(
-            AppAssets.collectionBottlePlaceholder,
-            fit: BoxFit.contain,
-          )
-        : CachedNetworkImage(
-            imageUrl: urls.first,
-            cacheManager: AppCacheManager.images,
-            fit: BoxFit.contain,
-            placeholder: (context, _) => Image.asset(
-              AppAssets.collectionBottlePlaceholder,
-              fit: BoxFit.contain,
-            ),
-            errorWidget: (context, error, stackTrace) => Image.asset(
-              AppAssets.collectionBottlePlaceholder,
-              fit: BoxFit.contain,
-            ),
-          );
+    Widget bottlePlaceholder() => Image.asset(
+      AppAssets.collectionBottlePlaceholder,
+      fit: BoxFit.contain,
+      gaplessPlayback: true,
+    );
+    final cacheWidthPx = (_kFigmaBottleImage *
+            MediaQuery.devicePixelRatioOf(context))
+        .round();
 
     return PopScope(
       canPop: false,
@@ -1037,7 +1027,15 @@ class _BottleQuickPopupState extends State<_BottleQuickPopup> {
                                         gradient: AppColors.bottleRadialGlow,
                                       ),
                                     ),
-                                    image,
+                                    if (urls.isNotEmpty)
+                                      _NetworkImageWithFallback(
+                                        urls: urls,
+                                        fit: BoxFit.contain,
+                                        placeholder: bottlePlaceholder(),
+                                        cacheWidthPx: cacheWidthPx,
+                                      )
+                                    else
+                                      bottlePlaceholder(),
                                   ],
                                 ),
                               ),

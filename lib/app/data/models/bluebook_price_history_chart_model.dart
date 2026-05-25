@@ -12,6 +12,7 @@ class BluebookPriceChartPoint {
   final DateTime date;
   final double price;
   final String? priceMovement;
+
   /// Optional BSMI value for this date when API provides `bsmi`.
   final double? bsmi;
 
@@ -19,15 +20,19 @@ class BluebookPriceChartPoint {
     final dateRaw = json['date']?.toString();
     DateTime date;
     if (dateRaw != null && dateRaw.isNotEmpty) {
-      date = DateTime.tryParse(dateRaw) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      date =
+          DateTime.tryParse(dateRaw) ?? DateTime.fromMillisecondsSinceEpoch(0);
     } else {
       date = DateTime.fromMillisecondsSinceEpoch(0);
     }
     final priceRaw = json['price']?.toString().trim() ?? '';
-    final price = double.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.-]'), '')) ?? 0;
+    final price =
+        double.tryParse(priceRaw.replaceAll(RegExp(r'[^\d.-]'), '')) ?? 0;
     final pm = json['price_movement']?.toString().trim();
     final bsmiRaw = json['bsmi']?.toString().trim();
-    final bsmi = double.tryParse((bsmiRaw ?? '').replaceAll(RegExp(r'[^\d.-]'), ''));
+    final bsmi = double.tryParse(
+      (bsmiRaw ?? '').replaceAll(RegExp(r'[^\d.-]'), ''),
+    );
     return BluebookPriceChartPoint(
       date: date,
       price: price,
@@ -60,7 +65,9 @@ class BluebookPriceHistoryDashboardRow {
     if (pricesRaw is List) {
       for (final e in pricesRaw) {
         if (e is Map) {
-          prices.add(BluebookPriceChartPoint.fromJson(Map<String, dynamic>.from(e)));
+          prices.add(
+            BluebookPriceChartPoint.fromJson(Map<String, dynamic>.from(e)),
+          );
         }
       }
     }

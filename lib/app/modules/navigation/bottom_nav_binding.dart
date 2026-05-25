@@ -10,14 +10,17 @@ import '../../data/repositories/categories_repository.dart';
 class BottomNavBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<BottomNavController>(() => BottomNavController());
-    Get.lazyPut<HomeController>(() => HomeController());
-    Get.lazyPut<CollectionController>(() => CollectionController());
+    // fenix: shell tabs swap widgets; without it GetX deletes lazy controllers
+    // when leaving a tab and Get.find fails on return (CollectionView Obx).
+    Get.lazyPut<BottomNavController>(() => BottomNavController(), fenix: true);
+    Get.lazyPut<HomeController>(() => HomeController(), fenix: true);
+    Get.lazyPut<CollectionController>(() => CollectionController(), fenix: true);
     Get.lazyPut<MarketController>(
       () => MarketController(
         bluebookRepo: Get.find<BluebookRepository>(),
         categoriesRepo: Get.find<CategoriesRepository>(),
       ),
+      fenix: true,
     );
   }
 }

@@ -70,25 +70,7 @@ class CollectionController extends GetxController {
           trendShort.value =
               '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%';
         } else {
-          final index = chart['index'];
-          final movement = (index is Map)
-              ? double.tryParse(index['movement']?.toString() ?? '')
-              : null;
-          final trend = (index is Map)
-              ? index['trend']?.toString().toLowerCase()
-              : null;
-          if (movement != null) {
-            final sign = trend == 'down'
-                ? '-'
-                : trend == 'up'
-                ? '+'
-                : movement < 0
-                ? ''
-                : '+';
-            trendShort.value = '$sign${movement.toStringAsFixed(1)}%';
-          } else {
-            trendShort.value = '—';
-          }
+          trendShort.value = '—';
         }
       } else {
         _applyFallbackValue(list, fmt);

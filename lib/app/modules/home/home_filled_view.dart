@@ -1,8 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
-import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/price_formatter.dart';
@@ -58,10 +58,7 @@ class HomeFilledView extends StatelessWidget {
                   const SizedBox(height: 38),
                   Padding(
                     padding: const EdgeInsets.only(right: 23),
-                    child: _SectionHeader(
-                      title: 'Top moved bottles',
-                      onTap: () {},
-                    ),
+                    child: const _SectionHeader(title: 'Top moved bottles'),
                   ),
                   const SizedBox(height: _kHomeHeadingToCardsGap),
                   Obx(() {
@@ -102,7 +99,7 @@ class HomeFilledView extends StatelessWidget {
                   const SizedBox(height: _kTopMovedToQuickStatsGap),
                   Padding(
                     padding: const EdgeInsets.only(right: 23),
-                    child: _SectionHeader(title: 'Quick Stats', onTap: () {}),
+                    child: const _SectionHeader(title: 'Quick Stats'),
                   ),
                   const SizedBox(height: _kHomeHeadingToCardsGap),
                   SizedBox(
@@ -144,23 +141,21 @@ class HomeFilledView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  // Chart: wider bleed layout (separate from content padding below).
-                  Padding(
-                    padding: const EdgeInsets.only(right: 23),
-                    child: LayoutBuilder(
-                      builder: (context, _) {
-                        const outer = 4.0;
-                        final w =
-                            MediaQuery.sizeOf(context).width - outer * 2;
-                        return Transform.translate(
-                          offset: const Offset(-7, 0),
-                          child: SizedBox(
-                            width: w,
-                            child: const HomeValueChart(),
-                          ),
-                        );
-                      },
-                    ),
+                  // Full-bleed chart (~2px from screen edges), like benchmark detail.
+                  LayoutBuilder(
+                    builder: (context, _) {
+                      const parentLeftPad = 23.0;
+                      final bleed = parentLeftPad - kHomeChartHorizontalInset;
+                      final w = MediaQuery.sizeOf(context).width -
+                          kHomeChartHorizontalInset * 2;
+                      return Transform.translate(
+                        offset: Offset(-bleed, 0),
+                        child: SizedBox(
+                          width: w,
+                          child: const HomeValueChart(),
+                        ),
+                      );
+                    },
                   ),
                   // Legend + range chips: align with Collection Value (23px).
                   const Padding(
@@ -204,69 +199,144 @@ class _CollectionValue extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        ShaderMask(
-          blendMode: BlendMode.srcIn,
-          shaderCallback: (bounds) => const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.gold2, AppColors.gold1],
-            stops: [0.21591, 0.90909],
-          ).createShader(bounds),
-          child: Obx(
-            () => Text(
-              home.collectionValueText.value,
-              style: AppTextStyles.button20Bold().copyWith(
-                fontSize: 36,
-                height: 1.12,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) => AppTextStyles
+                        .collectionValueGradient
+                        .createShader(bounds),
+                    child: Obx(
+                      () => Text(
+                        home.collectionValueText.value,
+                        style: AppTextStyles.button20Bold().copyWith(
+                          fontSize: 36,
+                          height: 1.12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Obx(() => _HomeMovedLine(text: home.movedText.value)),
+                ],
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Obx(
-          () => Text(
-            home.movedText.value,
-            style: AppTextStyles.body16().copyWith(
-              fontSize: 12,
-              height: 1.25,
-              color: const Color(0xFF9D9C9C),
+            const SizedBox(width: 14),
+            Obx(
+              () => _CollectionValueMiniBars(
+                heightFractions: home.collectionValueBarHeights.toList(),
+              ),
             ),
-          ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.onTap});
+/// Figma mini bar pair to the right of collection value (placeholder heights).
+class _CollectionValueMiniBars extends StatelessWidget {
+  const _CollectionValueMiniBars({required this.heightFractions});
 
-  final String title;
-  final VoidCallback? onTap;
+  final List<double> heightFractions;
+
+  static const double _maxHeight = 52;
+  static const double _barWidth = 16;
+  static const double _gap = 8;
+  static const double _barRadius = 1;
+  static const double _minBarHeight = 10;
 
   @override
   Widget build(BuildContext context) {
+    if (heightFractions.isEmpty) return const SizedBox.shrink();
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          title,
-          style: AppTextStyles.body16().copyWith(color: AppColors.white),
-        ),
-        const Spacer(),
-        InkResponse(
-          onTap: onTap,
-          radius: 20,
-          child: SvgPicture.asset(
-            AppAssets.iconArrowRight,
-            height: 13,
-            width: 6,
-            colorFilter: const ColorFilter.mode(
-              AppColors.white,
-              BlendMode.srcIn,
+        for (var i = 0; i < heightFractions.length; i++) ...[
+          if (i > 0) const SizedBox(width: _gap),
+          Container(
+            width: _barWidth,
+            height: math.max(
+              _minBarHeight,
+              _maxHeight * heightFractions[i].clamp(0.0, 1.0),
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(_barRadius),
+              gradient: AppTextStyles.collectionValueGradient,
             ),
           ),
-        ),
+        ],
       ],
+    );
+  }
+}
+
+/// “Moved +64% in last 3 months” — percent matches collection value gold.
+class _HomeMovedLine extends StatelessWidget {
+  const _HomeMovedLine({required this.text});
+
+  final String text;
+
+  static final _withPercent = RegExp(r'^Moved (.+?) in (.+)$');
+
+  @override
+  Widget build(BuildContext context) {
+    final base = AppTextStyles.homeMovedSubtitle();
+    final match = _withPercent.firstMatch(text);
+    if (match == null) {
+      return Text(text, style: base);
+    }
+
+    final percentPart = match.group(1)!;
+    final periodPart = match.group(2)!;
+    final showGoldPercent =
+        percentPart != '—' && RegExp(r'%').hasMatch(percentPart);
+
+    return Text.rich(
+      TextSpan(
+        style: base,
+        children: [
+          const TextSpan(text: 'Moved '),
+          if (showGoldPercent)
+            WidgetSpan(
+              alignment: PlaceholderAlignment.baseline,
+              baseline: TextBaseline.alphabetic,
+              child: ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) =>
+                    AppTextStyles.collectionValueGradient.createShader(bounds),
+                child: Text(
+                  percentPart,
+                  style: base.copyWith(color: AppColors.white),
+                ),
+              ),
+            )
+          else
+            TextSpan(text: percentPart),
+          TextSpan(text: ' in $periodPart'),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: AppTextStyles.body16().copyWith(color: AppColors.white),
     );
   }
 }
