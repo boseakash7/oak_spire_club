@@ -7,15 +7,25 @@ class ConfigRepository {
 
   Future<void> refresh() async {
     final json = await _remote.all();
-    final upload = json['upload_url']?.toString().trim();
-    if (upload != null && upload.isNotEmpty && upload != 'null') {
-      await AppStorage.setUploadUrl(upload);
-    }
+    await _saveIfPresent(json['upload_url'], AppStorage.setUploadUrl);
+    await _saveIfPresent(
+      json['pour_image_placeholder'],
+      AppStorage.setPourImagePlaceholderUrl,
+    );
+    await _saveIfPresent(json['razorpay_key_id'], AppStorage.setRazorpayKeyId);
+    await _saveIfPresent(
+      json['razorpay_key_secret'],
+      AppStorage.setRazorpayKeySecret,
+    );
+  }
 
-    final placeholder = json['pour_image_placeholder']?.toString().trim();
-    if (placeholder != null && placeholder.isNotEmpty && placeholder != 'null') {
-      await AppStorage.setPourImagePlaceholderUrl(placeholder);
-    }
+  static Future<void> _saveIfPresent(
+    dynamic raw,
+    Future<void> Function(String value) save,
+  ) async {
+    final value = raw?.toString().trim();
+    if (value == null || value.isEmpty || value == 'null') return;
+    await save(value);
   }
 }
 

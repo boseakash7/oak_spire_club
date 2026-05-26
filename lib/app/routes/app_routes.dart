@@ -11,6 +11,7 @@ class AppRoutes {
   static const String benchmarkDetail = '/benchmark-detail';
   static const String subscription = '/subscription';
   static const String subscriptionSkip = '/subscription-skip';
+  static const String subscriptionPaymentSuccess = '/subscription/payment-success';
   static const String settingsAccount = '/settings/account';
   static const String settingsNotifications = '/settings/notifications';
   static const String settingsPrivacy = '/settings/privacy';

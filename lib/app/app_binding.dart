@@ -8,6 +8,7 @@ import 'data/datasources/bluebook_remote_datasource.dart';
 import 'data/datasources/categories_remote_datasource.dart';
 import 'data/datasources/collection_remote_datasource.dart';
 import 'data/datasources/config_remote_datasource.dart';
+import 'data/datasources/package_remote_datasource.dart';
 import 'data/datasources/user_remote_datasource.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/bluebook_price_history_repository.dart';
@@ -15,6 +16,7 @@ import 'data/repositories/bluebook_repository.dart';
 import 'data/repositories/categories_repository.dart';
 import 'data/repositories/collection_repository.dart';
 import 'data/repositories/config_repository.dart';
+import 'data/repositories/package_repository.dart';
 import 'data/repositories/user_repository.dart';
 import 'modules/session/app_config_controller.dart';
 import 'modules/session/user_session_controller.dart';
@@ -84,6 +86,15 @@ class AppBinding extends Bindings {
     // Requires ConfigRepository, so register after it.
     Get.put<AppConfigController>(AppConfigController(), permanent: true);
 
+
+    Get.lazyPut<PackageRemoteDataSource>(
+      () => PackageRemoteDataSource(Get.find<ApiClient>()),
+      fenix: true,
+    );
+    Get.lazyPut<PackageRepository>(
+      () => PackageRepository(Get.find<PackageRemoteDataSource>()),
+      fenix: true,
+    );
 
     Get.lazyPut<UserRemoteDataSource>(
       () => UserRemoteDataSource(Get.find<ApiClient>()),

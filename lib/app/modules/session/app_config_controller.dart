@@ -6,6 +6,8 @@ import '../../data/repositories/config_repository.dart';
 class AppConfigController extends GetxController {
   final uploadUrl = RxnString();
   final pourImagePlaceholderUrl = RxnString();
+  final razorpayKeyId = RxnString();
+  final razorpayKeySecret = RxnString();
 
   ConfigRepository get _repo => Get.find<ConfigRepository>();
 
@@ -19,6 +21,8 @@ class AppConfigController extends GetxController {
   void loadFromStorage() {
     uploadUrl.value = AppStorage.uploadUrl;
     pourImagePlaceholderUrl.value = AppStorage.pourImagePlaceholderUrl;
+    razorpayKeyId.value = AppStorage.razorpayKeyId;
+    razorpayKeySecret.value = AppStorage.razorpayKeySecret;
   }
 
   @override

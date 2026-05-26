@@ -129,5 +129,30 @@ class AppColors {
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );
+
+  // --- Subscription / IAP (Figma 124:271, 129:320) -------------------------
+
+  /// Skip link, secondary actions — same as [ratingStarMuted].
+  static const Color subscriptionSkipLink = ratingStarMuted;
+
+  /// Benefit row gold emphasis.
+  static const Color subscriptionBenefitGold = Color(0xFFCA9F2E);
+
+  /// Benefit row alternate gold — same as [goldBright].
+  static const Color subscriptionBenefitGoldAlt = goldBright;
+
+  /// “No limits” benefit accents.
+  static const Color subscriptionBenefitLimitsPrimary = Color(0xFFC89D2C);
+  static const Color subscriptionBenefitLimitsSecondary = Color(0xFFC89C2C);
+
+  /// Plan card border (selected / unselected).
+  static const Color subscriptionPlanBorderSelected = Color(0xFFC89D2D);
+  static const Color subscriptionPlanBorderUnselected = Color(0xFF060304);
+
+  /// Plan price label (Playfair).
+  static const Color subscriptionPriceLabel = Color(0xFFCA9F2E);
+
+  /// Skip confirmation dismiss icon (Figma 129:320).
+  static const Color subscriptionSkipDismiss = Color(0xFFC89D2C);
 }
 

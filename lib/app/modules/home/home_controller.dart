@@ -45,8 +45,8 @@ class HomeController extends GetxController {
   final collectionValueText = r'$ —'.obs;
   final movedText = 'Moved — in last 3 months'.obs;
 
-  /// Mini bars beside collection value (fractions 0–1). Replace with API later.
-  final collectionValueBarHeights = <double>[0.28, 1.0].obs;
+  /// Movement % from chart `first_price` / `last_price`; null hides mini bars.
+  final collectionMovedPercent = Rxn<double>();
 
   final totalCollectionCount = 0.obs;
   final totalDrunkCount = 0.obs;
@@ -167,6 +167,7 @@ class HomeController extends GetxController {
     collectionValueText.value =
         total > 0 ? formatter.format(total) : r'$ —';
     movedText.value = 'Moved — in last 3 months';
+    collectionMovedPercent.value = null;
   }
 
   /// Default Y range when API returns no chart points (index scale).
@@ -181,6 +182,22 @@ class HomeController extends GetxController {
     chartBsmiPrices.clear();
     chartMinY.value = emptyChartMinY;
     chartMaxYk.value = emptyChartMaxYk;
+    collectionMovedPercent.value = null;
+  }
+
+  void _applyMovedForRange({
+    required double? percent,
+    required String period,
+  }) {
+    collectionMovedPercent.value = percent;
+    if (!hasCollection.value) {
+      movedText.value = 'Moved — in $period';
+    } else if (percent != null) {
+      movedText.value =
+          'Moved ${percent >= 0 ? '+' : ''}${percent.toStringAsFixed(2)}% in $period';
+    } else {
+      movedText.value = 'Moved — in $period';
+    }
   }
 
   Future<void> setChartRange(HomeChartRange range) async {
@@ -210,9 +227,7 @@ class HomeController extends GetxController {
     );
     if (chart == null) {
       _clearChartSeries();
-      if (!hasCollection.value) {
-        movedText.value = 'Moved — in ${range.movedPeriodLabel}';
-      }
+      _applyMovedForRange(percent: null, period: range.movedPeriodLabel);
       return;
     }
 
@@ -242,19 +257,11 @@ class HomeController extends GetxController {
     final first = double.tryParse(chart['first_price']?.toString() ?? '');
     final last = double.tryParse(chart['last_price']?.toString() ?? '');
     final period = range.movedPeriodLabel;
-    if (!hasCollection.value) {
-      movedText.value = 'Moved — in $period';
-    } else if (first != null && last != null && last != 0) {
-      final percent = CollectionValueCalculator.movedPercentFromFirstLast(
-        first: first,
-        last: last,
-      )!;
-      movedText.value =
-          'Moved ${percent >= 0 ? '+' : ''}${percent.toStringAsFixed(2)}% in $period';
-    } else {
-      // Bourboneur home: only first_price / last_price — no index.movement fallback.
-      movedText.value = 'Moved — in $period';
-    }
+    final percent = CollectionValueCalculator.movedPercentFromFirstLast(
+      first: first,
+      last: last,
+    );
+    _applyMovedForRange(percent: percent, period: period);
   }
 
   Future<void> forceReload() => fetchHomeData(forceRefresh: true);

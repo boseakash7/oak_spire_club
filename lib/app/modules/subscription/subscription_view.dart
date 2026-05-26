@@ -8,26 +8,27 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../core/animations/app_motion.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/payment_currency.dart';
+import '../../core/network/api_exception.dart';
+import '../../core/network/limit_exceeded_exception.dart';
+import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_subscription_theme.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_snackbar.dart';
 import '../../core/widgets/animated_pressable.dart';
 import '../../core/widgets/common_primary_button.dart';
 import '../../core/widgets/gradient_text.dart';
+import '../../data/models/razorpay_payment_create_model.dart';
+import '../../data/models/subscription_package_model.dart';
+import '../../data/models/subscription_payment_receipt.dart';
+import '../../data/repositories/package_repository.dart';
 import '../../routes/app_routes.dart';
 import '../../routes/auth_navigation.dart';
-
-/// Figma node 124:271 — IAP / subscription landing.
-const double _kHorizontalPad = 35;
-const double _kPriceCardHeight = 94;
-const double _kPriceCardRadius = 13;
-const double _kPriceCardGap = 19;
-const Color _kSkipText = Color(0xFF7B7878);
-const Color _kBenefitGold = Color(0xFFCA9F2E);
-const Color _kBenefitGoldAlt = Color(0xFFD3AE37);
-const Color _kPlanBorderSelected = Color(0xFFC89D2D);
-const Color _kPlanBorderUnselected = Color(0xFF060304);
-const Color _kPriceGold = Color(0xFFCA9F2E);
+import '../../routes/subscription_limit_navigation.dart';
+import '../../routes/subscription_payment_success_navigation.dart';
+import '../session/app_config_controller.dart';
+import 'subscription_controller.dart';
 
 class SubscriptionView extends StatefulWidget {
   const SubscriptionView({super.key});
@@ -38,27 +39,11 @@ class SubscriptionView extends StatefulWidget {
 
 class _SubscriptionViewState extends State<SubscriptionView> {
   late final Razorpay _razorpay;
+  late final SubscriptionController _subscription;
 
-  static const _plans = <_Plan>[
-    _Plan(
-      id: 'monthly',
-      title: 'Monthly',
-      billingSubtitle: 'Billed every month',
-      renewalNote: 'After trial will renew at \$5',
-      originalPrice: 5,
-      amountInr: 499,
-    ),
-    _Plan(
-      id: 'yearly',
-      title: 'Yearly',
-      billingSubtitle: 'Billed every year',
-      renewalNote: 'After trial will renew at \$30',
-      originalPrice: 30,
-      amountInr: 4499,
-    ),
-  ];
-
-  String? _selectedPlanId = 'monthly';
+  var _isCreatingPayment = false;
+  var _isVerifyingPayment = false;
+  RazorpayPaymentCreateModel? _pendingPayment;
 
   bool get _isPostAuth {
     final args = Get.arguments;
@@ -74,16 +59,10 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     );
   }
 
-  _Plan? get _selectedPlan {
-    for (final p in _plans) {
-      if (p.id == _selectedPlanId) return p;
-    }
-    return null;
-  }
-
   @override
   void initState() {
     super.initState();
+    _subscription = Get.find<SubscriptionController>();
     _razorpay = Razorpay();
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
@@ -97,11 +76,97 @@ class _SubscriptionViewState extends State<SubscriptionView> {
   }
 
   void _onPaymentSuccess(PaymentSuccessResponse res) {
-    unawaited(AppSnackbar.success('Payment successful'));
+    unawaited(
+      _submitPaymentVerify(
+        status: 'paid',
+        razorpayPaymentId: res.paymentId?.trim() ?? '',
+        razorpayOrderId: res.orderId?.trim(),
+        appMessage: 'Payment completed from app',
+      ),
+    );
   }
 
   void _onPaymentError(PaymentFailureResponse res) {
-    unawaited(AppSnackbar.error(res.message ?? 'Payment failed'));
+    unawaited(
+      _submitPaymentVerify(
+        status: 'failed',
+        razorpayPaymentId: '',
+        appMessage: res.message?.trim().isNotEmpty == true
+            ? res.message!.trim()
+            : 'Purchase failed from app',
+      ),
+    );
+  }
+
+  Future<void> _submitPaymentVerify({
+    required String status,
+    required String razorpayPaymentId,
+    String? razorpayOrderId,
+    required String appMessage,
+  }) async {
+    final pending = _pendingPayment;
+    if (pending == null) {
+      await AppSnackbar.error('Payment session expired. Please try again.');
+      return;
+    }
+
+    final isPaid = status == 'paid';
+    if (isPaid && razorpayPaymentId.isEmpty) {
+      await AppSnackbar.error(
+        'Could not confirm payment. Please contact support if you were charged.',
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _isVerifyingPayment = true);
+    try {
+      final verified = await Get.find<PackageRepository>().verifyPayment(
+        localOrderId: pending.localOrderId,
+        status: status,
+        razorpayOrderId: razorpayOrderId ?? pending.razorpayOrderId,
+        razorpayPaymentId: razorpayPaymentId,
+        razorpayPlanId: pending.razorpayPlanId,
+        message: appMessage,
+      );
+      _pendingPayment = null;
+      if (!mounted) return;
+
+      final defaultMessage = isPaid
+          ? 'Your subscription is now active.'
+          : 'Your purchase could not be completed.';
+      final displayMessage = verified.message.trim().isNotEmpty
+          ? verified.message.trim()
+          : defaultMessage;
+
+      final plan = _subscription.selectedPackage;
+      SubscriptionPaymentSuccessNavigation.open(
+        message: displayMessage,
+        isPostAuth: _isPostAuth,
+        paymentSucceeded: isPaid,
+        receipt: SubscriptionPaymentReceipt(
+          merchantName: AppConstants.appName,
+          planTitle: plan?.displayTitle ?? pending.planType,
+          amount: pending.amount,
+          currency: pending.currency,
+          status: verified.status,
+          paidAt: DateTime.now(),
+          localOrderId: verified.localOrderId,
+          razorpayOrderId: verified.razorpayOrderId.trim().isNotEmpty
+              ? verified.razorpayOrderId
+              : pending.razorpayOrderId,
+          razorpayPaymentId: verified.razorpayPaymentId,
+        ),
+      );
+    } on LimitExceededException {
+      // IAP opened by shared API handler.
+    } on ApiException catch (e) {
+      await AppSnackbar.error(e.message);
+    } catch (e) {
+      await AppSnackbar.error(e.toString());
+    } finally {
+      if (mounted) setState(() => _isVerifyingPayment = false);
+    }
   }
 
   void _onExternalWallet(ExternalWalletResponse res) {
@@ -110,42 +175,107 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     );
   }
 
+  /// TODO(testing): remove — wire button back to [_startCheckout].
+  void _openSuccessScreenForTesting() {
+    final plan = _subscription.selectedPackage;
+    SubscriptionPaymentSuccessNavigation.open(
+      message: 'Payment marked as successful',
+      isPostAuth: _isPostAuth,
+      paymentSucceeded: true,
+      receipt: SubscriptionPaymentReceipt(
+        merchantName: AppConstants.appName,
+        planTitle: plan?.displayTitle ?? 'Premium',
+        amount: double.tryParse(plan?.price ?? '') ?? 5,
+        currency: PaymentCurrency.usd,
+        status: 'paid',
+        paidAt: DateTime.now(),
+        localOrderId: '6',
+        razorpayOrderId: 'order_Stv2gNoG9s56Wa',
+        razorpayPaymentId: 'pay_ABC123',
+      ),
+    );
+  }
+
   Future<void> _startCheckout() async {
-    final plan = _selectedPlan;
+    if (_isCreatingPayment) return;
+
+    final plan = _subscription.selectedPackage;
     if (plan == null) {
       await AppSnackbar.error('Select a plan first.');
       return;
     }
 
-    final key = AppConstants.razorpayKeyId.trim();
-    if (key.isEmpty) {
-      await AppSnackbar.error(
-        'Razorpay key not configured. Set AppConstants.razorpayKeyId.',
-      );
+    final userId = AppStorage.userId?.trim();
+    if (userId == null || userId.isEmpty) {
+      await AppSnackbar.error('Please sign in again.');
       return;
     }
 
-    final options = <String, Object?>{
-      'key': key,
-      'amount': plan.amountInr * 100,
-      'currency': 'INR',
-      'name': AppConstants.appName,
-      'description': '${plan.title} subscription',
-      'prefill': <String, Object?>{'contact': '', 'email': ''},
-      'theme': <String, Object?>{'color': '#B9861F'},
-    };
-
+    setState(() => _isCreatingPayment = true);
     try {
+      final payment = await Get.find<PackageRepository>().createPayment(
+        userId: userId,
+        planType: plan.planTypeForPayment,
+        amount: plan.price,
+        packageId: plan.id,
+        currency: PaymentCurrency.usd,
+      );
+
+      if (!payment.hasValidOrder) {
+        await AppSnackbar.error(
+          payment.message.isNotEmpty
+              ? payment.message
+              : 'Could not start payment. Please try again.',
+        );
+        return;
+      }
+
+      var key = payment.keyId.trim();
+      if (key.isEmpty) {
+        key = AppStorage.razorpayKeyId?.trim() ?? '';
+      }
+      if (key.isEmpty && Get.isRegistered<AppConfigController>()) {
+        await Get.find<AppConfigController>().refresh();
+        key = AppStorage.razorpayKeyId?.trim() ?? '';
+      }
+      if (key.isEmpty) {
+        await AppSnackbar.error(
+          'Payment is not available right now. Please try again later.',
+        );
+        return;
+      }
+
+      _pendingPayment = payment;
+
+      final options = <String, Object?>{
+        'key': key,
+        'order_id': payment.razorpayOrderId,
+        'amount': payment.razorpayAmount,
+        'currency': payment.currency,
+        'name': AppConstants.appName,
+        'description': '${plan.displayTitle} subscription',
+        'prefill': <String, Object?>{'contact': '', 'email': ''},
+        'theme': <String, Object?>{'color': '#B9861F'},
+      };
+
       _razorpay.open(options);
+    } on LimitExceededException {
+      // IAP opened by shared API handler.
+    } on ApiException catch (e) {
+      await AppSnackbar.error(e.message);
     } catch (e) {
       await AppSnackbar.error(e.toString());
+    } finally {
+      if (mounted) setState(() => _isCreatingPayment = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final limitMessage = SubscriptionLimitNavigation.messageFromArguments();
+
     return PopScope(
-      canPop: !_isPostAuth,
+      canPop: !_isPostAuth && !_isVerifyingPayment,
       child: Scaffold(
         body: Stack(
           fit: StackFit.expand,
@@ -160,12 +290,25 @@ class _SubscriptionViewState extends State<SubscriptionView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (limitMessage != null && limitMessage.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSubscriptionTheme.horizontalPadding,
+                        12,
+                        AppSubscriptionTheme.horizontalPadding,
+                        0,
+                      ),
+                      child: _SubscriptionLimitBanner(message: limitMessage),
+                    ),
+                  ],
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(
-                        _kHorizontalPad,
-                        48,
-                        _kHorizontalPad,
+                      padding: EdgeInsets.fromLTRB(
+                        AppSubscriptionTheme.horizontalPadding,
+                        limitMessage != null && limitMessage.isNotEmpty
+                            ? AppSubscriptionTheme.scrollTopPaddingWithBanner
+                            : AppSubscriptionTheme.scrollTopPaddingDefault,
+                        AppSubscriptionTheme.horizontalPadding,
                         24,
                       ),
                       child: Column(
@@ -183,7 +326,9 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                                 TextSpan(text: 'Track '),
                                 TextSpan(
                                   text: 'unlimited',
-                                  style: TextStyle(color: _kBenefitGold),
+                                  style: TextStyle(
+                                    color: AppColors.subscriptionBenefitGold,
+                                  ),
                                 ),
                                 TextSpan(text: ' collection value overtime.'),
                               ],
@@ -197,7 +342,9 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                                 TextSpan(text: 'Access to the '),
                                 TextSpan(
                                   text: '10000+ bottles ',
-                                  style: TextStyle(color: _kBenefitGold),
+                                  style: TextStyle(
+                                    color: AppColors.subscriptionBenefitGold,
+                                  ),
                                 ),
                                 TextSpan(text: 'database.'),
                               ],
@@ -210,7 +357,9 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                               spans: [
                                 TextSpan(
                                   text: 'Full access',
-                                  style: TextStyle(color: _kBenefitGoldAlt),
+                                  style: TextStyle(
+                                    color: AppColors.subscriptionBenefitGoldAlt,
+                                  ),
                                 ),
                                 TextSpan(
                                   text: ' to bottle insights and tasting.',
@@ -225,46 +374,41 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                               spans: [
                                 TextSpan(
                                   text: 'No',
-                                  style: TextStyle(color: Color(0xFFC89D2C)),
+                                  style: TextStyle(
+                                    color: AppColors
+                                        .subscriptionBenefitLimitsPrimary,
+                                  ),
                                 ),
                                 TextSpan(text: ' daily '),
                                 TextSpan(
                                   text: 'limits',
-                                  style: TextStyle(color: Color(0xFFC89C2C)),
+                                  style: TextStyle(
+                                    color: AppColors
+                                        .subscriptionBenefitLimitsSecondary,
+                                  ),
                                 ),
                                 TextSpan(text: '.'),
                               ],
                             ),
                           ),
                           const SizedBox(height: 36),
-                          for (var i = 0; i < _plans.length; i++) ...[
-                            FadeSlideEntrance(
-                              index: 5 + i,
-                              child: _PricePlanCard(
-                                plan: _plans[i],
-                                isSelected: _plans[i].id == _selectedPlanId,
-                                onTap: () => setState(
-                                  () => _selectedPlanId = _plans[i].id,
-                                ),
-                              ),
-                            ),
-                            if (i < _plans.length - 1)
-                              const SizedBox(height: _kPriceCardGap),
-                          ],
+                          _PackagePlanList(subscription: _subscription),
                         ],
                       ),
                     ),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      _kHorizontalPad,
+                      AppSubscriptionTheme.horizontalPadding,
                       0,
-                      _kHorizontalPad,
+                      AppSubscriptionTheme.horizontalPadding,
                       12,
                     ),
                     child: CommonPrimaryButton(
                       label: 'Start free - 7 days trial',
+                      isLoading: _isCreatingPayment || _isVerifyingPayment,
                       onPressed: _startCheckout,
+                      //  _openSuccessScreenForTesting,
                     ),
                   ),
                   GestureDetector(
@@ -279,7 +423,9 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                           Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 12,
-                            color: _kSkipText.withValues(alpha: 0.9),
+                            color: AppColors.subscriptionSkipLink.withValues(
+                              alpha: 0.9,
+                            ),
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -287,7 +433,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                             style: GoogleFonts.roboto(
                               fontSize: 16,
                               fontWeight: FontWeight.w400,
-                              color: _kSkipText,
+                              color: AppColors.subscriptionSkipLink,
                             ),
                           ),
                         ],
@@ -297,7 +443,50 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                 ],
               ),
             ),
+            if (_isVerifyingPayment)
+              ColoredBox(
+                color: Colors.black.withValues(alpha: 0.5),
+                child: const Center(
+                  child: SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.gold1,
+                    ),
+                  ),
+                ),
+              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown when an API returns `LIMIT_EXCEEDED` and routes here.
+class _SubscriptionLimitBanner extends StatelessWidget {
+  const _SubscriptionLimitBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.black.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.gold2, width: 1),
+      ),
+      child: Text(
+        message,
+        style: AppTextStyles.body16().copyWith(
+          fontSize: 14,
+          height: 1.35,
+          color: AppColors.textCream,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
@@ -373,6 +562,74 @@ class _BenefitRow extends StatelessWidget {
   }
 }
 
+class _PackagePlanList extends StatelessWidget {
+  const _PackagePlanList({required this.subscription});
+
+  final SubscriptionController subscription;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (subscription.isLoadingPackages.value) {
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 32),
+          child: Center(
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.gold1,
+              ),
+            ),
+          ),
+        );
+      }
+
+      final error = subscription.loadError.value;
+      if (error != null && error.isNotEmpty) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            error,
+            style: GoogleFonts.roboto(fontSize: 14, color: AppColors.textWolf),
+          ),
+        );
+      }
+
+      final plans = subscription.packages;
+      if (plans.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            'No subscription plans available.',
+            style: GoogleFonts.roboto(fontSize: 14, color: AppColors.textWolf),
+          ),
+        );
+      }
+
+      final selectedId = subscription.selectedPackageId.value;
+
+      return Column(
+        children: [
+          for (var i = 0; i < plans.length; i++) ...[
+            FadeSlideEntrance(
+              index: 5 + i,
+              child: _PricePlanCard(
+                plan: plans[i],
+                isSelected: plans[i].id == selectedId,
+                onTap: () => subscription.selectPackage(plans[i].id),
+              ),
+            ),
+            if (i < plans.length - 1)
+              const SizedBox(height: AppSubscriptionTheme.priceCardGap),
+          ],
+        ],
+      );
+    });
+  }
+}
+
 /// Figma pricing cards 124:314 / 129:304 — 323×94 stacked plan rows.
 class _PricePlanCard extends StatelessWidget {
   const _PricePlanCard({
@@ -381,7 +638,7 @@ class _PricePlanCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final _Plan plan;
+  final SubscriptionPackageModel plan;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -392,12 +649,16 @@ class _PricePlanCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: AppMotion.fast,
         curve: AppMotion.standard,
-        height: _kPriceCardHeight,
+        height: AppSubscriptionTheme.priceCardHeight,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(_kPriceCardRadius),
+          borderRadius: BorderRadius.circular(
+            AppSubscriptionTheme.priceCardRadius,
+          ),
           gradient: AppColors.cardSurfaceGradient,
           border: Border.all(
-            color: isSelected ? _kPlanBorderSelected : _kPlanBorderUnselected,
+            color: isSelected
+                ? AppColors.subscriptionPlanBorderSelected
+                : AppColors.subscriptionPlanBorderUnselected,
             width: 1,
           ),
         ),
@@ -414,7 +675,7 @@ class _PricePlanCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          plan.title,
+                          plan.displayTitle,
                           style: GoogleFonts.roboto(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -435,7 +696,7 @@ class _PricePlanCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  _TrialPriceLabel(originalPrice: plan.originalPrice),
+                  _TrialPriceLabel(priceLabel: plan.displayPrice),
                 ],
               ),
               const Spacer(),
@@ -465,20 +726,20 @@ class _PricePlanCard extends StatelessWidget {
 }
 
 class _TrialPriceLabel extends StatelessWidget {
-  const _TrialPriceLabel({required this.originalPrice});
+  const _TrialPriceLabel({required this.priceLabel});
 
-  final int originalPrice;
+  final String priceLabel;
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      '\$$originalPrice',
+      '\$$priceLabel',
       textAlign: TextAlign.right,
       style: GoogleFonts.playfairDisplay(
         fontSize: 20,
         fontWeight: FontWeight.w700,
         height: 1,
-        color: _kPriceGold,
+        color: AppColors.subscriptionPriceLabel,
       ),
     );
   }
@@ -515,22 +776,4 @@ class _PlanSelectionIndicator extends StatelessWidget {
       child: const Icon(Icons.check_rounded, size: 15, color: AppColors.black),
     );
   }
-}
-
-class _Plan {
-  const _Plan({
-    required this.id,
-    required this.title,
-    required this.billingSubtitle,
-    required this.renewalNote,
-    required this.originalPrice,
-    required this.amountInr,
-  });
-
-  final String id;
-  final String title;
-  final String billingSubtitle;
-  final String renewalNote;
-  final int originalPrice;
-  final int amountInr;
 }

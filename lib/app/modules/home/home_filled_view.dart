@@ -1,22 +1,25 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/animations/app_motion.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/widgets/app_header.dart';
+import '../../data/collection_value_calculator.dart';
 import '../../data/models/collection_item_display.dart';
 import 'home_controller.dart';
 import 'widgets/home_chart_footer.dart';
 import 'widgets/home_value_chart.dart';
 
-/// Space between section heading and horizontal cards (Top moved / Quick Stats).
+/// Space between Top moved heading and its horizontal cards.
 const double _kHomeHeadingToCardsGap = 20;
 
 /// Space between Top moved bottles row and Quick Stats section.
-const double _kTopMovedToQuickStatsGap = 14;
+const double _kTopMovedToQuickStatsGap = 26;
+
+/// Space between Quick Stats heading and stat cards (tighter than Top moved).
+const double _kQuickStatsHeadingToCardsGap = 12;
 
 class HomeFilledView extends StatelessWidget {
   const HomeFilledView({super.key});
@@ -101,7 +104,7 @@ class HomeFilledView extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 23),
                     child: const _SectionHeader(title: 'Quick Stats'),
                   ),
-                  const SizedBox(height: _kHomeHeadingToCardsGap),
+                  const SizedBox(height: _kQuickStatsHeadingToCardsGap),
                   SizedBox(
                     height: 100,
                     child: ListView.separated(
@@ -227,11 +230,16 @@ class _CollectionValue extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 14),
-            Obx(
-              () => _CollectionValueMiniBars(
-                heightFractions: home.collectionValueBarHeights.toList(),
-              ),
-            ),
+            Obx(() {
+              final percent = home.collectionMovedPercent.value;
+              if (percent == null) return const SizedBox.shrink();
+              return _CollectionValueMiniBars(
+                movedFraction:
+                    CollectionValueCalculator.movedBarFractionFromPercent(
+                  percent,
+                ),
+              );
+            }),
           ],
         ),
       ],
@@ -239,41 +247,103 @@ class _CollectionValue extends StatelessWidget {
   }
 }
 
-/// Figma mini bar pair to the right of collection value (placeholder heights).
-class _CollectionValueMiniBars extends StatelessWidget {
-  const _CollectionValueMiniBars({required this.heightFractions});
+/// Mini bars beside collection value: left = moved %, right = 100% reference.
+class _CollectionValueMiniBars extends StatefulWidget {
+  const _CollectionValueMiniBars({required this.movedFraction});
 
-  final List<double> heightFractions;
+  /// Same % as “Moved +64% …” (0–1).
+  final double movedFraction;
 
+  @override
+  State<_CollectionValueMiniBars> createState() =>
+      _CollectionValueMiniBarsState();
+}
+
+class _CollectionValueMiniBarsState extends State<_CollectionValueMiniBars>
+    with SingleTickerProviderStateMixin {
   static const double _maxHeight = 52;
   static const double _barWidth = 16;
   static const double _gap = 8;
   static const double _barRadius = 1;
-  static const double _minBarHeight = 10;
+
+  static const Color _barColor = AppColors.gold2;
+
+  late final AnimationController _fillController;
+  double _leftBegin = 0;
+  double _leftEnd = 0;
+  double _rightBegin = 0;
+  double _rightEnd = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _fillController = AnimationController(
+      vsync: this,
+      duration: AppMotion.chartDraw,
+    )..addListener(() => setState(() {}));
+    _leftEnd = widget.movedFraction;
+    _rightEnd = 1;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fillController.forward(from: 0);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _CollectionValueMiniBars oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.movedFraction == widget.movedFraction) return;
+    final t = AppMotion.chart.transform(_fillController.value);
+    _leftBegin = _lerp(_leftBegin, _leftEnd, t);
+    _rightBegin = _lerp(_rightBegin, _rightEnd, t);
+    _leftEnd = widget.movedFraction;
+    _rightEnd = 1;
+    _fillController.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _fillController.dispose();
+    super.dispose();
+  }
+
+  static double _lerp(double a, double b, double t) => a + (b - a) * t;
+
+  double _animatedLeftHeight(double t) =>
+      _maxHeight * _lerp(_leftBegin, _leftEnd, t);
+
+  double _animatedRightHeight(double t) =>
+      _maxHeight * _lerp(_rightBegin, _rightEnd, t);
 
   @override
   Widget build(BuildContext context) {
-    if (heightFractions.isEmpty) return const SizedBox.shrink();
-
+    final t = AppMotion.chart.transform(_fillController.value);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (var i = 0; i < heightFractions.length; i++) ...[
-          if (i > 0) const SizedBox(width: _gap),
-          Container(
-            width: _barWidth,
-            height: math.max(
-              _minBarHeight,
-              _maxHeight * heightFractions[i].clamp(0.0, 1.0),
-            ),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(_barRadius),
-              gradient: AppTextStyles.collectionValueGradient,
-            ),
-          ),
-        ],
+        _MiniBar(height: _animatedLeftHeight(t)),
+        const SizedBox(width: _gap),
+        _MiniBar(height: _animatedRightHeight(t)),
       ],
+    );
+  }
+}
+
+class _MiniBar extends StatelessWidget {
+  const _MiniBar({required this.height});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _CollectionValueMiniBarsState._barWidth,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius:
+            BorderRadius.circular(_CollectionValueMiniBarsState._barRadius),
+        color: _CollectionValueMiniBarsState._barColor,
+      ),
     );
   }
 }

@@ -66,15 +66,7 @@ class CollectionRemoteDataSource {
     }
 
     final response = await _client.post(_add, form);
-    if (response.statusCode != 200) {
-      throw ApiException('Internal server error.');
-    }
-
-    final json = response.body;
-    if (json is! Map) throw ApiException('Unexpected server response.');
-    if (json['code']?.toString() != 'OK') {
-      throw ApiException(json['data']?.toString() ?? 'Something went wrong.');
-    }
+    final json = _client.parseEnvelope(response);
 
     final data = json['data'];
     if (data is Map) {
@@ -122,16 +114,7 @@ class CollectionRemoteDataSource {
       _all,
       query: {'user_id': userId, 'type': type.name},
     );
-
-    if (response.statusCode != 200) {
-      throw ApiException('Internal server error.');
-    }
-
-    final json = response.body;
-    if (json is! Map) throw ApiException('Unexpected server response.');
-    if (json['code']?.toString() != 'OK') {
-      throw ApiException(json['data']?.toString() ?? 'Something went wrong.');
-    }
+    final json = _client.parseEnvelope(response);
 
     final data = json['data'];
     if (data is! List) throw ApiException('Unexpected server response.');
@@ -153,16 +136,7 @@ class CollectionRemoteDataSource {
       _chartData,
       query: {'user_id': userId, 'look_back': lookBackDays.toString()},
     );
-
-    if (response.statusCode != 200) {
-      throw ApiException('Internal server error.');
-    }
-
-    final json = response.body;
-    if (json is! Map) throw ApiException('Unexpected server response.');
-    if (json['code']?.toString() != 'OK') {
-      throw ApiException(json['data']?.toString() ?? 'Something went wrong.');
-    }
+    final json = _client.parseEnvelope(response);
 
     final data = json['data'];
     if (data is! Map) throw ApiException('Unexpected server response.');

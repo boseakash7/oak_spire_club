@@ -39,6 +39,8 @@ abstract final class AnalyticsScreens {
         return 'subscription';
       case AppRoutes.subscriptionSkip:
         return 'subscription_skip';
+      case AppRoutes.subscriptionPaymentSuccess:
+        return 'subscription_payment_success';
       case AppRoutes.settingsAccount:
         return 'settings_account';
       case AppRoutes.settingsNotifications:

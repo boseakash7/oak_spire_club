@@ -122,18 +122,19 @@ class ChartIndexComparison {
     );
   }
 
+  /// Y axis anchored at the data minimum (bottom-left), with headroom only above.
+  /// Bourboneur leaves [minY]/[maxY] unset so fl_chart uses this tight range.
   static (double, double) _indexAxisBounds(List<double> values) {
     if (values.isEmpty) return (90, 110);
-    var minV = values.reduce(math.min);
-    var maxV = values.reduce(math.max);
-    var span = maxV - minV;
+    final minV = values.reduce(math.min);
+    final maxV = values.reduce(math.max);
+    final span = maxV - minV;
     if (span < 1) {
-      minV = 95;
-      maxV = 105;
-      span = 10;
+      // Bourboneur `priceGap == 0 ? 5` — small band above the floor, not centered on 100.
+      return (math.max(0, minV), minV + 5);
     }
-    final pad = span * 0.12;
-    return (math.max(0, minV - pad), maxV + pad);
+    final topPad = span * 0.12;
+    return (math.max(0, minV), maxV + topPad);
   }
 }
 

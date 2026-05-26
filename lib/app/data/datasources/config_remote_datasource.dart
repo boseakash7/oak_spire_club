@@ -9,15 +9,7 @@ class ConfigRemoteDataSource {
 
   Future<Map<String, dynamic>> all() async {
     final response = await _client.get(_all);
-    if (response.statusCode != 200) {
-      throw ApiException('Internal server error.');
-    }
-
-    final json = response.body;
-    if (json is! Map) throw ApiException('Unexpected server response.');
-    if (json['code']?.toString() != 'OK') {
-      throw ApiException(json['data']?.toString() ?? 'Something went wrong.');
-    }
+    final json = _client.parseEnvelope(response);
 
     final data = json['data'];
     if (data is! Map) throw ApiException('Unexpected server response.');

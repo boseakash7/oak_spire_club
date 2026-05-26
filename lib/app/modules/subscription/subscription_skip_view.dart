@@ -4,17 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_subscription_theme.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/common_primary_button.dart';
 import '../../routes/app_routes.dart';
 import '../../routes/auth_navigation.dart';
 
 /// Figma node 129:320 — skip / limited-access confirmation.
-const double _kHorizontalPad = 35;
-const double _kTitleHorizontalPad = 26;
-const Color _kSkipText = Color(0xFF7B7878);
-const Color _kCrossGold = Color(0xFFC89D2C);
-
 class SubscriptionSkipView extends StatelessWidget {
   const SubscriptionSkipView({super.key});
 
@@ -53,9 +49,9 @@ class SubscriptionSkipView extends StatelessWidget {
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(
-                        _kTitleHorizontalPad,
+                        AppSubscriptionTheme.skipTitleHorizontalPadding,
                         48,
-                        _kHorizontalPad,
+                        AppSubscriptionTheme.horizontalPadding,
                         24,
                       ),
                       child: Column(
@@ -99,9 +95,9 @@ class SubscriptionSkipView extends StatelessWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      _kHorizontalPad,
+                      AppSubscriptionTheme.horizontalPadding,
                       0,
-                      _kHorizontalPad,
+                      AppSubscriptionTheme.horizontalPadding,
                       12,
                     ),
                     child: CommonPrimaryButton(
@@ -121,7 +117,7 @@ class SubscriptionSkipView extends StatelessWidget {
                           Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 12,
-                            color: _kSkipText.withValues(alpha: 0.9),
+                            color: AppColors.subscriptionSkipLink.withValues(alpha: 0.9),
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -129,7 +125,7 @@ class SubscriptionSkipView extends StatelessWidget {
                             style: GoogleFonts.roboto(
                               fontSize: 16,
                               fontWeight: FontWeight.w400,
-                              color: _kSkipText,
+                              color: AppColors.subscriptionSkipLink,
                             ),
                           ),
                         ],
@@ -188,7 +184,7 @@ class _LimitationCrossIcon extends StatelessWidget {
       child: Icon(
         Icons.close_rounded,
         size: 28,
-        color: _kCrossGold,
+        color: AppColors.subscriptionSkipDismiss,
       ),
     );
   }

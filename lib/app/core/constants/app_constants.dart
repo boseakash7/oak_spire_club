@@ -7,13 +7,12 @@ class AppConstants {
   /// From `bourboneur-app/lib/Core/Constants.dart`
   static const String apiBaseUrl = 'https://www.oakspireclub.com/v2/api/';
 
-  /// Razorpay public key (Key ID). Set your live/test key here.
-  ///
-  /// Example: `rzp_test_...`
-  static const String razorpayKeyId = 'SeBxFTSGiy2WLf';
+  /// Razorpay keys come from `config/all` → `razorpay_key_id` / `razorpay_key_secret`.
+  /// See [AppStorage.razorpayKeyId] after [AppConfigController.refresh].
 
   static const String termsUrl = 'https://www.oakspireclub.com/terms';
-  static const String privacyUrl = 'https://www.oakspireclub.com/privacy-policy';
+  static const String privacyUrl =
+      'https://www.oakspireclub.com/privacy-policy';
 
   static const String supportEmail = 'support@oakspireclub.com';
 

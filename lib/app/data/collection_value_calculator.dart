@@ -19,6 +19,12 @@ class CollectionValueCalculator {
     return 100 - (first / last) * 100;
   }
 
+  /// Mini-bar fill (0–1) for the same % shown in “Moved +64% …”.
+  static double movedBarFractionFromPercent(double? percent) {
+    if (percent == null) return 0;
+    return (percent.abs() / 100).clamp(0.0, 1.0);
+  }
+
   static double totalInvestedFromItems(Iterable<CollectionItemModel> items) {
     var sum = 0.0;
     for (final item in items) {

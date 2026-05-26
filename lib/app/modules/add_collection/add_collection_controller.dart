@@ -5,6 +5,8 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/storage/app_storage.dart';
+import '../../core/network/api_exception.dart';
+import '../../core/network/limit_exceeded_exception.dart';
 import '../../core/utils/app_snackbar.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/utils/validators.dart';
@@ -272,6 +274,10 @@ class AddCollectionController extends GetxController {
       }
       await AppSnackbar.success('Added to collection.');
       Get.back(result: true);
+    } on LimitExceededException {
+      // [SubscriptionLimitNavigation] already opened IAP with the API message.
+    } on ApiException catch (e) {
+      await AppSnackbar.error(e.message);
     } catch (e) {
       await AppSnackbar.error(e.toString());
     } finally {

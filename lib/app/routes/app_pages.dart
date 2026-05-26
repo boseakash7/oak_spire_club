@@ -16,6 +16,8 @@ import '../modules/taste/taste_binding.dart';
 import '../modules/taste/taste_view.dart';
 import '../modules/market/benchmark_detail_binding.dart';
 import '../modules/market/benchmark_detail_view.dart';
+import '../modules/subscription/subscription_binding.dart';
+import '../modules/subscription/subscription_payment_success_view.dart';
 import '../modules/subscription/subscription_skip_view.dart';
 import '../modules/subscription/subscription_view.dart';
 import '../modules/settings/account/account_binding.dart';
@@ -75,10 +77,18 @@ class AppPages {
       page: () => const BenchmarkDetailView(),
       binding: BenchmarkDetailBinding(),
     ),
-    GetPage(name: AppRoutes.subscription, page: () => const SubscriptionView()),
+    GetPage(
+      name: AppRoutes.subscription,
+      page: () => const SubscriptionView(),
+      binding: SubscriptionBinding(),
+    ),
     GetPage(
       name: AppRoutes.subscriptionSkip,
       page: () => const SubscriptionSkipView(),
+    ),
+    GetPage(
+      name: AppRoutes.subscriptionPaymentSuccess,
+      page: () => const SubscriptionPaymentSuccessView(),
     ),
     GetPage(
       name: AppRoutes.settingsAccount,
