@@ -71,10 +71,10 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
 
 # Regenerate: `dart run flutter_launcher_icons`
-# iOS: enable after `flutter create --platforms ios .` (macOS), then set ios: true and run again.
+# Regenerate iOS icons: set ios: true (default below) and run again on macOS or Windows.
 flutter_launcher_icons:
   android: true
-  ios: false
+  ios: true
   image_path: assets/images/app_ic.png
   min_sdk_android: 21
   remove_alpha_ios: true
