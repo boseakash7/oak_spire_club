@@ -13,10 +13,12 @@ import 'widgets/home_chart_footer.dart';
 import 'widgets/home_value_chart.dart';
 
 /// Space between Top moved heading and its horizontal cards.
-const double _kHomeHeadingToCardsGap = 20;
+/// Keep consistent with Quick Stats spacing.
+const double _kHomeHeadingToCardsGap = 12;
 
 /// Space between Top moved bottles row and Quick Stats section.
-const double _kTopMovedToQuickStatsGap = 26;
+/// Keep consistent with Quick Stats spacing.
+const double _kTopMovedToQuickStatsGap = 12;
 
 /// Space between Quick Stats heading and stat cards (tighter than Top moved).
 const double _kQuickStatsHeadingToCardsGap = 12;
@@ -232,7 +234,6 @@ class _CollectionValue extends StatelessWidget {
             const SizedBox(width: 14),
             Obx(() {
               final percent = home.collectionMovedPercent.value;
-              if (percent == null) return const SizedBox.shrink();
               return _CollectionValueMiniBars(
                 movedFraction:
                     CollectionValueCalculator.movedBarFractionFromPercent(

@@ -93,6 +93,8 @@ class AddToCollectionLauncher {
       arguments: {
         if (matches.isNotEmpty) 'editMode': true,
         if (matches.isNotEmpty) 'originalBottleId': selectedBottleId,
+        'navigateToCollectionOnSuccess': navigateToCollectionOnSuccess,
+        'popBenchmarkDetailOnSuccess': popBenchmarkDetailOnSuccess,
         'prefill': prefill,
       },
     );

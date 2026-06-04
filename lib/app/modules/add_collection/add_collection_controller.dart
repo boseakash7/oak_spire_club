@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -13,6 +14,10 @@ import '../../core/utils/validators.dart';
 import '../../data/models/bluebook_model.dart';
 import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/collection_repository.dart';
+import '../../routes/app_routes.dart';
+import '../collection/collection_controller.dart';
+import '../home/home_controller.dart';
+import '../navigation/bottom_nav_controller.dart';
 
 class AddCollectionController extends GetxController {
   AddCollectionController({
@@ -50,6 +55,9 @@ class AddCollectionController extends GetxController {
   /// Set from route prefill — stays true for own-bottle flow even after bluebook create.
   bool _isCustomBottleFlow = true;
 
+  bool _navigateToCollectionOnSuccess = true;
+  bool _popBenchmarkDetailOnSuccess = false;
+
   static final _imagePicker = ImagePicker();
 
   /// True when adding a user-defined bottle (not picked from catalog/list).
@@ -77,6 +85,8 @@ class AddCollectionController extends GetxController {
     if (args is! Map) return;
     final map = Map<String, dynamic>.from(args);
     final prefillRaw = map['prefill'];
+    _navigateToCollectionOnSuccess = map['navigateToCollectionOnSuccess'] == true;
+    _popBenchmarkDetailOnSuccess = map['popBenchmarkDetailOnSuccess'] == true;
     isEditMode.value = map['editMode'] == true;
     final originalBottleIdRaw = map['originalBottleId']?.toString();
     if (originalBottleIdRaw != null &&
@@ -273,6 +283,26 @@ class AddCollectionController extends GetxController {
         );
       }
       await AppSnackbar.success('Added to collection.');
+
+      // Prevent a visible "flash" of the previous route by preparing the destination
+      // (Collection tab) before closing this screen.
+      if (_navigateToCollectionOnSuccess && Get.isRegistered<BottomNavController>()) {
+        Get.find<BottomNavController>().setIndex(1);
+      }
+      if (Get.isRegistered<HomeController>()) {
+        unawaited(Get.find<HomeController>().fetchHomeData(forceRefresh: false));
+      }
+      if (Get.isRegistered<CollectionController>()) {
+        unawaited(Get.find<CollectionController>().forceReload());
+      }
+
+      // If caller wants to land on Collection, pop straight back to Shell so any
+      // intermediate opener route (Search, Benchmark Detail, etc.) never flashes.
+      if (_navigateToCollectionOnSuccess || _popBenchmarkDetailOnSuccess) {
+        Get.until((route) => route.settings.name == AppRoutes.shell);
+        return;
+      }
+
       Get.back(result: true);
     } on LimitExceededException {
       // [SubscriptionLimitNavigation] already opened IAP with the API message.

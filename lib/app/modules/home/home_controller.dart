@@ -45,7 +45,7 @@ class HomeController extends GetxController {
   final collectionValueText = r'$ —'.obs;
   final movedText = 'Moved — in last 3 months'.obs;
 
-  /// Movement % from chart `first_price` / `last_price`; null hides mini bars.
+  /// Movement % from chart `first_price` / `last_price`; null → left bar at 0%.
   final collectionMovedPercent = Rxn<double>();
 
   final totalCollectionCount = 0.obs;

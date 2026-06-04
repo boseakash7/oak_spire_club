@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../core/constants/payment_currency.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
+import '../models/package_transaction_model.dart';
 import '../models/razorpay_payment_create_model.dart';
 import '../models/razorpay_payment_verify_model.dart';
 import '../models/subscription_package_model.dart';
@@ -14,6 +15,8 @@ class PackageRemoteDataSource {
   static const String _getAll = 'package/get-all';
   static const String _paymentCreate = 'package/payment-create';
   static const String _paymentVerify = 'package/payment-verify';
+  static const String _transactionHistory = 'package/transaction-history';
+  static const String _cancelSubscription = 'package/cancel-subscription';
 
   /// Bourboneur `PackageApi.all()` → GET `package/get-all`.
   Future<List<SubscriptionPackageModel>> getAll() async {
@@ -88,5 +91,42 @@ class PackageRemoteDataSource {
     return RazorpayPaymentVerifyModel.fromJson(
       Map<String, dynamic>.from(data),
     );
+  }
+
+  /// POST `package/transaction-history` with `user_id`.
+  Future<PackageTransactionHistoryResult> transactionHistory({
+    required String userId,
+  }) async {
+    final json = await _client.postJson(_transactionHistory, {
+      'user_id': userId,
+    });
+    final data = json['data'];
+    if (data is! Map) {
+      throw ApiException('Unexpected server response.');
+    }
+    return PackageTransactionHistoryResult.fromJson(
+      Map<String, dynamic>.from(data),
+    );
+  }
+
+  /// POST `package/cancel-subscription` with Razorpay subscription id.
+  Future<String> cancelSubscription({
+    required String razorpaySubscriptionId,
+  }) async {
+    final json = await _client.postJson(_cancelSubscription, {
+      'razorpay_subscription_id': razorpaySubscriptionId,
+      'cancel_at_cycle_end': 'false',
+    });
+    final data = json['data'];
+    if (data is Map) {
+      final message = data['message']?.toString();
+      if (message != null && message.trim().isNotEmpty) {
+        return message.trim();
+      }
+    }
+    if (data is String && data.trim().isNotEmpty) {
+      return data.trim();
+    }
+    return 'Subscription cancelled.';
   }
 }

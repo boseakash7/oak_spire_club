@@ -276,7 +276,8 @@ class _BottleRow extends StatelessWidget {
                           cacheManager: AppCacheManager.images,
                           width: 56,
                           height: 56,
-                          fit: BoxFit.cover,
+                          // Match Benchmark list behavior: show full bottle (no crop).
+                          fit: BoxFit.contain,
                           placeholder: (context, _) => _placeholder(),
                           errorWidget: (context, error, stackTrace) =>
                               _placeholder(),

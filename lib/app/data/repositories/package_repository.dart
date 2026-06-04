@@ -1,5 +1,6 @@
 import '../../core/constants/payment_currency.dart';
 import '../datasources/package_remote_datasource.dart';
+import '../models/package_transaction_model.dart';
 import '../models/razorpay_payment_create_model.dart';
 import '../models/razorpay_payment_verify_model.dart';
 import '../models/subscription_package_model.dart';
@@ -40,5 +41,17 @@ class PackageRepository {
         razorpayPaymentId: razorpayPaymentId,
         razorpayPlanId: razorpayPlanId,
         message: message,
+      );
+
+  Future<PackageTransactionHistoryResult> transactionHistory({
+    required String userId,
+  }) =>
+      _remote.transactionHistory(userId: userId);
+
+  Future<String> cancelSubscription({
+    required String razorpaySubscriptionId,
+  }) =>
+      _remote.cancelSubscription(
+        razorpaySubscriptionId: razorpaySubscriptionId,
       );
 }

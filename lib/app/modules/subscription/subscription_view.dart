@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../../core/animations/app_motion.dart';
@@ -17,17 +18,22 @@ import '../../core/theme/app_subscription_theme.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_snackbar.dart';
 import '../../core/widgets/animated_pressable.dart';
+import '../../core/widgets/app_back_button.dart';
+import '../../core/widgets/app_confirm_dialog.dart';
 import '../../core/widgets/common_primary_button.dart';
 import '../../core/widgets/gradient_text.dart';
+import '../../data/models/package_transaction_model.dart';
 import '../../data/models/razorpay_payment_create_model.dart';
 import '../../data/models/subscription_package_model.dart';
 import '../../data/models/subscription_payment_receipt.dart';
+import '../../data/models/user_model.dart';
 import '../../data/repositories/package_repository.dart';
 import '../../routes/app_routes.dart';
 import '../../routes/auth_navigation.dart';
 import '../../routes/subscription_limit_navigation.dart';
 import '../../routes/subscription_payment_success_navigation.dart';
 import '../session/app_config_controller.dart';
+import '../session/user_session_controller.dart';
 import 'subscription_controller.dart';
 
 class SubscriptionView extends StatefulWidget {
@@ -196,6 +202,20 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     );
   }
 
+  Future<void> _confirmCancelSubscription() async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Cancel subscription?',
+      message:
+          'Your premium access will end after cancellation. You can subscribe again anytime.',
+      confirmLabel: 'Cancel subscription',
+      cancelLabel: 'Keep subscription',
+      confirmIsDestructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+    await _subscription.cancelSubscription();
+  }
+
   Future<void> _startCheckout() async {
     if (_isCreatingPayment) return;
 
@@ -287,161 +307,124 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                   Image.asset(AppAssets.signUpBackground, fit: BoxFit.cover),
             ),
             SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (limitMessage != null && limitMessage.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSubscriptionTheme.horizontalPadding,
-                        12,
-                        AppSubscriptionTheme.horizontalPadding,
-                        0,
+              child: Obx(() {
+                final showCheckout = _subscription.showCheckout;
+                final showFree = _subscription.showFreeUser;
+                final showActive = _subscription.showActiveSubscription;
+
+                final showManagedSubscription = showActive || showFree;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (showManagedSubscription) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSubscriptionTheme.horizontalPadding - 10,
+                          4,
+                          AppSubscriptionTheme.horizontalPadding,
+                          0,
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: AppBackButton(
+                            color: AppColors.textCream,
+                            onPressed: () {
+                              if (Navigator.of(context).canPop()) {
+                                Navigator.of(context).pop();
+                                return;
+                              }
+                              Get.back<void>();
+                            },
+                          ),
+                        ),
                       ),
-                      child: _SubscriptionLimitBanner(message: limitMessage),
+                    ],
+                    if (limitMessage != null &&
+                        limitMessage.isNotEmpty &&
+                        showCheckout) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSubscriptionTheme.horizontalPadding,
+                          12,
+                          AppSubscriptionTheme.horizontalPadding,
+                          0,
+                        ),
+                        child: _SubscriptionLimitBanner(message: limitMessage),
+                      ),
+                    ],
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(
+                          AppSubscriptionTheme.horizontalPadding,
+                          showManagedSubscription
+                              ? 8
+                              : limitMessage != null &&
+                                    limitMessage.isNotEmpty &&
+                                    showCheckout
+                              ? AppSubscriptionTheme.scrollTopPaddingWithBanner
+                              : AppSubscriptionTheme.scrollTopPaddingDefault,
+                          AppSubscriptionTheme.horizontalPadding,
+                          24,
+                        ),
+                        child: showFree
+                            ? const _FreeUserSubscriptionBody()
+                            : showActive
+                            ? _ActiveSubscriptionBody(
+                                subscription: _subscription,
+                                onCancel: _confirmCancelSubscription,
+                              )
+                            : _CheckoutSubscriptionBody(
+                                subscription: _subscription,
+                              ),
+                      ),
                     ),
+                    if (showCheckout) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSubscriptionTheme.horizontalPadding,
+                          0,
+                          AppSubscriptionTheme.horizontalPadding,
+                          12,
+                        ),
+                        child: CommonPrimaryButton(
+                          label: 'Start free - 7 days trial',
+                          isLoading: _isCreatingPayment || _isVerifyingPayment,
+                          onPressed: _startCheckout,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: _openSkipConfirmation,
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 12,
+                                color: AppColors.subscriptionSkipLink
+                                    .withValues(alpha: 0.9),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Skip this for now',
+                                style: GoogleFonts.roboto(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w400,
+                                  color: AppColors.subscriptionSkipLink,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                        AppSubscriptionTheme.horizontalPadding,
-                        limitMessage != null && limitMessage.isNotEmpty
-                            ? AppSubscriptionTheme.scrollTopPaddingWithBanner
-                            : AppSubscriptionTheme.scrollTopPaddingDefault,
-                        AppSubscriptionTheme.horizontalPadding,
-                        24,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const FadeSlideEntrance(
-                            index: 0,
-                            child: _SubscriptionHeader(),
-                          ),
-                          const SizedBox(height: 34),
-                          const FadeSlideEntrance(
-                            index: 1,
-                            child: _BenefitRow(
-                              spans: [
-                                TextSpan(text: 'Track '),
-                                TextSpan(
-                                  text: 'unlimited',
-                                  style: TextStyle(
-                                    color: AppColors.subscriptionBenefitGold,
-                                  ),
-                                ),
-                                TextSpan(text: ' collection value overtime.'),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 22),
-                          const FadeSlideEntrance(
-                            index: 2,
-                            child: _BenefitRow(
-                              spans: [
-                                TextSpan(text: 'Access to the '),
-                                TextSpan(
-                                  text: '10000+ bottles ',
-                                  style: TextStyle(
-                                    color: AppColors.subscriptionBenefitGold,
-                                  ),
-                                ),
-                                TextSpan(text: 'database.'),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 22),
-                          const FadeSlideEntrance(
-                            index: 3,
-                            child: _BenefitRow(
-                              spans: [
-                                TextSpan(
-                                  text: 'Full access',
-                                  style: TextStyle(
-                                    color: AppColors.subscriptionBenefitGoldAlt,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: ' to bottle insights and tasting.',
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 22),
-                          const FadeSlideEntrance(
-                            index: 4,
-                            child: _BenefitRow(
-                              spans: [
-                                TextSpan(
-                                  text: 'No',
-                                  style: TextStyle(
-                                    color: AppColors
-                                        .subscriptionBenefitLimitsPrimary,
-                                  ),
-                                ),
-                                TextSpan(text: ' daily '),
-                                TextSpan(
-                                  text: 'limits',
-                                  style: TextStyle(
-                                    color: AppColors
-                                        .subscriptionBenefitLimitsSecondary,
-                                  ),
-                                ),
-                                TextSpan(text: '.'),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 36),
-                          _PackagePlanList(subscription: _subscription),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSubscriptionTheme.horizontalPadding,
-                      0,
-                      AppSubscriptionTheme.horizontalPadding,
-                      12,
-                    ),
-                    child: CommonPrimaryButton(
-                      label: 'Start free - 7 days trial',
-                      isLoading: _isCreatingPayment || _isVerifyingPayment,
-                      onPressed: _startCheckout,
-                      //  _openSuccessScreenForTesting,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _openSkipConfirmation,
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 12,
-                            color: AppColors.subscriptionSkipLink.withValues(
-                              alpha: 0.9,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Skip this for now',
-                            style: GoogleFonts.roboto(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.subscriptionSkipLink,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              }),
             ),
             if (_isVerifyingPayment)
               ColoredBox(
@@ -459,6 +442,409 @@ class _SubscriptionViewState extends State<SubscriptionView> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+String _formatTransactionDate(int unixSeconds) {
+  if (unixSeconds <= 0) return '—';
+  final dt = DateTime.fromMillisecondsSinceEpoch(unixSeconds * 1000);
+  return DateFormat('MMM d, yyyy').format(dt);
+}
+
+class _CheckoutSubscriptionBody extends StatelessWidget {
+  const _CheckoutSubscriptionBody({required this.subscription});
+
+  final SubscriptionController subscription;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const FadeSlideEntrance(index: 0, child: _SubscriptionHeader()),
+        const SizedBox(height: 34),
+        const FadeSlideEntrance(
+          index: 1,
+          child: _BenefitRow(
+            spans: [
+              TextSpan(text: 'Track '),
+              TextSpan(
+                text: 'unlimited',
+                style: TextStyle(color: AppColors.subscriptionBenefitGold),
+              ),
+              TextSpan(text: ' collection value overtime.'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        const FadeSlideEntrance(
+          index: 2,
+          child: _BenefitRow(
+            spans: [
+              TextSpan(text: 'Access to the '),
+              TextSpan(
+                text: '10000+ bottles ',
+                style: TextStyle(color: AppColors.subscriptionBenefitGold),
+              ),
+              TextSpan(text: 'database.'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        const FadeSlideEntrance(
+          index: 3,
+          child: _BenefitRow(
+            spans: [
+              TextSpan(
+                text: 'Full access',
+                style: TextStyle(color: AppColors.subscriptionBenefitGoldAlt),
+              ),
+              TextSpan(text: ' to bottle insights and tasting.'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        const FadeSlideEntrance(
+          index: 4,
+          child: _BenefitRow(
+            spans: [
+              TextSpan(
+                text: 'No',
+                style: TextStyle(
+                  color: AppColors.subscriptionBenefitLimitsPrimary,
+                ),
+              ),
+              TextSpan(text: ' daily '),
+              TextSpan(
+                text: 'limits',
+                style: TextStyle(
+                  color: AppColors.subscriptionBenefitLimitsSecondary,
+                ),
+              ),
+              TextSpan(text: '.'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 36),
+        _PackagePlanList(subscription: subscription),
+      ],
+    );
+  }
+}
+
+class _FreeUserSubscriptionBody extends StatelessWidget {
+  const _FreeUserSubscriptionBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final user = Get.find<UserSessionController>().user.value;
+    final planName = user?.activePlanLabel ?? 'Premium';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const FadeSlideEntrance(index: 0, child: _SubscriptionHeader()),
+        const SizedBox(height: 28),
+        FadeSlideEntrance(
+          index: 1,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(13),
+              gradient: AppColors.cardSurfaceGradient,
+              border: Border.all(color: AppColors.gold2, width: 1),
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.verified_rounded,
+                  size: 40,
+                  color: AppColors.goldBright,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'You are a Free user',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.heading32Bold().copyWith(
+                    fontSize: 22,
+                    color: AppColors.textCream,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'You can use all premium features on $planName.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.roboto(
+                    fontSize: 16,
+                    height: 1.35,
+                    color: AppColors.textCream,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActiveSubscriptionBody extends StatelessWidget {
+  const _ActiveSubscriptionBody({
+    required this.subscription,
+    required this.onCancel,
+  });
+
+  final SubscriptionController subscription;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = Get.find<UserSessionController>().user.value;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Obx(() {
+          final loading = subscription.isCancelling.value;
+          final canCancel = subscription.canCancelSubscription;
+          final historyLoading = subscription.isLoadingHistory.value;
+          return FadeSlideEntrance(
+            index: 0,
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton(
+                onPressed: loading || historyLoading || !canCancel
+                    ? null
+                    : onCancel,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFE57373)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: loading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.gold1,
+                        ),
+                      )
+                    : Text(
+                        'Cancel subscription',
+                        style: GoogleFonts.roboto(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFE57373),
+                        ),
+                      ),
+              ),
+            ),
+          );
+        }),
+        const SizedBox(height: 24),
+        FadeSlideEntrance(index: 1, child: _CurrentPlanSummaryCard(user: user)),
+        const SizedBox(height: 28),
+        FadeSlideEntrance(
+          index: 2,
+          child: Text(
+            'Subscription history',
+            style: AppTextStyles.heading32Bold().copyWith(
+              fontSize: 20,
+              color: AppColors.white,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _TransactionHistorySection(subscription: subscription),
+      ],
+    );
+  }
+}
+
+class _CurrentPlanSummaryCard extends StatelessWidget {
+  const _CurrentPlanSummaryCard({required this.user});
+
+  final UserModel? user;
+
+  @override
+  Widget build(BuildContext context) {
+    final planName = user?.activePlanLabel ?? 'Premium';
+    final billing = user?.subscriptionType?.trim();
+    final price = user?.packagePrice?.trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(13),
+        gradient: AppColors.cardSurfaceGradient,
+        border: Border.all(
+          color: AppColors.subscriptionPlanBorderSelected,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Active subscription',
+            style: GoogleFonts.roboto(fontSize: 12, color: AppColors.textWolf),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            planName,
+            style: GoogleFonts.roboto(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textCream,
+            ),
+          ),
+          if (billing != null && billing.isNotEmpty && billing != 'null') ...[
+            const SizedBox(height: 4),
+            Text(
+              'Billed ${billing.toLowerCase()}',
+              style: GoogleFonts.roboto(
+                fontSize: 13,
+                color: AppColors.textWolf,
+              ),
+            ),
+          ],
+          if (price != null && price.isNotEmpty && price != 'null') ...[
+            const SizedBox(height: 8),
+            Text(
+              r'$' + price,
+              style: GoogleFonts.playfairDisplay(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: AppColors.subscriptionPriceLabel,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TransactionHistorySection extends StatelessWidget {
+  const _TransactionHistorySection({required this.subscription});
+
+  final SubscriptionController subscription;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (subscription.isLoadingHistory.value) {
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Center(
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.gold1,
+              ),
+            ),
+          ),
+        );
+      }
+
+      final error = subscription.historyError.value;
+      if (error != null && error.isNotEmpty) {
+        return Text(
+          error,
+          style: GoogleFonts.roboto(fontSize: 14, color: AppColors.textWolf),
+        );
+      }
+
+      final items = subscription.transactionHistory;
+      if (items.isEmpty) {
+        return Text(
+          'No subscription history yet.',
+          style: GoogleFonts.roboto(fontSize: 14, color: AppColors.textWolf),
+        );
+      }
+
+      return Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            FadeSlideEntrance(
+              index: 3 + i,
+              child: _TransactionHistoryTile(item: items[i]),
+            ),
+            if (i < items.length - 1) const SizedBox(height: 12),
+          ],
+        ],
+      );
+    });
+  }
+}
+
+class _TransactionHistoryTile extends StatelessWidget {
+  const _TransactionHistoryTile({required this.item});
+
+  final PackageTransactionModel item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        gradient: AppColors.cardSurfaceGradient,
+        border: Border.all(
+          color: AppColors.subscriptionPlanBorderUnselected,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  item.packageName.isNotEmpty
+                      ? item.packageName
+                      : 'Subscription',
+                  style: GoogleFonts.roboto(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textCream,
+                  ),
+                ),
+              ),
+              Text(
+                item.displayAmount,
+                style: GoogleFonts.roboto(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.subscriptionPriceLabel,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _formatTransactionDate(item.displayTimestamp),
+            style: GoogleFonts.roboto(fontSize: 12, color: AppColors.textWolf),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${item.displayStatus} · ${item.planType.isNotEmpty ? item.planType : item.packageType}',
+            style: GoogleFonts.roboto(fontSize: 11, color: AppColors.textWolf),
+          ),
+        ],
       ),
     );
   }

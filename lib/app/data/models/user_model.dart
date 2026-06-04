@@ -14,6 +14,8 @@ class UserModel {
     this.subscriptionStatus,
     this.isFree,
     this.gender,
+    this.packageName,
+    this.createdAt,
   });
 
   final String id;
@@ -30,9 +32,34 @@ class UserModel {
   final String? lastPaymentMethod;
   final String? subscriptionStatus;
   final String? isFree;
+  final String? packageName;
+  final String? createdAt;
+
+  /// Backend granted free premium (`is_free` = `1`).
+  bool get isFreeUser {
+    final raw = isFree?.trim().toLowerCase();
+    return raw == '1' || raw == 'true';
+  }
+
+  /// Active paid subscription (`subscription_status` = `subscribed`).
+  bool get hasActiveSubscription {
+    final raw = subscriptionStatus?.trim().toLowerCase();
+    return raw == 'subscribed' || raw == 'active' || raw == 'paid';
+  }
+
+  String get activePlanLabel {
+    final name = packageName?.trim();
+    if (name != null && name.isNotEmpty && name != 'null') return name;
+    final type = subscriptionType?.trim();
+    if (type != null && type.isNotEmpty && type != 'null') {
+      return type[0].toUpperCase() + type.substring(1);
+    }
+    return 'Premium';
+  }
 
   /// No paid package — show subscription offer after auth.
   bool get needsSubscriptionOffer {
+    if (isFreeUser) return false;
     final pkg = packageId?.trim();
     if (pkg != null && pkg.isNotEmpty && pkg != 'null') return false;
     final sub = subscriptionStatus?.trim().toLowerCase();
@@ -58,6 +85,8 @@ class UserModel {
       subscriptionStatus: json['subscription_status']?.toString(),
       isFree: json['is_free']?.toString(),
       gender: json['gender']?.toString(),
+      packageName: json['package_name']?.toString(),
+      createdAt: json['created_at']?.toString(),
     );
   }
 
@@ -99,6 +128,8 @@ class UserModel {
         'subscription_status': subscriptionStatus,
         'is_free': isFree,
         'gender': gender,
+        'package_name': packageName,
+        'created_at': createdAt,
       };
 }
 
