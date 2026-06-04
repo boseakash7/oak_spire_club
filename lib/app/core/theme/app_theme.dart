@@ -37,10 +37,9 @@ abstract final class AppTheme {
           ),
         ),
         pageTransitionsTheme: const PageTransitionsTheme(
-          builders: {
+          builders: <TargetPlatform, PageTransitionsBuilder>{
             TargetPlatform.android: CupertinoPageTransitionsBuilder(),
             TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-       
           },
         ),
       );
