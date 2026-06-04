@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -18,7 +19,7 @@ abstract final class AppTheme {
         seedColor: AppColors.gold1,
         brightness: Brightness.dark,
       ).copyWith(
-        surface: AppColors.black,
+        surface: const Color.fromARGB(255, 12, 1, 1),
         surfaceContainerHighest: AppColors.panel,
         onSurface: AppColors.white,
       );
