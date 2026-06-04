@@ -1,0 +1,25 @@
+name: firebase_performance_example
+description: Demonstrates how to use the firebase_performance plugin.
+version: 0.0.1
+resolution: workspace
+publish_to: none
+
+environment:
+  sdk: '^3.6.0'
+  flutter: '>=3.27.0'
+
+dependencies:
+  firebase_core: ^4.8.0
+  firebase_performance: ^0.11.4
+  flutter:
+    sdk: flutter
+  http: ^1.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
