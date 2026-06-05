@@ -22,7 +22,7 @@ class AppConstants {
   /// Numeric App Store ID for iOS store redirect (set when published).
   static const String iosAppStoreId = '';
 
-  /// App Store Connect auto-renewable subscription product IDs.
+  /// Fallback App Store product IDs when `apple_store_id` is missing from API.
   static const String appleMonthlyProductId = 'monthly_sub';
   static const String appleYearlyProductId = 'yearly_plan';
 

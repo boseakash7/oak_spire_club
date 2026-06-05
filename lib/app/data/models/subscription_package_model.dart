@@ -55,11 +55,17 @@ class SubscriptionPackageModel {
   String get planTypeForPayment =>
       packageType.isNotEmpty ? packageType : (isYearly ? 'yearly' : 'monthly');
 
-  /// Oak Spire App Store product id (`monthly_sub` / `yearly_plan`).
-  ///
-  /// Ignores [appleStoreId] from the shared CMS — that field may still hold
-  /// Bourboneur ids (`bourboneur_monthly_subscription`, etc.).
-  String get appleProductId => isYearly
-      ? AppConstants.appleYearlyProductId
-      : AppConstants.appleMonthlyProductId;
+  /// App Store product id from `apple_store_id` on `package/get-all`.
+  /// Falls back to [AppConstants] when the API omits it.
+  String get appleProductId {
+    final fromApi = appleStoreId?.trim();
+    if (fromApi != null &&
+        fromApi.isNotEmpty &&
+        fromApi.toLowerCase() != 'null') {
+      return fromApi;
+    }
+    return isYearly
+        ? AppConstants.appleYearlyProductId
+        : AppConstants.appleMonthlyProductId;
+  }
 }
