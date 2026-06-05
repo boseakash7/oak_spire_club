@@ -21,3 +21,4 @@ yearly_plan
 ] Store available: true, querying: {bourboneur_monthly_subscription, bourboneur_yearly_subscription}
 [AppleIAP] [IAP] Products not found: [bourboneur_monthly_subscription, bourboneur_yearly_subscription]
 [AppleIAP] [IAP] queryProductDetails error: IAPError(code: storekit_no_response, source: app_store, message: StoreKit: Failed to get response from platform., details: null)
+https://www.transfernow.net/dl/20260605JzCzGqaf
