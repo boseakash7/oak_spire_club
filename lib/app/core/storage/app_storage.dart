@@ -14,6 +14,8 @@ class AppStorage {
   static const String _keyCurrentVersion = 'current_version';
   static const String _keyUserGender = 'user_gender';
   static const String _keyNotificationPrefs = 'notification_prefs';
+  static const String _keyNotificationTopicsInitialSyncDone =
+      'notification_topics_initial_sync_done';
 
   static String? get userId => _box.read<String>(_keyUserId);
   static Future<void> setUserId(String value) => _box.write(_keyUserId, value);
@@ -68,5 +70,10 @@ class AppStorage {
       _box.read<Map<String, dynamic>>(_keyNotificationPrefs);
   static Future<void> setNotificationPrefs(Map<String, dynamic> value) =>
       _box.write(_keyNotificationPrefs, value);
+
+  static bool get notificationTopicsInitialSyncDone =>
+      _box.read<bool>(_keyNotificationTopicsInitialSyncDone) ?? false;
+  static Future<void> setNotificationTopicsInitialSyncDone(bool value) =>
+      _box.write(_keyNotificationTopicsInitialSyncDone, value);
 }
 

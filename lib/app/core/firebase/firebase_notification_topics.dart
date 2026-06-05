@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../data/models/notification_prefs_model.dart';
+import '../storage/app_storage.dart';
 
 /// FCM topic names for notification preference toggles (no REST API on toggle).
 abstract final class FirebaseNotificationTopics {
@@ -30,6 +31,39 @@ abstract final class FirebaseNotificationTopics {
         NotificationPreferenceKey.tipsUpdates => tips,
         _ => null,
       };
+
+  /// First app launch only: subscribe default alert topics in the background.
+  /// Later launches and user toggles are handled elsewhere.
+  static Future<void> subscribeOnFirstLaunchIfNeeded() async {
+    if (kIsWeb) return;
+    if (AppStorage.notificationTopicsInitialSyncDone) return;
+
+    final stored = AppStorage.notificationPrefs;
+    final prefs = NotificationPrefsModel.fromJson(stored);
+    if (stored == null) {
+      await AppStorage.setNotificationPrefs(prefs.toJson());
+    }
+
+    try {
+      if (prefs.pushEnabled) {
+        for (final key in alertPreferenceKeys) {
+          if (!_isPreferenceEnabled(prefs, key)) continue;
+          final topic = topicForPreferenceKey(key);
+          if (topic == null) continue;
+          await _messaging.subscribeToTopic(topic);
+          if (kDebugMode) {
+            debugPrint('[FCM] First launch subscribed: $topic');
+          }
+        }
+      }
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[FCM] First-launch topic subscribe failed: $e\n$st');
+      }
+    } finally {
+      await AppStorage.setNotificationTopicsInitialSyncDone(true);
+    }
+  }
 
   /// Aligns device topic subscriptions with stored preferences.
   static Future<void> syncFromPrefs(NotificationPrefsModel prefs) async {

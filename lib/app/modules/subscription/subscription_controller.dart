@@ -35,6 +35,7 @@ class SubscriptionController extends GetxController {
   final isLoadingHistory = false.obs;
   final historyError = RxnString();
   final isCancelling = false.obs;
+  final isBootstrapping = true.obs;
 
   PackageRepository get _repo => Get.find<PackageRepository>();
 
@@ -47,9 +48,14 @@ class SubscriptionController extends GetxController {
   }
 
   Future<void> _bootstrap() async {
-    await _refreshProfile();
-    _applyScreenMode();
-    await _loadForMode();
+    isBootstrapping.value = true;
+    try {
+      await _refreshProfile();
+      _applyScreenMode();
+      await _loadForMode();
+    } finally {
+      isBootstrapping.value = false;
+    }
   }
 
   Future<void> _refreshProfile() async {
@@ -89,9 +95,14 @@ class SubscriptionController extends GetxController {
   }
 
   Future<void> reload() async {
-    await _refreshProfile();
-    _applyScreenMode();
-    await _loadForMode();
+    isBootstrapping.value = true;
+    try {
+      await _refreshProfile();
+      _applyScreenMode();
+      await _loadForMode();
+    } finally {
+      isBootstrapping.value = false;
+    }
   }
 
   Future<void> loadPackages() async {

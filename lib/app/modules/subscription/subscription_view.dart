@@ -40,6 +40,7 @@ import '../../routes/subscription_payment_success_navigation.dart';
 import '../session/app_config_controller.dart';
 import '../session/user_session_controller.dart';
 import 'subscription_controller.dart';
+import 'subscription_loading_view.dart';
 
 class SubscriptionView extends StatefulWidget {
   const SubscriptionView({super.key});
@@ -485,6 +486,46 @@ class _SubscriptionViewState extends State<SubscriptionView> {
             ),
             SafeArea(
               child: Obx(() {
+                if (_subscription.isBootstrapping.value) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSubscriptionTheme.horizontalPadding - 10,
+                          4,
+                          AppSubscriptionTheme.horizontalPadding,
+                          0,
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: AppBackButton(
+                            color: AppColors.textCream,
+                            onPressed: () {
+                              if (Navigator.of(context).canPop()) {
+                                Navigator.of(context).pop();
+                                return;
+                              }
+                              Get.back<void>();
+                            },
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSubscriptionTheme.horizontalPadding,
+                            8,
+                            AppSubscriptionTheme.horizontalPadding,
+                            24,
+                          ),
+                          child: const SubscriptionLoadingView(),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
                 final showCheckout = _subscription.showCheckout;
                 final showFree = _subscription.showFreeUser;
                 final showActive = _subscription.showActiveSubscription;
@@ -562,7 +603,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                               ),
                       ),
                     ),
-                    if (showCheckout) ...[
+                    if (showCheckout && !_subscription.isBootstrapping.value) ...[
                       Padding(
                         padding: const EdgeInsets.fromLTRB(
                           AppSubscriptionTheme.horizontalPadding,
@@ -577,19 +618,22 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                         ),
                       ),
                       if (_isIosCheckout)
-                        GestureDetector(
-                          onTap: _isVerifyingPayment
-                              ? null
-                              : () => unawaited(_restoreApplePurchases()),
-                          behavior: HitTestBehavior.opaque,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              'Restore purchases',
-                              style: GoogleFonts.roboto(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.subscriptionSkipLink,
+                        Center(
+                          child: GestureDetector(
+                            onTap: _isVerifyingPayment
+                                ? null
+                                : () => unawaited(_restoreApplePurchases()),
+                            behavior: HitTestBehavior.opaque,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                'Restore purchases',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.roboto(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.subscriptionSkipLink,
+                                ),
                               ),
                             ),
                           ),
