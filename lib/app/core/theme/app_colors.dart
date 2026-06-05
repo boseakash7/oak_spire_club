@@ -154,5 +154,21 @@ class AppColors {
 
   /// Skip confirmation dismiss icon (Figma 129:320).
   static const Color subscriptionSkipDismiss = Color(0xFFC89D2C);
+
+  // --- Delete account --------------------------------------------------------
+
+  /// Destructive actions (delete button, permanent warnings).
+  static const Color destructive = Color(0xFFB3261E);
+
+  /// Neutral card surface (Figma delete-account flow).
+  static const Color deleteAccountCardBackground = Color(0xFF1C1C1E);
+
+  static const Color deleteAccountCardBorder = Color(0xFF2C2C2E);
+
+  /// Nested inset surface inside delete-account cards.
+  static const Color deleteAccountNestedSurface = Color(0xFF141416);
+
+  /// Secondary body copy on delete-account cards.
+  static const Color deleteAccountBodyText = Color(0xFF8E8E93);
 }
 

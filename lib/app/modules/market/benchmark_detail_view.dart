@@ -7,14 +7,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
-import '../../core/animations/app_motion.dart';
 import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/animations/app_motion.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/network/app_cache_manager.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/app_back_button.dart';
 import '../../core/utils/price_formatter.dart';
+import '../../core/widgets/app_back_button.dart';
 import 'benchmark_detail_controller.dart';
 
 FlLine _benchmarkDottedGridLine(double _) => FlLine(
@@ -70,10 +70,7 @@ List<Widget> _collectionTrendWidgets({
     widgets.add(
       Text(
         PriceFormatter.format(gainDollars.abs().round().toString()),
-        style: AppTextStyles.body16().copyWith(
-          fontSize: 12,
-          color: gainColor,
-        ),
+        style: AppTextStyles.body16().copyWith(fontSize: 12, color: gainColor),
       ),
     );
   }
@@ -199,7 +196,7 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(23, 22, 23, 20),
+                      padding: const EdgeInsets.fromLTRB(23, 22, 23, 8),
                       child: _TopSummary(
                         name: controller.productName,
                         avg: controller.avgFormatted,
@@ -215,7 +212,7 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 8),
                         const _BenchmarkPriceChart(),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(23, 14, 23, 0),
@@ -304,36 +301,34 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                                     borderRadius: BorderRadius.circular(6),
                                     gradient: AppColors.goldGradient,
                                   ),
-                                  child: Obx(
-                                    () {
-                                      final inCollection =
-                                          controller.hasInCollection.value;
-                                      final label = inCollection
-                                          ? 'Edit collection'
-                                          : '+ Add to collection';
-                                      final textStyle =
-                                          AppTextStyles.body16().copyWith(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.black,
-                                      );
-                                      if (!inCollection) {
-                                        return Text(label, style: textStyle);
-                                      }
-                                      return Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.edit_outlined,
-                                            size: 14,
-                                            color: AppColors.black,
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Text(label, style: textStyle),
-                                        ],
-                                      );
-                                    },
-                                  ),
+                                  child: Obx(() {
+                                    final inCollection =
+                                        controller.hasInCollection.value;
+                                    final label = inCollection
+                                        ? 'Edit collection'
+                                        : '+ Add to collection';
+                                    final textStyle = AppTextStyles.body16()
+                                        .copyWith(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.black,
+                                        );
+                                    if (!inCollection) {
+                                      return Text(label, style: textStyle);
+                                    }
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.edit_outlined,
+                                          size: 14,
+                                          color: AppColors.black,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(label, style: textStyle),
+                                      ],
+                                    );
+                                  }),
                                 ),
                               ),
                             ],
@@ -403,18 +398,21 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                                 }
                                 const fillBarWidth = 110.0;
                                 final fillW =
-                                    (fillBarWidth * controller.collectionFillRatio.value)
+                                    (fillBarWidth *
+                                            controller
+                                                .collectionFillRatio
+                                                .value)
                                         .clamp(4.0, fillBarWidth);
                                 final movementRaw =
                                     controller.collectionPriceMovementRaw.value;
                                 final movementColor =
                                     PriceFormatter.priceMovementColor(
-                                  movementRaw,
-                                );
+                                      movementRaw,
+                                    );
                                 final movementLabel =
                                     PriceFormatter.formatPriceMovementLabel(
-                                  movementRaw,
-                                );
+                                      movementRaw,
+                                    );
                                 final gain =
                                     controller.collectionGainDollars.value;
 
@@ -437,8 +435,7 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                                           style: AppTextStyles.body16()
                                               .copyWith(
                                                 fontSize: 12,
-                                                color:
-                                                    AppColors.textOwnedLabel,
+                                                color: AppColors.textOwnedLabel,
                                               ),
                                         ),
                                         const SizedBox(width: 8),
@@ -463,8 +460,9 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                                           height: 9,
                                           decoration: BoxDecoration(
                                             color: AppColors.fillBarTrack,
-                                            borderRadius:
-                                                BorderRadius.circular(27),
+                                            borderRadius: BorderRadius.circular(
+                                              27,
+                                            ),
                                           ),
                                           child: Align(
                                             alignment: Alignment.centerLeft,
@@ -743,14 +741,32 @@ class _TopSummary extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    '$low - $high',
-                    style: AppTextStyles.body16().copyWith(
-                      fontSize: 10,
-                      height: 1.2,
-                      color: AppColors.textWolf,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        '$low - $high',
+                        style: AppTextStyles.body16().copyWith(
+                          fontSize: 10,
+                          height: 1.2,
+                          color: AppColors.textWolf,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      _ratingChipInline(ratingChipLabel),
+                    ],
                   ),
+                  if (proofLine != null && proofLine!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      proofLine!.trim(),
+                      style: AppTextStyles.body16().copyWith(
+                        fontSize: 11,
+                        height: 1.2,
+                        color: AppColors.textWolf,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -792,19 +808,6 @@ class _TopSummary extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 2),
-        _ratingChipInline(ratingChipLabel),
-        if (proofLine != null && proofLine!.trim().isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            proofLine!.trim(),
-            style: AppTextStyles.body16().copyWith(
-              fontSize: 11,
-              height: 1.2,
-              color: AppColors.textWolf,
-            ),
-          ),
-        ],
       ],
     );
   }

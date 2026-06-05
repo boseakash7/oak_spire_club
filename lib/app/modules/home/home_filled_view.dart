@@ -54,129 +54,131 @@ class HomeFilledView extends StatelessWidget {
                   96,
                 ),
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 23),
-                    child: _CollectionValue(home: home),
-                  ),
-                  const SizedBox(height: 38),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 23),
-                    child: const _SectionHeader(title: 'Top moved bottles'),
-                  ),
-                  const SizedBox(height: _kHomeHeadingToCardsGap),
-                  Obx(() {
-                    final bottles = home.topMovedBottles;
-                    if (bottles.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    return SizedBox(
-                      height: 68,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 23),
+                      child: _CollectionValue(home: home),
+                    ),
+                    const SizedBox(height: 38),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 23),
+                      child: const _SectionHeader(title: 'Top moved bottles'),
+                    ),
+                    const SizedBox(height: _kHomeHeadingToCardsGap),
+                    Obx(() {
+                      final bottles = home.topMovedBottles;
+                      if (bottles.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return SizedBox(
+                        height: 68,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          clipBehavior: Clip.none,
+                          padding: const EdgeInsets.only(left: 0, right: 23),
+                          itemCount: bottles.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(width: 14),
+                          itemBuilder: (context, index) {
+                            final item = bottles[index];
+                            final subtitle = item.lineSubtitle.trim().isNotEmpty
+                                ? item.lineSubtitle.trim()
+                                : item.proofLabel;
+                            final movementRaw = item.priceMovementRaw;
+                            return _TrendingCard(
+                              title: item.lineTitle,
+                              subtitle: subtitle,
+                              price: item.marketAverageLabel,
+                              changeText:
+                                  PriceFormatter.formatPriceMovementLabel(
+                                    movementRaw,
+                                  ),
+                              changeColor: PriceFormatter.priceMovementColor(
+                                movementRaw,
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: _kTopMovedToQuickStatsGap),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 23),
+                      child: const _SectionHeader(title: 'Quick Stats'),
+                    ),
+                    const SizedBox(height: _kQuickStatsHeadingToCardsGap),
+                    SizedBox(
+                      height: 100,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         clipBehavior: Clip.none,
-                        padding: const EdgeInsets.only(left: 0, right: 23),
-                        itemCount: bottles.length,
+                        padding: const EdgeInsets.only(left: 0, right: 8),
+                        itemCount: 4,
                         separatorBuilder: (context, index) =>
                             const SizedBox(width: 14),
                         itemBuilder: (context, index) {
-                          final item = bottles[index];
-                          final subtitle = item.lineSubtitle.trim().isNotEmpty
-                              ? item.lineSubtitle.trim()
-                              : item.proofLabel;
-                          final movementRaw = item.priceMovementRaw;
-                          return _TrendingCard(
-                            title: item.lineTitle,
-                            subtitle: subtitle,
-                            price: item.marketAverageLabel,
-                            changeText: PriceFormatter.formatPriceMovementLabel(
-                              movementRaw,
-                            ),
-                            changeColor: PriceFormatter.priceMovementColor(
-                              movementRaw,
+                          if (index == 2) {
+                            return Obx(
+                              () => _StatCardRating(
+                                label: 'Collection\nRating',
+                                value: home.collectionRatingText.value,
+                              ),
+                            );
+                          }
+                          final label = switch (index) {
+                            0 => 'Total\nCollection',
+                            1 => 'Total\nDrunk',
+                            3 => 'Rare\nBottles',
+                            _ => 'Total\nCollection',
+                          };
+                          return Obx(
+                            () => _StatCard(
+                              label: label,
+                              value: switch (index) {
+                                0 => home.totalCollectionCount.value,
+                                1 => home.totalDrunkCount.value,
+                                3 => home.totalRareCount.value,
+                                _ => home.totalCollectionCount.value,
+                              }.toString(),
                             ),
                           );
                         },
                       ),
-                    );
-                  }),
-                  const SizedBox(height: _kTopMovedToQuickStatsGap),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 23),
-                    child: const _SectionHeader(title: 'Quick Stats'),
-                  ),
-                  const SizedBox(height: _kQuickStatsHeadingToCardsGap),
-                  SizedBox(
-                    height: 100,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none,
-                      padding: const EdgeInsets.only(left: 0, right: 8),
-                      itemCount: 4,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(width: 14),
-                      itemBuilder: (context, index) {
-                        if (index == 2) {
-                          return Obx(
-                            () => _StatCardRating(
-                              label: 'Collection\nRating',
-                              value: home.collectionRatingText.value,
-                            ),
-                          );
-                        }
-                        final label = switch (index) {
-                          0 => 'Total\nCollection',
-                          1 => 'Total\nDrunk',
-                          3 => 'Rare\nBottles',
-                          _ => 'Total\nCollection',
-                        };
-                        return Obx(
-                          () => _StatCard(
-                            label: label,
-                            value: switch (index) {
-                              0 => home.totalCollectionCount.value,
-                              1 => home.totalDrunkCount.value,
-                              3 => home.totalRareCount.value,
-                              _ => home.totalCollectionCount.value,
-                            }.toString(),
+                    ),
+                    const SizedBox(height: 18),
+                    // Full-bleed chart (~2px from screen edges), like benchmark detail.
+                    LayoutBuilder(
+                      builder: (context, _) {
+                        const parentLeftPad = 23.0;
+                        final bleed = parentLeftPad - kHomeChartHorizontalInset;
+                        final w =
+                            MediaQuery.sizeOf(context).width -
+                            kHomeChartHorizontalInset * 2;
+                        return Transform.translate(
+                          offset: Offset(-bleed, 0),
+                          child: SizedBox(
+                            width: w,
+                            child: const HomeValueChart(),
                           ),
                         );
                       },
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  // Full-bleed chart (~2px from screen edges), like benchmark detail.
-                  LayoutBuilder(
-                    builder: (context, _) {
-                      const parentLeftPad = 23.0;
-                      final bleed = parentLeftPad - kHomeChartHorizontalInset;
-                      final w = MediaQuery.sizeOf(context).width -
-                          kHomeChartHorizontalInset * 2;
-                      return Transform.translate(
-                        offset: Offset(-bleed, 0),
-                        child: SizedBox(
-                          width: w,
-                          child: const HomeValueChart(),
-                        ),
-                      );
-                    },
-                  ),
-                  // Legend + range chips: align with Collection Value (23px).
-                  const Padding(
-                    padding: EdgeInsets.only(right: 23),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(height: 14),
-                        HomeChartLegend(),
-                        HomeChartFooter(),
-                      ],
+                    // Legend + range chips: align with Collection Value (23px).
+                    const Padding(
+                      padding: EdgeInsets.only(right: 23),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(height: 14),
+                          HomeChartLegend(),
+                          HomeChartFooter(),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             ),
           ),
         ],
@@ -237,8 +239,8 @@ class _CollectionValue extends StatelessWidget {
               return _CollectionValueMiniBars(
                 movedFraction:
                     CollectionValueCalculator.movedBarFractionFromPercent(
-                  percent,
-                ),
+                      percent,
+                    ),
               );
             }),
           ],
@@ -341,8 +343,9 @@ class _MiniBar extends StatelessWidget {
       width: _CollectionValueMiniBarsState._barWidth,
       height: height,
       decoration: BoxDecoration(
-        borderRadius:
-            BorderRadius.circular(_CollectionValueMiniBarsState._barRadius),
+        borderRadius: BorderRadius.circular(
+          _CollectionValueMiniBarsState._barRadius,
+        ),
         color: _CollectionValueMiniBarsState._barColor,
       ),
     );
