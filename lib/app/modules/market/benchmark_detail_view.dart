@@ -196,7 +196,7 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(23, 22, 23, 8),
+                      padding: const EdgeInsets.fromLTRB(23, 22, 23, 12),
                       child: _TopSummary(
                         name: controller.productName,
                         avg: controller.avgFormatted,
@@ -212,7 +212,7 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 16),
                         const _BenchmarkPriceChart(),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(23, 14, 23, 0),

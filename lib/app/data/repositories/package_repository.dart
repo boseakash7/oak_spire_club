@@ -54,4 +54,15 @@ class PackageRepository {
       _remote.cancelSubscription(
         razorpaySubscriptionId: razorpaySubscriptionId,
       );
+
+  Future<String> subscribeApple({
+    required String userId,
+    required String packageId,
+    required String uniqueId,
+  }) =>
+      _remote.subscribeApple(
+        userId: userId,
+        packageId: packageId,
+        uniqueId: uniqueId,
+      );
 }

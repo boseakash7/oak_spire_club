@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 
 import '../../core/constants/payment_currency.dart';
@@ -17,6 +19,7 @@ class PackageRemoteDataSource {
   static const String _paymentVerify = 'package/payment-verify';
   static const String _transactionHistory = 'package/transaction-history';
   static const String _cancelSubscription = 'package/cancel-subscription';
+  static const String _subscribe = 'package/subscribe';
 
   /// Bourboneur `PackageApi.all()` → GET `package/get-all`.
   Future<List<SubscriptionPackageModel>> getAll() async {
@@ -128,5 +131,30 @@ class PackageRemoteDataSource {
       return data.trim();
     }
     return 'Subscription cancelled.';
+  }
+
+  /// Bourboneur `PackageApi.subscribe()` → POST `package/subscribe` (iOS IAP).
+  Future<String> subscribeApple({
+    required String userId,
+    required String packageId,
+    required String uniqueId,
+  }) async {
+    final json = await _client.postJson(_subscribe, {
+      'user_id': userId,
+      'package_id': packageId,
+      'unique_id': uniqueId,
+      'payment_method': Platform.isIOS ? 'apple_in_app' : 'razorpay',
+    });
+    final data = json['data'];
+    if (data is Map) {
+      final message = data['message']?.toString();
+      if (message != null && message.trim().isNotEmpty) {
+        return message.trim();
+      }
+    }
+    if (data is String && data.trim().isNotEmpty) {
+      return data.trim();
+    }
+    return 'Subscription activated.';
   }
 }

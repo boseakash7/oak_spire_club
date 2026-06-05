@@ -18,4 +18,15 @@ class AppConstants {
 
   /// WhatsApp number with country code, no + or spaces.
   static const String supportWhatsApp = '919876543210';
+
+  /// Numeric App Store ID for iOS store redirect (set when published).
+  static const String iosAppStoreId = '';
+
+  /// App Store Connect auto-renewable subscription product IDs.
+  static const String appleMonthlyProductId = 'monthly_sub';
+  static const String appleYearlyProductId = 'yearly_plan';
+
+  /// Manage / cancel Apple subscriptions (Settings → Apple ID → Subscriptions).
+  static const String appleSubscriptionsUrl =
+      'https://apps.apple.com/account/subscriptions';
 }

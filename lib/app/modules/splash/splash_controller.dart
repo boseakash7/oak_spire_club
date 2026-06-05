@@ -1,11 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/services/app_store_launcher.dart';
+import '../../core/services/app_update_checker.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/widgets/app_update_dialog.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../routes/app_routes.dart';
 import '../../routes/auth_navigation.dart';
+import '../session/app_config_controller.dart';
 
 class SplashController extends GetxController {
   final isChecking = true.obs;
@@ -23,9 +28,14 @@ class SplashController extends GetxController {
 
   Future<void> _boot() async {
     final userFuture = _resolveUser();
+    final configFuture = Get.find<AppConfigController>().refresh();
 
-    await Future.delayed(_minSplashVisible);
+    await Future.wait([Future<void>.delayed(_minSplashVisible), configFuture]);
+
     final user = await userFuture;
+
+    final canContinue = await _checkAppUpdate();
+    if (!canContinue) return;
 
     isChecking.value = false;
     if (user == null) {
@@ -33,6 +43,37 @@ class SplashController extends GetxController {
     } else {
       AuthNavigation.completeSession(user);
     }
+  }
+
+  Future<bool> _checkAppUpdate() async {
+    final config = Get.find<AppConfigController>();
+    final result = await AppUpdateChecker.evaluate(config.currentVersion.value);
+    if (!result.needsUpdate) return true;
+
+    final context = Get.context;
+    if (context == null || !context.mounted) return true;
+
+    if (Get.isRegistered<AppAnalyticsController>()) {
+      AppAnalyticsController.to.logTap('app_update_prompt');
+    }
+
+    return showAppUpdateDialog(
+      context,
+      isForced: result.isForced,
+      onUpdate: () {
+        if (Get.isRegistered<AppAnalyticsController>()) {
+          AppAnalyticsController.to.logTap('app_update_confirm');
+        }
+        AppStoreLauncher.openStoreListing();
+      },
+    ).then((continueApp) {
+      if (continueApp) {
+        if (Get.isRegistered<AppAnalyticsController>()) {
+          AppAnalyticsController.to.logTap('app_update_later');
+        }
+      }
+      return continueApp;
+    });
   }
 
   Future<UserModel?> _resolveUser() async {

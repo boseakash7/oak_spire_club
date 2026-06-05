@@ -1,3 +1,5 @@
+import '../../core/constants/app_constants.dart';
+
 /// `package/get-all` row (bourboneur `Package`).
 class SubscriptionPackageModel {
   const SubscriptionPackageModel({
@@ -52,4 +54,17 @@ class SubscriptionPackageModel {
   /// `plan_type` for payment-create (falls back to package type).
   String get planTypeForPayment =>
       packageType.isNotEmpty ? packageType : (isYearly ? 'yearly' : 'monthly');
+
+  /// App Store product id from API, or known defaults (`monthly_sub` / `yearly_plan`).
+  String get appleProductId {
+    final fromApi = appleStoreId?.trim();
+    if (fromApi != null &&
+        fromApi.isNotEmpty &&
+        fromApi.toLowerCase() != 'null') {
+      return fromApi;
+    }
+    return isYearly
+        ? AppConstants.appleYearlyProductId
+        : AppConstants.appleMonthlyProductId;
+  }
 }

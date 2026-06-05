@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:intl/intl.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
@@ -12,6 +14,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/payment_currency.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/limit_exceeded_exception.dart';
+import '../../core/services/app_store_launcher.dart';
+import '../../core/services/apple_in_app_purchase_service.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_subscription_theme.dart';
@@ -28,6 +32,7 @@ import '../../data/models/subscription_package_model.dart';
 import '../../data/models/subscription_payment_receipt.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/package_repository.dart';
+import '../../data/repositories/user_repository.dart';
 import '../../routes/app_routes.dart';
 import '../../routes/auth_navigation.dart';
 import '../../routes/subscription_limit_navigation.dart';
@@ -44,12 +49,16 @@ class SubscriptionView extends StatefulWidget {
 }
 
 class _SubscriptionViewState extends State<SubscriptionView> {
-  late final Razorpay _razorpay;
+  Razorpay? _razorpay;
+  AppleInAppPurchaseService? _iapService;
+  Worker? _iapPackagesWorker;
   late final SubscriptionController _subscription;
 
   var _isCreatingPayment = false;
   var _isVerifyingPayment = false;
   RazorpayPaymentCreateModel? _pendingPayment;
+
+  bool get _isIosCheckout => Platform.isIOS;
 
   bool get _isPostAuth {
     final args = Get.arguments;
@@ -69,16 +78,183 @@ class _SubscriptionViewState extends State<SubscriptionView> {
   void initState() {
     super.initState();
     _subscription = Get.find<SubscriptionController>();
-    _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
+    if (_isIosCheckout) {
+      _iapService = AppleInAppPurchaseService(
+        onPurchaseUpdated: _onApplePurchaseUpdated,
+      );
+      _iapService!.startListening();
+      _iapPackagesWorker = ever<bool>(_subscription.isLoadingPackages, (
+        loading,
+      ) {
+        if (!loading) unawaited(_loadAppleProducts());
+      });
+      if (!_subscription.isLoadingPackages.value) {
+        unawaited(_loadAppleProducts());
+      }
+    } else {
+      _razorpay = Razorpay();
+      _razorpay!
+        ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess)
+        ..on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError)
+        ..on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
+    }
   }
 
   @override
   void dispose() {
-    _razorpay.clear();
+    _iapPackagesWorker?.dispose();
+    _iapService?.dispose();
+    _razorpay?.clear();
     super.dispose();
+  }
+
+  Future<void> _loadAppleProducts() async {
+    final service = _iapService;
+    if (service == null) return;
+    final productIds = _subscription.packages
+        .map((plan) => plan.appleProductId)
+        .toSet();
+    await service.loadProducts(productIds);
+  }
+
+  void _onApplePurchaseUpdated(PurchaseDetails purchase) {
+    switch (purchase.status) {
+      case PurchaseStatus.pending:
+        break;
+      case PurchaseStatus.purchased:
+      case PurchaseStatus.restored:
+        unawaited(_submitAppleSubscribe(purchase));
+      case PurchaseStatus.error:
+        if (mounted) setState(() => _isVerifyingPayment = false);
+        final message = purchase.error?.message.trim();
+        unawaited(
+          AppSnackbar.error(
+            message != null && message.isNotEmpty
+                ? message
+                : 'Purchase failed. Please try again.',
+          ),
+        );
+      case PurchaseStatus.canceled:
+        if (mounted) setState(() => _isVerifyingPayment = false);
+    }
+  }
+
+  Future<void> _submitAppleSubscribe(PurchaseDetails purchase) async {
+    final plan = _subscription.selectedPackage;
+    final userId = AppStorage.userId?.trim();
+    final purchaseId = purchase.purchaseID?.trim() ?? '';
+
+    if (plan == null || userId == null || userId.isEmpty) {
+      await AppSnackbar.error(
+        'Could not confirm subscription. Please try again.',
+      );
+      return;
+    }
+    if (purchaseId.isEmpty) {
+      await AppSnackbar.error('Missing purchase id from App Store.');
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _isVerifyingPayment = true);
+    try {
+      final message = await Get.find<PackageRepository>().subscribeApple(
+        userId: userId,
+        packageId: plan.id,
+        uniqueId: purchaseId,
+      );
+      await Get.find<UserRepository>().refreshUserById(userId);
+      await _subscription.reload();
+
+      if (!mounted) return;
+      SubscriptionPaymentSuccessNavigation.open(
+        message: message,
+        isPostAuth: _isPostAuth,
+        paymentSucceeded: true,
+        receipt: SubscriptionPaymentReceipt(
+          merchantName: AppConstants.appName,
+          planTitle: plan.displayTitle,
+          amount: double.tryParse(plan.price) ?? 0,
+          currency: PaymentCurrency.usd,
+          status: 'paid',
+          paidAt: DateTime.now(),
+          localOrderId: plan.id,
+          razorpayOrderId: purchase.productID,
+          razorpayPaymentId: purchaseId,
+        ),
+      );
+    } on LimitExceededException {
+      // IAP opened by shared API handler.
+    } on ApiException catch (e) {
+      await AppSnackbar.error(e.message);
+    } catch (e) {
+      await AppSnackbar.error(e.toString());
+    } finally {
+      if (mounted) setState(() => _isVerifyingPayment = false);
+    }
+  }
+
+  Future<void> _startAppleCheckout(SubscriptionPackageModel plan) async {
+    final service = _iapService;
+    if (service == null) return;
+
+    if (!service.isAvailable) {
+      await AppSnackbar.error('In-app purchases are not available.');
+      return;
+    }
+
+    final product = service.productForAppleId(plan.appleProductId);
+    if (product == null) {
+      await _loadAppleProducts();
+      final retryProduct = service.productForAppleId(plan.appleProductId);
+      if (retryProduct == null) {
+        await AppSnackbar.error(
+          'This plan is not available on the App Store yet.',
+        );
+        return;
+      }
+      await _purchaseAppleProduct(retryProduct);
+      return;
+    }
+
+    await _purchaseAppleProduct(product);
+  }
+
+  Future<void> _purchaseAppleProduct(ProductDetails product) async {
+    final service = _iapService;
+    if (service == null) return;
+
+    setState(() => _isCreatingPayment = true);
+    try {
+      final started = await service.purchase(product);
+      if (!started) {
+        await AppSnackbar.error('Could not open App Store purchase.');
+      }
+    } catch (e) {
+      await AppSnackbar.error(e.toString());
+    } finally {
+      if (mounted) setState(() => _isCreatingPayment = false);
+    }
+  }
+
+  Future<void> _restoreApplePurchases() async {
+    final service = _iapService;
+    if (service == null || !service.isAvailable) {
+      await AppSnackbar.error('Restore is not available right now.');
+      return;
+    }
+
+    setState(() => _isVerifyingPayment = true);
+    try {
+      await service.restorePurchases();
+      await AppSnackbar.info('Checking for previous purchases…');
+    } catch (e) {
+      await AppSnackbar.error(e.toString());
+    } finally {
+      Future<void>.delayed(const Duration(seconds: 4), () {
+        if (mounted) setState(() => _isVerifyingPayment = false);
+      });
+    }
   }
 
   void _onPaymentSuccess(PaymentSuccessResponse res) {
@@ -181,27 +357,6 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     );
   }
 
-  /// TODO(testing): remove — wire button back to [_startCheckout].
-  void _openSuccessScreenForTesting() {
-    final plan = _subscription.selectedPackage;
-    SubscriptionPaymentSuccessNavigation.open(
-      message: 'Payment marked as successful',
-      isPostAuth: _isPostAuth,
-      paymentSucceeded: true,
-      receipt: SubscriptionPaymentReceipt(
-        merchantName: AppConstants.appName,
-        planTitle: plan?.displayTitle ?? 'Premium',
-        amount: double.tryParse(plan?.price ?? '') ?? 5,
-        currency: PaymentCurrency.usd,
-        status: 'paid',
-        paidAt: DateTime.now(),
-        localOrderId: '6',
-        razorpayOrderId: 'order_Stv2gNoG9s56Wa',
-        razorpayPaymentId: 'pay_ABC123',
-      ),
-    );
-  }
-
   Future<void> _confirmCancelSubscription() async {
     final confirmed = await showAppConfirmDialog(
       context,
@@ -217,7 +372,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
   }
 
   Future<void> _startCheckout() async {
-    if (_isCreatingPayment) return;
+    if (_isCreatingPayment || _isVerifyingPayment) return;
 
     final plan = _subscription.selectedPackage;
     if (plan == null) {
@@ -228,6 +383,11 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     final userId = AppStorage.userId?.trim();
     if (userId == null || userId.isEmpty) {
       await AppSnackbar.error('Please sign in again.');
+      return;
+    }
+
+    if (_isIosCheckout) {
+      await _startAppleCheckout(plan);
       return;
     }
 
@@ -278,7 +438,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
         'theme': <String, Object?>{'color': '#B9861F'},
       };
 
-      _razorpay.open(options);
+      _razorpay!.open(options);
     } on LimitExceededException {
       // IAP opened by shared API handler.
     } on ApiException catch (e) {
@@ -373,6 +533,9 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                             ? _ActiveSubscriptionBody(
                                 subscription: _subscription,
                                 onCancel: _confirmCancelSubscription,
+                                onManageApple: () => unawaited(
+                                  AppStoreLauncher.openAppleSubscriptions(),
+                                ),
                               )
                             : _CheckoutSubscriptionBody(
                                 subscription: _subscription,
@@ -393,6 +556,24 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                           onPressed: _startCheckout,
                         ),
                       ),
+                      if (_isIosCheckout)
+                        GestureDetector(
+                          onTap: _isVerifyingPayment
+                              ? null
+                              : () => unawaited(_restoreApplePurchases()),
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              'Restore purchases',
+                              style: GoogleFonts.roboto(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.subscriptionSkipLink,
+                              ),
+                            ),
+                          ),
+                        ),
                       GestureDetector(
                         onTap: _openSkipConfirmation,
                         behavior: HitTestBehavior.opaque,
@@ -596,10 +777,12 @@ class _ActiveSubscriptionBody extends StatelessWidget {
   const _ActiveSubscriptionBody({
     required this.subscription,
     required this.onCancel,
+    required this.onManageApple,
   });
 
   final SubscriptionController subscription;
   final VoidCallback onCancel;
+  final VoidCallback onManageApple;
 
   @override
   Widget build(BuildContext context) {
@@ -611,7 +794,36 @@ class _ActiveSubscriptionBody extends StatelessWidget {
         Obx(() {
           final loading = subscription.isCancelling.value;
           final canCancel = subscription.canCancelSubscription;
+          final canManageApple = subscription.canManageAppleSubscription;
           final historyLoading = subscription.isLoadingHistory.value;
+
+          if (canManageApple) {
+            return FadeSlideEntrance(
+              index: 0,
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton(
+                  onPressed: onManageApple,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.gold2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    'Manage in App Store',
+                    style: GoogleFonts.roboto(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.goldBright,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
           return FadeSlideEntrance(
             index: 0,
             child: SizedBox(

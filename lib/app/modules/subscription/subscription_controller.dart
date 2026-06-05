@@ -157,7 +157,15 @@ class SubscriptionController extends GetxController {
   String? get razorpaySubscriptionIdForCancel =>
       transactionHistory.resolveRazorpaySubscriptionIdForCancel();
 
-  bool get canCancelSubscription => razorpaySubscriptionIdForCancel != null;
+  bool get isAppleSubscriber {
+    final method = _user?.lastPaymentMethod?.trim().toLowerCase();
+    return method == 'apple_in_app';
+  }
+
+  bool get canCancelSubscription =>
+      !isAppleSubscriber && razorpaySubscriptionIdForCancel != null;
+
+  bool get canManageAppleSubscription => isAppleSubscriber;
 
   Future<void> cancelSubscription() async {
     var razorpaySubscriptionId = razorpaySubscriptionIdForCancel;

@@ -11,6 +11,7 @@ class AppStorage {
   static const String _keyPourPlaceholderUrl = 'pour_image_placeholder';
   static const String _keyRazorpayKeyId = 'razorpay_key_id';
   static const String _keyRazorpayKeySecret = 'razorpay_key_secret';
+  static const String _keyCurrentVersion = 'current_version';
   static const String _keyUserGender = 'user_gender';
   static const String _keyNotificationPrefs = 'notification_prefs';
 
@@ -48,6 +49,11 @@ class AppStorage {
   static String? get razorpayKeySecret => _box.read<String>(_keyRazorpayKeySecret);
   static Future<void> setRazorpayKeySecret(String value) =>
       _box.write(_keyRazorpayKeySecret, value);
+
+  static Map<String, dynamic>? get currentVersion =>
+      _box.read<Map<String, dynamic>>(_keyCurrentVersion);
+  static Future<void> setCurrentVersion(Map<String, dynamic> value) =>
+      _box.write(_keyCurrentVersion, value);
 
   static String? get userGender => _box.read<String>(_keyUserGender);
   static Future<void> setUserGender(String? value) async {
