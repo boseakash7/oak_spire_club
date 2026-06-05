@@ -56,7 +56,9 @@ class _SubscriptionViewState extends State<SubscriptionView> {
 
   var _isCreatingPayment = false;
   var _isVerifyingPayment = false;
+  var _isLoadingApplePrices = false;
   RazorpayPaymentCreateModel? _pendingPayment;
+  final _appleLocalizedPrices = <String, String>{};
 
   bool get _isIosCheckout => Platform.isIOS;
 
@@ -114,8 +116,23 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     final productIds = _subscription.packages
         .map((plan) => plan.appleProductId)
         .toSet();
-    await service.loadProducts(productIds);
+    if (!mounted) return;
+    setState(() => _isLoadingApplePrices = true);
+    try {
+      await service.loadProducts(productIds);
+      if (!mounted) return;
+      setState(() {
+        _appleLocalizedPrices
+          ..clear()
+          ..addAll({for (final p in service.products) p.id: p.price});
+      });
+    } finally {
+      if (mounted) setState(() => _isLoadingApplePrices = false);
+    }
   }
+
+  String? _applePriceForPlan(SubscriptionPackageModel plan) =>
+      _appleLocalizedPrices[plan.appleProductId];
 
   void _onApplePurchaseUpdated(PurchaseDetails purchase) {
     switch (purchase.status) {
@@ -539,6 +556,9 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                               )
                             : _CheckoutSubscriptionBody(
                                 subscription: _subscription,
+                                useAppleStorePrices: _isIosCheckout,
+                                applePriceForPlan: _applePriceForPlan,
+                                isLoadingApplePrices: _isLoadingApplePrices,
                               ),
                       ),
                     ),
@@ -635,9 +655,17 @@ String _formatTransactionDate(int unixSeconds) {
 }
 
 class _CheckoutSubscriptionBody extends StatelessWidget {
-  const _CheckoutSubscriptionBody({required this.subscription});
+  const _CheckoutSubscriptionBody({
+    required this.subscription,
+    required this.useAppleStorePrices,
+    required this.applePriceForPlan,
+    required this.isLoadingApplePrices,
+  });
 
   final SubscriptionController subscription;
+  final bool useAppleStorePrices;
+  final String? Function(SubscriptionPackageModel plan) applePriceForPlan;
+  final bool isLoadingApplePrices;
 
   @override
   Widget build(BuildContext context) {
@@ -709,7 +737,12 @@ class _CheckoutSubscriptionBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 36),
-        _PackagePlanList(subscription: subscription),
+        _PackagePlanList(
+          subscription: subscription,
+          useAppleStorePrices: useAppleStorePrices,
+          applePriceForPlan: applePriceForPlan,
+          isLoadingApplePrices: isLoadingApplePrices,
+        ),
       ],
     );
   }
@@ -1161,9 +1194,17 @@ class _BenefitRow extends StatelessWidget {
 }
 
 class _PackagePlanList extends StatelessWidget {
-  const _PackagePlanList({required this.subscription});
+  const _PackagePlanList({
+    required this.subscription,
+    required this.useAppleStorePrices,
+    required this.applePriceForPlan,
+    required this.isLoadingApplePrices,
+  });
 
   final SubscriptionController subscription;
+  final bool useAppleStorePrices;
+  final String? Function(SubscriptionPackageModel plan) applePriceForPlan;
+  final bool isLoadingApplePrices;
 
   @override
   Widget build(BuildContext context) {
@@ -1217,6 +1258,11 @@ class _PackagePlanList extends StatelessWidget {
                 plan: plans[i],
                 isSelected: plans[i].id == selectedId,
                 onTap: () => subscription.selectPackage(plans[i].id),
+                applePriceLabel: useAppleStorePrices
+                    ? applePriceForPlan(plans[i])
+                    : null,
+                isLoadingApplePrice:
+                    useAppleStorePrices && isLoadingApplePrices,
               ),
             ),
             if (i < plans.length - 1)
@@ -1234,11 +1280,23 @@ class _PricePlanCard extends StatelessWidget {
     required this.plan,
     required this.isSelected,
     required this.onTap,
+    this.applePriceLabel,
+    this.isLoadingApplePrice = false,
   });
 
   final SubscriptionPackageModel plan;
   final bool isSelected;
   final VoidCallback onTap;
+  final String? applePriceLabel;
+  final bool isLoadingApplePrice;
+
+  String get _renewalNote {
+    final storePrice = applePriceLabel?.trim();
+    if (storePrice != null && storePrice.isNotEmpty) {
+      return 'After trial will renew at $storePrice';
+    }
+    return plan.renewalNote;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1294,7 +1352,12 @@ class _PricePlanCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  _TrialPriceLabel(priceLabel: plan.displayPrice),
+                  _TrialPriceLabel(
+                    priceLabel: applePriceLabel ?? plan.displayPrice,
+                    isStoreLocalized:
+                        applePriceLabel != null && applePriceLabel!.isNotEmpty,
+                    isLoading: isLoadingApplePrice,
+                  ),
                 ],
               ),
               const Spacer(),
@@ -1303,7 +1366,7 @@ class _PricePlanCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      plan.renewalNote,
+                      _renewalNote,
                       style: GoogleFonts.roboto(
                         fontSize: 10,
                         fontWeight: FontWeight.w400,
@@ -1324,14 +1387,32 @@ class _PricePlanCard extends StatelessWidget {
 }
 
 class _TrialPriceLabel extends StatelessWidget {
-  const _TrialPriceLabel({required this.priceLabel});
+  const _TrialPriceLabel({
+    required this.priceLabel,
+    this.isStoreLocalized = false,
+    this.isLoading = false,
+  });
 
   final String priceLabel;
+  final bool isStoreLocalized;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: AppColors.gold1,
+        ),
+      );
+    }
+
+    final label = isStoreLocalized ? priceLabel : '\$$priceLabel';
     return Text(
-      '\$$priceLabel',
+      label,
       textAlign: TextAlign.right,
       style: GoogleFonts.playfairDisplay(
         fontSize: 20,

@@ -82,6 +82,10 @@ class AppleInAppPurchaseService {
     return null;
   }
 
+  /// App Store localized price (e.g. `$4.99`) for a product id.
+  String? localizedPrice(String appleProductId) =>
+      productForAppleId(appleProductId)?.price;
+
   Future<bool> purchase(ProductDetails product) async {
     developer.log('[IAP] Starting purchase for ${product.id}', name: 'AppleIAP');
     return _iap.buyNonConsumable(
