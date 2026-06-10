@@ -32,9 +32,8 @@ class PackageRemoteDataSource {
     return data
         .whereType<Map>()
         .map(
-          (e) => SubscriptionPackageModel.fromJson(
-            Map<String, dynamic>.from(e),
-          ),
+          (e) =>
+              SubscriptionPackageModel.fromJson(Map<String, dynamic>.from(e)),
         )
         .where((p) => p.id.isNotEmpty)
         .toList();
@@ -62,9 +61,7 @@ class PackageRemoteDataSource {
     if (data is! Map) {
       throw ApiException('Unexpected server response.');
     }
-    return RazorpayPaymentCreateModel.fromJson(
-      Map<String, dynamic>.from(data),
-    );
+    return RazorpayPaymentCreateModel.fromJson(Map<String, dynamic>.from(data));
   }
 
   Future<RazorpayPaymentVerifyModel> verifyPayment({
@@ -73,6 +70,7 @@ class PackageRemoteDataSource {
     required String razorpayOrderId,
     required String razorpayPaymentId,
     required String razorpayPlanId,
+    String razorpaySubscriptionId = '',
     required String message,
   }) async {
     final response = await _client.post(
@@ -83,6 +81,8 @@ class PackageRemoteDataSource {
         'razorpay_order_id': razorpayOrderId,
         'razorpay_payment_id': razorpayPaymentId,
         'razorpay_plan_id': razorpayPlanId,
+        if (razorpaySubscriptionId.trim().isNotEmpty)
+          'razorpay_subscription_id': razorpaySubscriptionId,
         'message': message,
       }),
     );
@@ -91,9 +91,7 @@ class PackageRemoteDataSource {
     if (data is! Map) {
       throw ApiException('Unexpected server response.');
     }
-    return RazorpayPaymentVerifyModel.fromJson(
-      Map<String, dynamic>.from(data),
-    );
+    return RazorpayPaymentVerifyModel.fromJson(Map<String, dynamic>.from(data));
   }
 
   /// POST `package/transaction-history` with `user_id`.
@@ -118,7 +116,7 @@ class PackageRemoteDataSource {
   }) async {
     final json = await _client.postJson(_cancelSubscription, {
       'razorpay_subscription_id': razorpaySubscriptionId,
-      'cancel_at_cycle_end': 'false',
+      'cancel_at_cycle_end': 'true',
     });
     final data = json['data'];
     if (data is Map) {

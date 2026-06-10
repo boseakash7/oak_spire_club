@@ -36,6 +36,7 @@ class SubscriptionController extends GetxController {
   final historyError = RxnString();
   final isCancelling = false.obs;
   final isBootstrapping = true.obs;
+  final paymentGatewayForCancel = RxnString();
 
   PackageRepository get _repo => Get.find<PackageRepository>();
 
@@ -153,11 +154,14 @@ class SubscriptionController extends GetxController {
     try {
       final result = await _repo.transactionHistory(userId: userId);
       transactionHistory.assignAll(result.history);
+      paymentGatewayForCancel.value = result.resolvedPaymentGateway;
     } on ApiException catch (e) {
       transactionHistory.clear();
+      paymentGatewayForCancel.value = null;
       historyError.value = e.message;
     } catch (e) {
       transactionHistory.clear();
+      paymentGatewayForCancel.value = null;
       historyError.value = e.toString();
     } finally {
       isLoadingHistory.value = false;
@@ -168,15 +172,21 @@ class SubscriptionController extends GetxController {
   String? get razorpaySubscriptionIdForCancel =>
       transactionHistory.resolveRazorpaySubscriptionIdForCancel();
 
-  bool get isAppleSubscriber {
-    final method = _user?.lastPaymentMethod?.trim().toLowerCase();
-    return method == 'apple_in_app';
+  bool get isRazorpayGateway =>
+      paymentGatewayForCancel.value == 'razorpay';
+
+  bool get isAppleInAppGateway =>
+      paymentGatewayForCancel.value == 'apple_in_app';
+
+  bool get canShowCancelSubscription =>
+      paymentGatewayForCancel.value != null;
+
+  bool get canCancelSubscription {
+    if (isLoadingHistory.value) return false;
+    if (isAppleInAppGateway) return true;
+    if (isRazorpayGateway) return razorpaySubscriptionIdForCancel != null;
+    return false;
   }
-
-  bool get canCancelSubscription =>
-      !isAppleSubscriber && razorpaySubscriptionIdForCancel != null;
-
-  bool get canManageAppleSubscription => isAppleSubscriber;
 
   Future<void> cancelSubscription() async {
     var razorpaySubscriptionId = razorpaySubscriptionIdForCancel;

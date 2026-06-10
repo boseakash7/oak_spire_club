@@ -11,8 +11,10 @@ class UserModel {
     this.packagePrice,
     this.subscriptionType,
     this.lastPaymentMethod,
+    this.paymentGateway,
     this.subscriptionStatus,
     this.isFree,
+    this.isTrialUsed,
     this.gender,
     this.packageName,
     this.createdAt,
@@ -30,8 +32,10 @@ class UserModel {
   final String? packagePrice;
   final String? subscriptionType;
   final String? lastPaymentMethod;
+  final String? paymentGateway;
   final String? subscriptionStatus;
   final String? isFree;
+  final String? isTrialUsed;
   final String? packageName;
   final String? createdAt;
 
@@ -40,6 +44,28 @@ class UserModel {
     final raw = isFree?.trim().toLowerCase();
     return raw == '1' || raw == 'true';
   }
+
+  /// User already consumed the free trial (`is_trial_used` = `1`).
+  bool get hasUsedTrial {
+    final raw = isTrialUsed?.trim().toLowerCase();
+    return raw == '1' || raw == 'true';
+  }
+
+  String? get resolvedPaymentGateway {
+    final gateway = paymentGateway?.trim().toLowerCase();
+    if (gateway != null && gateway.isNotEmpty && gateway != 'null') {
+      return gateway;
+    }
+    final method = lastPaymentMethod?.trim().toLowerCase();
+    if (method == 'apple_in_app' || method == 'razorpay') return method;
+    return null;
+  }
+
+  bool get isRazorpayPaymentGateway =>
+      resolvedPaymentGateway == 'razorpay';
+
+  bool get isAppleInAppPaymentGateway =>
+      resolvedPaymentGateway == 'apple_in_app';
 
   /// Active paid subscription (`subscription_status` = `subscribed`).
   bool get hasActiveSubscription {
@@ -82,8 +108,10 @@ class UserModel {
       packagePrice: json['package_price']?.toString(),
       subscriptionType: json['subscription_type']?.toString(),
       lastPaymentMethod: json['last_payment_method']?.toString(),
+      paymentGateway: json['payment_gateway']?.toString(),
       subscriptionStatus: json['subscription_status']?.toString(),
       isFree: json['is_free']?.toString(),
+      isTrialUsed: json['is_trial_used']?.toString(),
       gender: json['gender']?.toString(),
       packageName: json['package_name']?.toString(),
       createdAt: json['created_at']?.toString(),
@@ -107,8 +135,10 @@ class UserModel {
       packagePrice: packagePrice,
       subscriptionType: subscriptionType,
       lastPaymentMethod: lastPaymentMethod,
+      paymentGateway: paymentGateway,
       subscriptionStatus: subscriptionStatus,
       isFree: isFree,
+      isTrialUsed: isTrialUsed,
       gender: gender ?? this.gender,
     );
   }
@@ -125,8 +155,10 @@ class UserModel {
         'package_price': packagePrice,
         'subscription_type': subscriptionType,
         'last_payment_method': lastPaymentMethod,
+        'payment_gateway': paymentGateway,
         'subscription_status': subscriptionStatus,
         'is_free': isFree,
+        'is_trial_used': isTrialUsed,
         'gender': gender,
         'package_name': packageName,
         'created_at': createdAt,

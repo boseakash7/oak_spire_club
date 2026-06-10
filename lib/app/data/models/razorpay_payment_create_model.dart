@@ -1,6 +1,7 @@
 import '../../core/constants/payment_currency.dart';
 
-/// `package/payment-create` → `data` when `flag` is `RAZORPAY_PAYMENT_CREATED`.
+/// `package/payment-create` → `data` when `flag` is `RAZORPAY_PAYMENT_CREATED`
+/// or `RAZORPAY_TRIAL_SUBSCRIPTION_CREATED`.
 class RazorpayPaymentCreateModel {
   const RazorpayPaymentCreateModel({
     required this.flag,
@@ -19,6 +20,16 @@ class RazorpayPaymentCreateModel {
     this.razorpayPlanError,
     required this.razorpayOrderId,
     required this.razorpayOrderStatus,
+    required this.subscriptionCreated,
+    required this.razorpaySubscriptionId,
+    required this.razorpaySubscriptionStatus,
+    this.razorpaySubscriptionShortUrl,
+    this.razorpaySubscriptionError,
+    this.razorpaySubscriptionChargeAt,
+    this.trialDays,
+    this.trialStartAt,
+    this.subscriptionStartAt,
+    required this.checkoutEntity,
   });
 
   factory RazorpayPaymentCreateModel.fromJson(Map<String, dynamic> json) {
@@ -41,6 +52,22 @@ class RazorpayPaymentCreateModel {
       razorpayPlanError: json['razorpay_plan_error']?.toString(),
       razorpayOrderId: json['razorpay_order_id']?.toString() ?? '',
       razorpayOrderStatus: json['razorpay_order_status']?.toString() ?? '',
+      subscriptionCreated: json['subscription_created'] == true ||
+          json['subscription_created']?.toString() == '1' ||
+          json['subscription_created']?.toString().toLowerCase() == 'true',
+      razorpaySubscriptionId: json['razorpay_subscription_id']?.toString() ?? '',
+      razorpaySubscriptionStatus:
+          json['razorpay_subscription_status']?.toString() ?? '',
+      razorpaySubscriptionShortUrl:
+          json['razorpay_subscription_short_url']?.toString(),
+      razorpaySubscriptionError: json['razorpay_subscription_error']?.toString(),
+      razorpaySubscriptionChargeAt:
+          int.tryParse(json['razorpay_subscription_charge_at']?.toString() ?? ''),
+      trialDays: int.tryParse(json['trial_days']?.toString() ?? ''),
+      trialStartAt: int.tryParse(json['trial_start_at']?.toString() ?? ''),
+      subscriptionStartAt:
+          int.tryParse(json['subscription_start_at']?.toString() ?? ''),
+      checkoutEntity: json['checkout_entity']?.toString() ?? '',
     );
   }
 
@@ -60,10 +87,33 @@ class RazorpayPaymentCreateModel {
   final String? razorpayPlanError;
   final String razorpayOrderId;
   final String razorpayOrderStatus;
+  final bool subscriptionCreated;
+  final String razorpaySubscriptionId;
+  final String razorpaySubscriptionStatus;
+  final String? razorpaySubscriptionShortUrl;
+  final String? razorpaySubscriptionError;
+  final int? razorpaySubscriptionChargeAt;
+  final int? trialDays;
+  final int? trialStartAt;
+  final int? subscriptionStartAt;
+  final String checkoutEntity;
 
   /// USD from API — same value Razorpay order was created with (no ×100 conversion).
   int get razorpayAmount => amount.round();
 
-  bool get hasValidOrder =>
-      razorpayOrderId.trim().isNotEmpty && keyId.trim().isNotEmpty;
+  bool get isSubscriptionCheckout =>
+      checkoutEntity.trim().toLowerCase() == 'subscription' ||
+      (razorpaySubscriptionId.trim().isNotEmpty &&
+          razorpayOrderId.trim().isEmpty);
+
+  bool get hasValidCheckout {
+    if (keyId.trim().isEmpty) return false;
+    if (isSubscriptionCheckout) {
+      return razorpaySubscriptionId.trim().isNotEmpty;
+    }
+    return razorpayOrderId.trim().isNotEmpty;
+  }
+
+  /// Backward-compatible alias for order and subscription checkout.
+  bool get hasValidOrder => hasValidCheckout;
 }

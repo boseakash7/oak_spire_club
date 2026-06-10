@@ -26,6 +26,7 @@ class PackageTransactionModel {
     required this.packageType,
     required this.amount,
     required this.paymentMethod,
+    this.paymentGateway,
     required this.purchasedAt,
     required this.orderCreatedAt,
     required this.transactionCreatedAt,
@@ -57,6 +58,7 @@ class PackageTransactionModel {
       packageType: json['package_type']?.toString() ?? '',
       amount: _parseDouble(json['amount']),
       paymentMethod: json['payment_method']?.toString() ?? '',
+      paymentGateway: json['payment_gateway']?.toString(),
       purchasedAt: _parseInt(json['purchased_at']),
       orderCreatedAt: _parseInt(json['order_created_at']),
       transactionCreatedAt: _parseInt(json['transaction_created_at']),
@@ -88,6 +90,7 @@ class PackageTransactionModel {
   final String packageType;
   final double amount;
   final String paymentMethod;
+  final String? paymentGateway;
   final int purchasedAt;
   final int orderCreatedAt;
   final int transactionCreatedAt;
@@ -134,21 +137,52 @@ class PackageTransactionModel {
     if (id == null || id.isEmpty || id == 'null') return null;
     return id;
   }
+
+  /// `payment_gateway` from transaction history, with `payment_method` fallback.
+  String? get resolvedPaymentGateway {
+    final gateway = paymentGateway?.trim().toLowerCase();
+    if (gateway != null && gateway.isNotEmpty && gateway != 'null') {
+      return gateway;
+    }
+    final method = paymentMethod.trim().toLowerCase();
+    if (method == 'apple_in_app' || method == 'razorpay') return method;
+    return null;
+  }
 }
 
 /// Picks `razorpay_subscription_id` for `package/cancel-subscription`.
 extension PackageTransactionHistoryCancel on List<PackageTransactionModel> {
+  static const _preferredStatuses = {'paid', 'active', 'subscribed', 'verified'};
+
   String? resolveRazorpaySubscriptionIdForCancel() {
     final withId = where((t) => t.validRazorpaySubscriptionId != null).toList();
     if (withId.isEmpty) return null;
 
-    const preferredStatuses = {'paid', 'active', 'subscribed', 'verified'};
     for (final item in withId) {
-      if (preferredStatuses.contains(item.status.trim().toLowerCase())) {
+      if (_preferredStatuses.contains(item.status.trim().toLowerCase())) {
         return item.validRazorpaySubscriptionId;
       }
     }
     return withId.first.validRazorpaySubscriptionId;
+  }
+
+  /// `payment_gateway` from the active subscription transaction row.
+  String? resolvePaymentGatewayForCancel() {
+    if (isEmpty) return null;
+
+    for (final item in this) {
+      if (_preferredStatuses.contains(item.status.trim().toLowerCase())) {
+        final gateway = item.resolvedPaymentGateway;
+        if (gateway != null) return gateway;
+      }
+    }
+
+    for (final item in this) {
+      final gateway = item.resolvedPaymentGateway;
+      if (gateway != null) return gateway;
+    }
+
+    return null;
   }
 }
 
@@ -160,6 +194,7 @@ class PackageTransactionHistoryResult {
     required this.userId,
     required this.count,
     required this.history,
+    this.paymentGateway,
   });
 
   factory PackageTransactionHistoryResult.fromJson(Map<String, dynamic> json) {
@@ -181,6 +216,7 @@ class PackageTransactionHistoryResult {
       userId: _parseInt(json['user_id']),
       count: _parseInt(json['count']),
       history: items,
+      paymentGateway: json['payment_gateway']?.toString(),
     );
   }
 
@@ -189,4 +225,13 @@ class PackageTransactionHistoryResult {
   final int userId;
   final int count;
   final List<PackageTransactionModel> history;
+  final String? paymentGateway;
+
+  String? get resolvedPaymentGateway {
+    final gateway = paymentGateway?.trim().toLowerCase();
+    if (gateway != null && gateway.isNotEmpty && gateway != 'null') {
+      return gateway;
+    }
+    return history.resolvePaymentGatewayForCancel();
+  }
 }

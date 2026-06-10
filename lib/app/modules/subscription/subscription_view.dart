@@ -68,6 +68,13 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     return args is Map && args[AuthNavigation.postAuthSubscriptionArg] == true;
   }
 
+  String get _checkoutButtonLabel {
+    final user = Get.find<UserSessionController>().user.value;
+    return user?.hasUsedTrial == true
+        ? 'Subscribe'
+        : 'Start free - 7 days trial';
+  }
+
   void _openSkipConfirmation() {
     Get.toNamed(
       AppRoutes.subscriptionSkip,
@@ -276,11 +283,15 @@ class _SubscriptionViewState extends State<SubscriptionView> {
   }
 
   void _onPaymentSuccess(PaymentSuccessResponse res) {
+    final subscriptionId = res.data?['razorpay_subscription_id']
+        ?.toString()
+        .trim();
     unawaited(
       _submitPaymentVerify(
         status: 'paid',
         razorpayPaymentId: res.paymentId?.trim() ?? '',
         razorpayOrderId: res.orderId?.trim(),
+        razorpaySubscriptionId: subscriptionId,
         appMessage: 'Payment completed from app',
       ),
     );
@@ -302,6 +313,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     required String status,
     required String razorpayPaymentId,
     String? razorpayOrderId,
+    String? razorpaySubscriptionId,
     required String appMessage,
   }) async {
     final pending = _pendingPayment;
@@ -321,12 +333,19 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     if (!mounted) return;
     setState(() => _isVerifyingPayment = true);
     try {
+      final resolvedOrderId = razorpayOrderId?.trim();
+      final resolvedSubscriptionId = razorpaySubscriptionId?.trim();
       final verified = await Get.find<PackageRepository>().verifyPayment(
         localOrderId: pending.localOrderId,
         status: status,
-        razorpayOrderId: razorpayOrderId ?? pending.razorpayOrderId,
+        razorpayOrderId: resolvedOrderId?.isNotEmpty == true
+            ? resolvedOrderId!
+            : pending.razorpayOrderId,
         razorpayPaymentId: razorpayPaymentId,
         razorpayPlanId: pending.razorpayPlanId,
+        razorpaySubscriptionId: resolvedSubscriptionId?.isNotEmpty == true
+            ? resolvedSubscriptionId!
+            : pending.razorpaySubscriptionId,
         message: appMessage,
       );
       _pendingPayment = null;
@@ -389,6 +408,28 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     await _subscription.cancelSubscription();
   }
 
+  Future<void> _handleCancelSubscription() async {
+    if (_subscription.isAppleInAppGateway) {
+      if (Platform.isIOS) {
+        await AppStoreLauncher.openAppleSubscriptions();
+      } else {
+        await AppSnackbar.info(
+          'Please log in to an Apple device to cancel your subscription.',
+        );
+      }
+      return;
+    }
+
+    if (_subscription.isRazorpayGateway) {
+      await _confirmCancelSubscription();
+      return;
+    }
+
+    await AppSnackbar.error(
+      'Unable to cancel subscription. Please contact support.',
+    );
+  }
+
   Future<void> _startCheckout() async {
     if (_isCreatingPayment || _isVerifyingPayment) return;
 
@@ -419,7 +460,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
         currency: PaymentCurrency.usd,
       );
 
-      if (!payment.hasValidOrder) {
+      if (!payment.hasValidCheckout) {
         await AppSnackbar.error(
           payment.message.isNotEmpty
               ? payment.message
@@ -447,14 +488,19 @@ class _SubscriptionViewState extends State<SubscriptionView> {
 
       final options = <String, Object?>{
         'key': key,
-        'order_id': payment.razorpayOrderId,
-        'amount': payment.razorpayAmount,
-        'currency': payment.currency,
         'name': AppConstants.appName,
         'description': '${plan.displayTitle} subscription',
         'prefill': <String, Object?>{'contact': '', 'email': ''},
         'theme': <String, Object?>{'color': '#B9861F'},
       };
+
+      if (payment.isSubscriptionCheckout) {
+        options['subscription_id'] = payment.razorpaySubscriptionId;
+      } else {
+        options['order_id'] = payment.razorpayOrderId;
+        options['amount'] = payment.razorpayAmount;
+        options['currency'] = payment.currency;
+      }
 
       _razorpay!.open(options);
     } on LimitExceededException {
@@ -590,10 +636,8 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                             : showActive
                             ? _ActiveSubscriptionBody(
                                 subscription: _subscription,
-                                onCancel: _confirmCancelSubscription,
-                                onManageApple: () => unawaited(
-                                  AppStoreLauncher.openAppleSubscriptions(),
-                                ),
+                                onCancel: () =>
+                                    unawaited(_handleCancelSubscription()),
                               )
                             : _CheckoutSubscriptionBody(
                                 subscription: _subscription,
@@ -603,7 +647,8 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                               ),
                       ),
                     ),
-                    if (showCheckout && !_subscription.isBootstrapping.value) ...[
+                    if (showCheckout &&
+                        !_subscription.isBootstrapping.value) ...[
                       Padding(
                         padding: const EdgeInsets.fromLTRB(
                           AppSubscriptionTheme.horizontalPadding,
@@ -612,7 +657,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                           12,
                         ),
                         child: CommonPrimaryButton(
-                          label: 'Start free - 7 days trial',
+                          label: _checkoutButtonLabel,
                           isLoading: _isCreatingPayment || _isVerifyingPayment,
                           onPressed: _startCheckout,
                         ),
@@ -854,12 +899,10 @@ class _ActiveSubscriptionBody extends StatelessWidget {
   const _ActiveSubscriptionBody({
     required this.subscription,
     required this.onCancel,
-    required this.onManageApple,
   });
 
   final SubscriptionController subscription;
   final VoidCallback onCancel;
-  final VoidCallback onManageApple;
 
   @override
   Widget build(BuildContext context) {
@@ -871,77 +914,25 @@ class _ActiveSubscriptionBody extends StatelessWidget {
         Obx(() {
           final loading = subscription.isCancelling.value;
           final canCancel = subscription.canCancelSubscription;
-          final canManageApple = subscription.canManageAppleSubscription;
           final historyLoading = subscription.isLoadingHistory.value;
-
-          if (canManageApple) {
-            return FadeSlideEntrance(
-              index: 0,
-              child: SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton(
-                  onPressed: onManageApple,
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.gold2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Text(
-                    'Manage in App Store',
-                    style: GoogleFonts.roboto(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.goldBright,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
+          final needsHistory = subscription.isRazorpayGateway;
 
           return FadeSlideEntrance(
             index: 0,
-            child: SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton(
-                onPressed: loading || historyLoading || !canCancel
-                    ? null
-                    : onCancel,
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFE57373)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: loading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.gold1,
-                        ),
-                      )
-                    : Text(
-                        'Cancel subscription',
-                        style: GoogleFonts.roboto(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFFE57373),
-                        ),
-                      ),
-              ),
+            child: _CurrentPlanSummaryCard(
+              user: user,
+              actionLabel: 'Cancel subscription',
+              onAction: onCancel,
+              actionLoading: loading,
+              actionEnabled:
+                  canCancel && (!needsHistory || !historyLoading),
+              showAction: subscription.canShowCancelSubscription,
             ),
           );
         }),
-        const SizedBox(height: 24),
-        FadeSlideEntrance(index: 1, child: _CurrentPlanSummaryCard(user: user)),
         const SizedBox(height: 28),
         FadeSlideEntrance(
-          index: 2,
+          index: 1,
           child: Text(
             'Subscription history',
             style: AppTextStyles.heading32Bold().copyWith(
@@ -958,19 +949,33 @@ class _ActiveSubscriptionBody extends StatelessWidget {
 }
 
 class _CurrentPlanSummaryCard extends StatelessWidget {
-  const _CurrentPlanSummaryCard({required this.user});
+  const _CurrentPlanSummaryCard({
+    required this.user,
+    this.actionLabel,
+    this.onAction,
+    this.actionLoading = false,
+    this.actionEnabled = true,
+    this.showAction = false,
+  });
 
   final UserModel? user;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final bool actionLoading;
+  final bool actionEnabled;
+  final bool showAction;
 
   @override
   Widget build(BuildContext context) {
     final planName = user?.activePlanLabel ?? 'Premium';
     final billing = user?.subscriptionType?.trim();
     final price = user?.packagePrice?.trim();
+    final isDestructiveAction =
+        actionLabel?.toLowerCase().contains('cancel') == true;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(13),
         gradient: AppColors.cardSurfaceGradient,
@@ -980,7 +985,7 @@ class _CurrentPlanSummaryCard extends StatelessWidget {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             'Active subscription',
@@ -1013,6 +1018,44 @@ class _CurrentPlanSummaryCard extends StatelessWidget {
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
                 color: AppColors.subscriptionPriceLabel,
+              ),
+            ),
+          ],
+          if (showAction &&
+              actionLabel != null &&
+              actionLabel!.isNotEmpty &&
+              onAction != null) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.center,
+              child: GestureDetector(
+                onTap: actionEnabled && !actionLoading ? onAction : null,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: actionLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.gold1,
+                          ),
+                        )
+                      : Text(
+                          actionLabel!,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.roboto(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: actionEnabled
+                                ? (isDestructiveAction
+                                      ? const Color(0xFFE57373)
+                                      : AppColors.subscriptionSkipLink)
+                                : AppColors.textWolf.withValues(alpha: 0.5),
+                          ),
+                        ),
+                ),
               ),
             ),
           ],
@@ -1398,6 +1441,7 @@ class _PricePlanCard extends StatelessWidget {
                   ),
                   _TrialPriceLabel(
                     priceLabel: applePriceLabel ?? plan.displayPrice,
+                    salePrice: double.tryParse(plan.price),
                     isStoreLocalized:
                         applePriceLabel != null && applePriceLabel!.isNotEmpty,
                     isLoading: isLoadingApplePrice,
@@ -1433,13 +1477,38 @@ class _PricePlanCard extends StatelessWidget {
 class _TrialPriceLabel extends StatelessWidget {
   const _TrialPriceLabel({
     required this.priceLabel,
+    this.salePrice,
     this.isStoreLocalized = false,
     this.isLoading = false,
   });
 
+  static const double _originalPriceMultiplier = 1.5;
+
   final String priceLabel;
+  final double? salePrice;
   final bool isStoreLocalized;
   final bool isLoading;
+
+  String _formatAmount(double amount) {
+    if (amount == amount.roundToDouble()) return amount.toInt().toString();
+    return amount.toStringAsFixed(2);
+  }
+
+  String? _originalPriceLabel(String saleLabel) {
+    final basePrice = salePrice;
+    if (basePrice == null || basePrice <= 0) return null;
+
+    final originalAmount = basePrice * _originalPriceMultiplier;
+    final formattedAmount = _formatAmount(originalAmount);
+
+    if (isStoreLocalized) {
+      final symbolMatch = RegExp(r'^[^\d\s]+').firstMatch(saleLabel.trim());
+      final symbol = symbolMatch?.group(0) ?? r'$';
+      return '$symbol$formattedAmount';
+    }
+
+    return r'$' + formattedAmount;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1454,16 +1523,39 @@ class _TrialPriceLabel extends StatelessWidget {
       );
     }
 
-    final label = isStoreLocalized ? priceLabel : '\$$priceLabel';
-    return Text(
-      label,
-      textAlign: TextAlign.right,
-      style: GoogleFonts.playfairDisplay(
-        fontSize: 20,
-        fontWeight: FontWeight.w700,
-        height: 1,
-        color: AppColors.subscriptionPriceLabel,
-      ),
+    final label = isStoreLocalized ? priceLabel : r'$' + priceLabel;
+    final originalLabel = _originalPriceLabel(label);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          label,
+          textAlign: TextAlign.right,
+          style: GoogleFonts.playfairDisplay(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            height: 1,
+            color: AppColors.subscriptionPriceLabel,
+          ),
+        ),
+        if (originalLabel != null) ...[
+          const SizedBox(width: 6),
+          Text(
+            originalLabel,
+            textAlign: TextAlign.right,
+            style: GoogleFonts.roboto(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              height: 1,
+              color: AppColors.textWolf,
+              decoration: TextDecoration.lineThrough,
+              decorationColor: AppColors.textWolf,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
