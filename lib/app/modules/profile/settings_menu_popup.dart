@@ -5,20 +5,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
+import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/animations/app_dialog_transitions.dart';
 import '../../core/animations/app_motion.dart';
-import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/animated_list_entrance.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_snackbar.dart';
+import '../../core/widgets/animated_list_entrance.dart';
 import '../../core/widgets/app_confirm_dialog.dart';
 import '../../modules/navigation/bottom_nav_controller.dart';
 import '../../modules/session/user_session_controller.dart';
 import '../../routes/app_routes.dart';
+import '../../routes/auth_navigation.dart';
 
 const Color _kPopupBackdropOverlay = Color.fromRGBO(0, 0, 0, 0.72);
 const double _kCardHorizontalPadding = 16;
@@ -54,7 +55,7 @@ Future<void> settingsLogout() async {
     Get.find<UserSessionController>().loadFromStorage();
   }
 
-  Get.offAllNamed(AppRoutes.signUp);
+  AuthNavigation.openWelcome();
 }
 
 class _SettingsMenuDialog extends StatelessWidget {
@@ -311,9 +312,7 @@ class _SettingsMenuDialog extends StatelessWidget {
 
   Future<void> _onDeleteAccountTap(BuildContext context) async {
     if (Get.isRegistered<AppAnalyticsController>()) {
-      unawaited(
-        AppAnalyticsController.to.logTap('settings_delete_account'),
-      );
+      unawaited(AppAnalyticsController.to.logTap('settings_delete_account'));
     }
     Navigator.of(context).pop();
     await Get.toNamed(AppRoutes.settingsDeleteAccount);

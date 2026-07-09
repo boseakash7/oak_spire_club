@@ -8,7 +8,6 @@ import '../../core/storage/app_storage.dart';
 import '../../core/widgets/app_update_dialog.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../routes/app_routes.dart';
 import '../../routes/auth_navigation.dart';
 import '../session/app_config_controller.dart';
 
@@ -39,7 +38,7 @@ class SplashController extends GetxController {
 
     isChecking.value = false;
     if (user == null) {
-      Get.offAllNamed(AppRoutes.signUp);
+      AuthNavigation.openWelcome();
     } else {
       AuthNavigation.completeSession(user);
     }
@@ -77,12 +76,25 @@ class SplashController extends GetxController {
   }
 
   Future<UserModel?> _resolveUser() async {
-    final id = AppStorage.userId;
+    await AppStorage.ensureReady();
+    await AppStorage.repairUserIdFromUser();
+
+    final local = _localUser();
+    final id = AppStorage.userId ?? local?.id;
+
+    if (kDebugMode) {
+      debugPrint(
+        '[Auth] Boot session userId=$id localUser=${local?.id} '
+        'hasStoredUser=${AppStorage.user != null}',
+      );
+    }
+
     if (id == null || id.isEmpty) {
       return null;
     }
-    if (kDebugMode) {
-      debugPrint('[Auth] Auto-login stored user_id=$id');
+
+    if (local != null && AppStorage.userId == null) {
+      await AppStorage.saveSession(local.toJson());
     }
 
     try {
@@ -91,9 +103,22 @@ class SplashController extends GetxController {
         debugPrint('[Auth] Auto-login refreshed user_id=${user.id}');
       }
       return user;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[Auth] Auto-login refresh failed, using cache: $e');
+      }
+      return local ?? _localUser();
+    }
+  }
+
+  UserModel? _localUser() {
+    final json = AppStorage.user;
+    if (json == null) return null;
+    try {
+      final user = UserModel.fromJson(json);
+      if (user.id.isEmpty) return null;
+      return user;
     } catch (_) {
-      await AppStorage.clearUserId();
-      await AppStorage.clearUser();
       return null;
     }
   }

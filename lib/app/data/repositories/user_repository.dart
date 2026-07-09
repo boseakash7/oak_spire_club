@@ -11,8 +11,7 @@ class UserRepository {
 
   Future<UserModel> refreshUserById(String id) async {
     final user = await _remote.getById(id);
-    await AppStorage.setUserId(user.id);
-    await AppStorage.setUser(user.toJson());
+    await AppStorage.saveSession(user.toJson());
 
     if (!Get.isRegistered<UserSessionController>()) {
       Get.put<UserSessionController>(UserSessionController(), permanent: true);
@@ -21,4 +20,3 @@ class UserRepository {
     return user;
   }
 }
-

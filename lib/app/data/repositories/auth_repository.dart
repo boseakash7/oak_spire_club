@@ -21,8 +21,7 @@ class AuthRepository {
     required String password,
   }) async {
     final user = await _remote.login(email: email, password: password);
-    await AppStorage.setUserId(user.id);
-    await AppStorage.setUser(user.toJson());
+    await AppStorage.saveSession(user.toJson());
     _session().setUser(user);
     return user;
   }
@@ -39,8 +38,7 @@ class AuthRepository {
       password: password,
       subscribe: subscribe,
     );
-    await AppStorage.setUserId(user.id);
-    await AppStorage.setUser(user.toJson());
+    await AppStorage.saveSession(user.toJson());
     _session().setUser(user);
     return user;
   }
@@ -66,7 +64,7 @@ class AuthRepository {
         name: name,
         gender: gender,
       );
-      await AppStorage.setUser(updated.toJson());
+      await AppStorage.saveSession(updated.toJson());
       if (gender != null) {
         await AppStorage.setUserGender(gender);
       }

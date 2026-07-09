@@ -37,4 +37,3 @@ class ConfigRepository {
     await save(value);
   }
 }
-

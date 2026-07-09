@@ -3,6 +3,11 @@ class AppAssets {
 
   static const String signInBackground = 'assets/images/signin_bg.png';
   static const String signUpBackground = 'assets/images/signup_bg.png';
+  static const String onboardingBackground = 'assets/images/onboarding_bg.jpeg';
+  static const String onboardingBell = 'assets/images/bell.png';
+  static const String onboardingStat = 'assets/images/stat.png';
+  static const String onboardingBottle = 'assets/images/bottle.png';
+  static const String onboardingGroup = 'assets/images/group.png';
   static const String subscriptionBackground =
       'assets/images/subscription_bg.png';
   static const String subscriptionCheck = 'assets/icons/subscription_check.png';

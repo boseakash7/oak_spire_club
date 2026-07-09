@@ -9,6 +9,10 @@ class AuthNavigation {
 
   static const postAuthSubscriptionArg = 'postAuth';
 
+  static void openWelcome() {
+    Get.offAllNamed(AppRoutes.getStarted);
+  }
+
   static void completeSession(UserModel user) {
     if (user.needsSubscriptionOffer) {
       Get.offAllNamed(
