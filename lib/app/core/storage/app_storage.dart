@@ -16,6 +16,9 @@ class AppStorage {
   static const String _keyNotificationPrefs = 'notification_prefs';
   static const String _keyNotificationTopicsInitialSyncDone =
       'notification_topics_initial_sync_done';
+  static const String _keyCurrentRegistrationTopic =
+      'current_registration_topic';
+  static const String _keyCurrentTierTopic = 'current_tier_topic';
 
   static String? get userId => _box.read<String>(_keyUserId);
   static Future<void> setUserId(String value) => _box.write(_keyUserId, value);
@@ -33,6 +36,8 @@ class AppStorage {
     await clearUser();
     await _box.remove(_keyUserGender);
     await _box.remove(_keyNotificationPrefs);
+    await _box.remove(_keyCurrentRegistrationTopic);
+    await _box.remove(_keyCurrentTierTopic);
   }
 
   static String? get uploadUrl => _box.read<String>(_keyUploadUrl);
@@ -75,5 +80,25 @@ class AppStorage {
       _box.read<bool>(_keyNotificationTopicsInitialSyncDone) ?? false;
   static Future<void> setNotificationTopicsInitialSyncDone(bool value) =>
       _box.write(_keyNotificationTopicsInitialSyncDone, value);
+
+  static String? get currentRegistrationTopic =>
+      _box.read<String>(_keyCurrentRegistrationTopic);
+  static Future<void> setCurrentRegistrationTopic(String? value) async {
+    if (value == null) {
+      await _box.remove(_keyCurrentRegistrationTopic);
+    } else {
+      await _box.write(_keyCurrentRegistrationTopic, value);
+    }
+  }
+
+  static String? get currentTierTopic =>
+      _box.read<String>(_keyCurrentTierTopic);
+  static Future<void> setCurrentTierTopic(String? value) async {
+    if (value == null) {
+      await _box.remove(_keyCurrentTierTopic);
+    } else {
+      await _box.write(_keyCurrentTierTopic, value);
+    }
+  }
 }
 

@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../../core/firebase/firebase_notification_topics.dart';
 import '../../core/storage/app_storage.dart';
 import '../../modules/session/user_session_controller.dart';
 import '../datasources/auth_remote_datasource.dart';
@@ -76,6 +77,7 @@ class AuthRepository {
 
   Future<void> deleteAccount({required String userId}) async {
     await _remote.deleteAccount(userId: userId);
+    await FirebaseNotificationTopics.syncLogoutTopic();
     await AppStorage.clearSession();
     _session().loadFromStorage();
   }

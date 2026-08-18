@@ -10,6 +10,7 @@ import '../../core/animations/app_motion.dart';
 import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/firebase/firebase_notification_topics.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/animated_list_entrance.dart';
@@ -48,6 +49,7 @@ Future<void> showSettingsPopup(BuildContext context) async {
 }
 
 Future<void> settingsLogout() async {
+  await FirebaseNotificationTopics.syncLogoutTopic();
   await AppStorage.clearSession();
 
   if (Get.isRegistered<UserSessionController>()) {
@@ -57,8 +59,15 @@ Future<void> settingsLogout() async {
   Get.offAllNamed(AppRoutes.signUp);
 }
 
-class _SettingsMenuDialog extends StatelessWidget {
+class _SettingsMenuDialog extends StatefulWidget {
   const _SettingsMenuDialog();
+
+  @override
+  State<_SettingsMenuDialog> createState() => _SettingsMenuDialogState();
+}
+
+class _SettingsMenuDialogState extends State<_SettingsMenuDialog> {
+  bool _isLoggingOut = false;
 
   static const List<_SettingsRowData> _accountRows = [
     _SettingsRowData(
@@ -117,7 +126,7 @@ class _SettingsMenuDialog extends StatelessWidget {
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.of(context).pop(),
+            onTap: _isLoggingOut ? null : () => Navigator.of(context).pop(),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
               child: const ColoredBox(color: _kPopupBackdropOverlay),
@@ -180,7 +189,9 @@ class _SettingsMenuDialog extends StatelessWidget {
                                 ),
                               ),
                               IconButton(
-                                onPressed: () => Navigator.of(context).pop(),
+                                onPressed: _isLoggingOut
+                                    ? null
+                                    : () => Navigator.of(context).pop(),
                                 icon: const Icon(
                                   Icons.close_rounded,
                                   color: AppColors.textCream,
@@ -218,7 +229,9 @@ class _SettingsMenuDialog extends StatelessWidget {
                                     index: e.key,
                                     child: _SettingsMenuRow(
                                       data: e.value,
-                                      onTap: () => _onRowTap(context, e.value),
+                                      onTap: _isLoggingOut
+                                          ? null
+                                          : () => _onRowTap(context, e.value),
                                     ),
                                   ),
                                 ),
@@ -230,7 +243,9 @@ class _SettingsMenuDialog extends StatelessWidget {
                                     index: e.key + _accountRows.length,
                                     child: _SettingsMenuRow(
                                       data: e.value,
-                                      onTap: () => _onRowTap(context, e.value),
+                                      onTap: _isLoggingOut
+                                          ? null
+                                          : () => _onRowTap(context, e.value),
                                     ),
                                   ),
                                 ),
@@ -239,14 +254,21 @@ class _SettingsMenuDialog extends StatelessWidget {
                                   index:
                                       _accountRows.length + _supportRows.length,
                                   child: _SettingsMenuRow(
-                                    data: const _SettingsRowData(
+                                    data: _SettingsRowData(
                                       icon: Icons.logout_rounded,
-                                      title: 'Log out',
-                                      subtitle: 'Sign out of this device',
+                                      title: _isLoggingOut
+                                          ? 'Logging out...'
+                                          : 'Log out',
+                                      subtitle: _isLoggingOut
+                                          ? 'Signing out of this device...'
+                                          : 'Sign out of this device',
                                       headerGoldStyle: true,
                                       analyticsKey: 'logout',
                                     ),
-                                    onTap: () => _onLogoutTap(context),
+                                    isLoading: _isLoggingOut,
+                                    onTap: _isLoggingOut
+                                        ? null
+                                        : () => _onLogoutTap(context),
                                   ),
                                 ),
                                 AnimatedListEntrance(
@@ -262,7 +284,9 @@ class _SettingsMenuDialog extends StatelessWidget {
                                       destructive: true,
                                       analyticsKey: 'delete_account',
                                     ),
-                                    onTap: () => _onDeleteAccountTap(context),
+                                    onTap: _isLoggingOut
+                                        ? null
+                                        : () => _onDeleteAccountTap(context),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -320,6 +344,8 @@ class _SettingsMenuDialog extends StatelessWidget {
   }
 
   Future<void> _onLogoutTap(BuildContext context) async {
+    if (_isLoggingOut) return;
+
     final confirmed = await showAppConfirmDialog(
       context,
       title: 'Log out?',
@@ -328,12 +354,14 @@ class _SettingsMenuDialog extends StatelessWidget {
       cancelLabel: 'Stay',
       confirmIsDestructive: true,
     );
-    if (!context.mounted) return;
+    if (!mounted) return;
     if (confirmed == true) {
       if (Get.isRegistered<AppAnalyticsController>()) {
         unawaited(AppAnalyticsController.to.logTap('settings_logout'));
       }
-      Navigator.of(context).pop();
+      setState(() {
+        _isLoggingOut = true;
+      });
       await settingsLogout();
     }
   }
@@ -444,10 +472,15 @@ class _UserHeaderRow extends StatelessWidget {
 }
 
 class _SettingsMenuRow extends StatelessWidget {
-  const _SettingsMenuRow({required this.data, required this.onTap});
+  const _SettingsMenuRow({
+    required this.data,
+    required this.onTap,
+    this.isLoading = false,
+  });
 
   final _SettingsRowData data;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -475,7 +508,7 @@ class _SettingsMenuRow extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: isLoading ? null : onTap,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -489,7 +522,16 @@ class _SettingsMenuRow extends StatelessWidget {
                   color: iconBg,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(data.icon, color: iconColor, size: 22),
+                child: isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation(AppColors.goldBright),
+                        ),
+                      )
+                    : Icon(data.icon, color: iconColor, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -520,7 +562,16 @@ class _SettingsMenuRow extends StatelessWidget {
                   ],
                 ),
               ),
-              if (!data.destructive && !data.headerGoldStyle)
+              if (isLoading)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(AppColors.goldBright),
+                  ),
+                )
+              else if (!data.destructive && !data.headerGoldStyle)
                 SvgPicture.asset(
                   AppAssets.iconArrowRight,
                   height: 14,
