@@ -21,21 +21,16 @@ class SubscriptionLoadingView extends StatelessWidget {
         const ShimmerBox(height: 48, width: double.infinity, radius: 10),
         const SizedBox(height: 24),
         ShimmerBox(
-          height: 120,
+          height: AppSubscriptionTheme.priceCardHeight,
           width: double.infinity,
           radius: AppSubscriptionTheme.priceCardRadius,
         ),
-        const SizedBox(height: 28),
-        const ShimmerBox(height: 20, width: 180, radius: 6),
-        const SizedBox(height: 14),
-        for (var i = 0; i < 3; i++) ...[
-          ShimmerBox(
-            height: 72,
-            width: double.infinity,
-            radius: AppSubscriptionTheme.priceCardRadius,
-          ),
-          if (i < 2) const SizedBox(height: 12),
-        ],
+        const SizedBox(height: AppSubscriptionTheme.priceCardGap),
+        ShimmerBox(
+          height: AppSubscriptionTheme.priceCardHeight,
+          width: double.infinity,
+          radius: AppSubscriptionTheme.priceCardRadius,
+        ),
       ],
     );
   }

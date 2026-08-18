@@ -6,6 +6,13 @@ class AppAssets {
   static const String subscriptionBackground =
       'assets/images/subscription_bg.png';
   static const String subscriptionCheck = 'assets/icons/subscription_check.png';
+  static const String subscriptionBenefitCheck =
+      'assets/icons/subscription_benefit_check.svg';
+  static const String subscriptionPlanCheck =
+      'assets/icons/subscription_plan_check.svg';
+  static const String subscriptionCrown = 'assets/icons/subscription_crown.svg';
+  static const String subscriptionSkipChevron =
+      'assets/icons/subscription_skip_chevron.svg';
 
   /// Brand mark for splash / about (same asset as launcher source).
   static const String appIc = 'assets/images/app_ic.png';

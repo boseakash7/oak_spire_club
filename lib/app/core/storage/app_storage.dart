@@ -19,6 +19,7 @@ class AppStorage {
   static const String _keyCurrentRegistrationTopic =
       'current_registration_topic';
   static const String _keyCurrentTierTopic = 'current_tier_topic';
+  static const String _keyTrialCountdownEndsAt = 'trial_countdown_ends_at';
 
   static String? get userId => _box.read<String>(_keyUserId);
   static Future<void> setUserId(String value) => _box.write(_keyUserId, value);
@@ -100,5 +101,16 @@ class AppStorage {
       await _box.write(_keyCurrentTierTopic, value);
     }
   }
+
+  /// Epoch millis when the 4-hour free-trial countdown ends.
+  static int? get trialCountdownEndsAtMillis {
+    final value = _box.read(_keyTrialCountdownEndsAt);
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  static Future<void> setTrialCountdownEndsAtMillis(int value) =>
+      _box.write(_keyTrialCountdownEndsAt, value);
 }
 
