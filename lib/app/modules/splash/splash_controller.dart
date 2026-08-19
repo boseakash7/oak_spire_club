@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/firebase/firebase_notification_topics.dart';
 import '../../core/services/app_store_launcher.dart';
 import '../../core/services/app_update_checker.dart';
 import '../../core/storage/app_storage.dart';
@@ -32,6 +35,10 @@ class SplashController extends GetxController {
     await Future.wait([Future<void>.delayed(_minSplashVisible), configFuture]);
 
     final user = await userFuture;
+
+    if (user == null) {
+      unawaited(FirebaseNotificationTopics.syncUnregisteredTopic());
+    }
 
     final canContinue = await _checkAppUpdate();
     if (!canContinue) return;

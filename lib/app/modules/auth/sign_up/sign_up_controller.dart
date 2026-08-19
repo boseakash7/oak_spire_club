@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/firebase/firebase_notification_topics.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/utils/app_snackbar.dart';
 import '../../../core/utils/validators.dart';
@@ -52,6 +53,7 @@ class SignUpController extends GetxController {
         email: email,
         password: passwordController.text,
       );
+      await FirebaseNotificationTopics.syncNewRegistrationTopic();
       AuthNavigation.completeSession(user);
     } on ApiException catch (e) {
       AppSnackbar.error(e.message);

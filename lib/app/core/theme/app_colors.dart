@@ -147,7 +147,16 @@ class AppColors {
 
   /// Plan card border (selected / unselected).
   static const Color subscriptionPlanBorderSelected = Color(0xFFC89D2D);
-  static const Color subscriptionPlanBorderUnselected = Color(0xFF060304);
+  static const Color subscriptionPlanBorderUnselected = Color(0xFF422E27);
+
+  /// “Billed every …” on plan cards.
+  static const Color subscriptionBillingSubtitle = Color(0xFF787878);
+
+  /// Trial countdown digits.
+  static const Color subscriptionTrialTime = Color(0xFFD0A934);
+
+  /// Trial progress track.
+  static const Color subscriptionTrialTrack = Color(0xFF201116);
 
   /// Plan price label (Playfair).
   static const Color subscriptionPriceLabel = Color(0xFFCA9F2E);

@@ -17,6 +17,10 @@ class AppStorage {
   static const String _keyNotificationPrefs = 'notification_prefs';
   static const String _keyNotificationTopicsInitialSyncDone =
       'notification_topics_initial_sync_done';
+  static const String _keyCurrentRegistrationTopic =
+      'current_registration_topic';
+  static const String _keyCurrentTierTopic = 'current_tier_topic';
+  static const String _keyTrialCountdownEndsAt = 'trial_countdown_ends_at';
 
   static late final GetStorage _box;
   static late final Box<dynamic> _sessionBox;
@@ -73,7 +77,7 @@ class AppStorage {
     return _readMap(_keyUser);
   }
 
-  /// Persists login session to Hive (durable) and GetStorage (legacy).
+  /// Persists login session to Hive (durable on iOS) and GetStorage (legacy).
   static Future<void> saveSession(Map<String, dynamic> userJson) async {
     await ensureReady();
     final id = _parseId(userJson['id']);
@@ -86,6 +90,20 @@ class AppStorage {
     await _box.write(_keyUser, userJson);
     await _box.save();
   }
+
+  /// Compatibility with older GetStorage-only callers.
+  static Future<void> setUserId(String value) async {
+    await ensureReady();
+    final id = _parseId(value);
+    if (id == null) return;
+    await _sessionBox.put(_keyUserId, id);
+    await _box.write(_keyUserId, id);
+    await _box.save();
+  }
+
+  /// Compatibility with older GetStorage-only callers.
+  static Future<void> setUser(Map<String, dynamic> value) =>
+      saveSession(value);
 
   static Future<void> repairUserIdFromUser() async {
     if (userId != null) return;
@@ -118,11 +136,14 @@ class AppStorage {
     await _box.remove(_keyUser);
     await _box.remove(_keyUserGender);
     await _box.remove(_keyNotificationPrefs);
+    await _box.remove(_keyCurrentRegistrationTopic);
+    await _box.remove(_keyCurrentTierTopic);
     await _box.save();
   }
 
   static Future<void> _migrateSessionFromGetStorage() async {
-    if (_sessionBox.containsKey(_keyUserId) || _sessionBox.containsKey(_keyUser)) {
+    if (_sessionBox.containsKey(_keyUserId) ||
+        _sessionBox.containsKey(_keyUser)) {
       return;
     }
 
@@ -150,11 +171,13 @@ class AppStorage {
   static Future<void> setRazorpayKeyId(String value) =>
       _box.write(_keyRazorpayKeyId, value);
 
-  static String? get razorpayKeySecret => _box.read<String>(_keyRazorpayKeySecret);
+  static String? get razorpayKeySecret =>
+      _box.read<String>(_keyRazorpayKeySecret);
   static Future<void> setRazorpayKeySecret(String value) =>
       _box.write(_keyRazorpayKeySecret, value);
 
-  static Map<String, dynamic>? get currentVersion => _readMap(_keyCurrentVersion);
+  static Map<String, dynamic>? get currentVersion =>
+      _readMap(_keyCurrentVersion);
   static Future<void> setCurrentVersion(Map<String, dynamic> value) =>
       _box.write(_keyCurrentVersion, value);
 
@@ -176,4 +199,35 @@ class AppStorage {
       _box.read<bool>(_keyNotificationTopicsInitialSyncDone) ?? false;
   static Future<void> setNotificationTopicsInitialSyncDone(bool value) =>
       _box.write(_keyNotificationTopicsInitialSyncDone, value);
+
+  static String? get currentRegistrationTopic =>
+      _box.read<String>(_keyCurrentRegistrationTopic);
+  static Future<void> setCurrentRegistrationTopic(String? value) async {
+    if (value == null) {
+      await _box.remove(_keyCurrentRegistrationTopic);
+    } else {
+      await _box.write(_keyCurrentRegistrationTopic, value);
+    }
+  }
+
+  static String? get currentTierTopic =>
+      _box.read<String>(_keyCurrentTierTopic);
+  static Future<void> setCurrentTierTopic(String? value) async {
+    if (value == null) {
+      await _box.remove(_keyCurrentTierTopic);
+    } else {
+      await _box.write(_keyCurrentTierTopic, value);
+    }
+  }
+
+  /// Epoch millis when the 4-hour free-trial countdown ends.
+  static int? get trialCountdownEndsAtMillis {
+    final value = _box.read(_keyTrialCountdownEndsAt);
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  static Future<void> setTrialCountdownEndsAtMillis(int value) =>
+      _box.write(_keyTrialCountdownEndsAt, value);
 }

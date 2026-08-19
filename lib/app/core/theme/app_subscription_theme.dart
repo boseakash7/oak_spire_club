@@ -5,10 +5,14 @@ abstract final class AppSubscriptionTheme {
   static const double horizontalPadding = 35;
   static const double skipTitleHorizontalPadding = 26;
 
-  static const double priceCardHeight = 94;
+  /// Cards / trial block sit 5px inside the page padding (Figma x=40).
+  static const double planBlockInset = 5;
+
+  static const double priceCardHeight = 58;
   static const double priceCardRadius = 13;
-  static const double priceCardGap = 19;
+  static const double priceCardGap = 13;
+  static const double bestValueBadgeOverlap = 10;
 
   static const double scrollTopPaddingWithBanner = 16;
-  static const double scrollTopPaddingDefault = 48;
+  static const double scrollTopPaddingDefault = 40;
 }
