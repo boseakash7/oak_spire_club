@@ -11,10 +11,10 @@ import 'app/core/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await bootstrapFirebase();
-  SystemChrome.setSystemUIOverlayStyle(AppTheme.systemUiOverlayStyle);
   await Hive.initFlutter();
   await AppStorage.init();
+  await bootstrapFirebase();
+  SystemChrome.setSystemUIOverlayStyle(AppTheme.systemUiOverlayStyle);
   Get.put<AppCache>(await AppCache.init(), permanent: true);
   runApp(const OakSpireApp());
 }

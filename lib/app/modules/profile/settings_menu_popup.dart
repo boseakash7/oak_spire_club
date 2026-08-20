@@ -11,6 +11,7 @@ import '../../core/animations/app_motion.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/firebase/firebase_notification_topics.dart';
+import '../../core/firebase/fcm_token_sync_service.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -50,6 +51,7 @@ Future<void> showSettingsPopup(BuildContext context) async {
 }
 
 Future<void> settingsLogout() async {
+  await FcmTokenSyncService.clearOnLogout();
   await FirebaseNotificationTopics.syncLogoutTopic();
   await AppStorage.clearSession();
 

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 
 import '../../core/firebase/firebase_notification_topics.dart';
+import '../../core/firebase/fcm_token_sync_service.dart';
 import '../../core/storage/app_storage.dart';
 import '../../modules/session/user_session_controller.dart';
 import '../datasources/auth_remote_datasource.dart';
@@ -24,6 +27,7 @@ class AuthRepository {
     final user = await _remote.login(email: email, password: password);
     await AppStorage.saveSession(user.toJson());
     _session().setUser(user);
+    unawaited(FcmTokenSyncService.syncIfLoggedIn());
     return user;
   }
 
@@ -41,6 +45,7 @@ class AuthRepository {
     );
     await AppStorage.saveSession(user.toJson());
     _session().setUser(user);
+    unawaited(FcmTokenSyncService.syncIfLoggedIn());
     return user;
   }
 
@@ -73,8 +78,17 @@ class AuthRepository {
     }
   }
 
+  Future<void> sendOtp({required String email}) async {
+    await _remote.sendOtp(email: email);
+  }
+
+  Future<void> verifyOtp({required String email, required String otp}) async {
+    await _remote.verifyOtp(email: email, otp: otp);
+  }
+
   Future<void> deleteAccount({required String userId}) async {
     await _remote.deleteAccount(userId: userId);
+    await FcmTokenSyncService.clearOnLogout();
     await FirebaseNotificationTopics.syncLogoutTopic();
     await AppStorage.clearSession();
     _session().loadFromStorage();

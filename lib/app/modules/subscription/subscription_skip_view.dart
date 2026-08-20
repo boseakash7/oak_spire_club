@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_subscription_theme.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -20,8 +21,9 @@ class SubscriptionSkipView extends StatelessWidget {
         args[AuthNavigation.postAuthSubscriptionArg] == true;
   }
 
-  void _continueWithLimitedAccess() {
+  Future<void> _continueWithLimitedAccess() async {
     if (_isPostAuth) {
+      await AppStorage.markSubscriptionOfferDismissed();
       Get.offAllNamed(AppRoutes.shell);
     } else {
       Get.close(2);
@@ -106,7 +108,7 @@ class SubscriptionSkipView extends StatelessWidget {
                     ),
                   ),
                   GestureDetector(
-                    onTap: _continueWithLimitedAccess,
+                    onTap: () => _continueWithLimitedAccess(),
                     behavior: HitTestBehavior.opaque,
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 16),

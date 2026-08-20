@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../core/storage/app_storage.dart';
 import '../data/models/user_model.dart';
 import 'app_routes.dart';
 
@@ -14,7 +15,8 @@ class AuthNavigation {
   }
 
   static void completeSession(UserModel user) {
-    if (user.needsSubscriptionOffer) {
+    if (user.needsSubscriptionOffer &&
+        !AppStorage.hasDismissedSubscriptionOfferFor(user.id)) {
       Get.offAllNamed(
         AppRoutes.subscription,
         arguments: const {postAuthSubscriptionArg: true},

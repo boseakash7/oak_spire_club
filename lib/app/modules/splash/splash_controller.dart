@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/firebase/firebase_notification_topics.dart';
+import '../../core/firebase/fcm_token_sync_service.dart';
 import '../../core/services/app_store_launcher.dart';
 import '../../core/services/app_update_checker.dart';
 import '../../core/storage/app_storage.dart';
@@ -47,6 +48,7 @@ class SplashController extends GetxController {
     if (user == null) {
       AuthNavigation.openWelcome();
     } else {
+      unawaited(FcmTokenSyncService.syncIfLoggedIn());
       AuthNavigation.completeSession(user);
     }
   }

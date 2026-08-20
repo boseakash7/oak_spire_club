@@ -10,6 +10,8 @@ class AuthRemoteDataSource {
   static const String _login = 'auth/login';
   static const String _update = 'auth/update';
   static const String _delete = 'auth/delete';
+  static const String _sendOtp = 'auth/send-otp';
+  static const String _verifyOtp = 'auth/verify-otp';
 
   Future<UserModel> login({
     required String email,
@@ -69,6 +71,20 @@ class AuthRemoteDataSource {
     }
 
     await _client.postJson(_update, body);
+  }
+
+  Future<void> sendOtp({required String email}) async {
+    await _client.postJson(_sendOtp, {'email': email.trim()});
+  }
+
+  Future<void> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    await _client.postJson(_verifyOtp, {
+      'email': email.trim(),
+      'otp': otp,
+    });
   }
 
   Future<void> deleteAccount({required String userId}) async {

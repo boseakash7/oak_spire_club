@@ -7,6 +7,8 @@ import '../modules/auth/sign_in/sign_in_binding.dart';
 import '../modules/auth/sign_in/sign_in_view.dart';
 import '../modules/auth/sign_up/sign_up_binding.dart';
 import '../modules/auth/sign_up/sign_up_view.dart';
+import '../modules/auth/verify_otp/verify_otp_binding.dart';
+import '../modules/auth/verify_otp/verify_otp_view.dart';
 import '../modules/add_collection/add_collection_binding.dart';
 import '../modules/add_collection/add_collection_view.dart';
 import '../modules/navigation/bottom_nav_binding.dart';
@@ -61,6 +63,11 @@ class AppPages {
       name: AppRoutes.signUp,
       page: () => const SignUpView(),
       binding: SignUpBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.verifyOtp,
+      page: () => const VerifyOtpView(),
+      binding: VerifyOtpBinding(),
     ),
     GetPage(
       name: AppRoutes.forgotPassword,
