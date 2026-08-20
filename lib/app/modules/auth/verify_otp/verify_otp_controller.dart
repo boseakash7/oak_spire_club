@@ -44,7 +44,7 @@ class VerifyOtpController extends GetxController {
     try {
       await _repo.sendOtp(email: email);
       if (isClosed) return;
-      statusMessage.value = 'OTP sent to $email';
+      statusMessage.value = 'OTP sent';
       _startResendTimer();
     } on ApiException catch (e) {
       if (isClosed) return;
@@ -113,7 +113,7 @@ class VerifyOtpController extends GetxController {
     try {
       await _repo.sendOtp(email: email);
       AppSnackbar.success('Code resent to $email');
-      statusMessage.value = 'OTP sent to $email';
+      statusMessage.value = 'OTP sent';
       _startResendTimer();
     } on ApiException catch (e) {
       statusMessage.value = '';
