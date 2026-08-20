@@ -14,6 +14,20 @@ class AuthNavigation {
     Get.offAllNamed(AppRoutes.getStarted);
   }
 
+  /// After login/register: require OTP when email is not verified.
+  static void afterAuth(UserModel user) {
+    if (!user.emailVerified) {
+      Get.toNamed(
+        AppRoutes.verifyOtp,
+        arguments: {
+          'email': user.email ?? '',
+        },
+      );
+      return;
+    }
+    completeSession(user);
+  }
+
   static void completeSession(UserModel user) {
     if (user.needsSubscriptionOffer &&
         !AppStorage.hasDismissedSubscriptionOfferFor(user.id)) {

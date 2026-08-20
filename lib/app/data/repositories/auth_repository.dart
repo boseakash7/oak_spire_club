@@ -25,9 +25,9 @@ class AuthRepository {
     required String password,
   }) async {
     final user = await _remote.login(email: email, password: password);
-    await AppStorage.saveSession(user.toJson());
-    _session().setUser(user);
-    unawaited(FcmTokenSyncService.syncIfLoggedIn());
+    if (user.emailVerified) {
+      await _persistSession(user);
+    }
     return user;
   }
 
@@ -43,10 +43,16 @@ class AuthRepository {
       password: password,
       subscribe: subscribe,
     );
+    if (user.emailVerified) {
+      await _persistSession(user);
+    }
+    return user;
+  }
+
+  Future<void> _persistSession(UserModel user) async {
     await AppStorage.saveSession(user.toJson());
     _session().setUser(user);
     unawaited(FcmTokenSyncService.syncIfLoggedIn());
-    return user;
   }
 
   Future<void> updateProfile({
@@ -82,8 +88,25 @@ class AuthRepository {
     await _remote.sendOtp(email: email);
   }
 
-  Future<void> verifyOtp({required String email, required String otp}) async {
-    await _remote.verifyOtp(email: email, otp: otp);
+  Future<UserModel> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final user = await _remote.verifyOtp(email: email, otp: otp);
+    await _persistSession(user);
+    return user;
+  }
+
+  Future<void> forgetPassword({required String email}) async {
+    await _remote.forgetPassword(email: email);
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String password,
+  }) async {
+    await _remote.resetPassword(email: email, otp: otp, password: password);
   }
 
   Future<void> deleteAccount({required String userId}) async {

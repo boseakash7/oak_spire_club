@@ -6,10 +6,11 @@ import 'package:get/get.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/utils/app_snackbar.dart';
 import '../../../core/utils/dispose_after_detach.dart';
+import '../../../core/utils/validators.dart';
 import '../../../data/repositories/auth_repository.dart';
-import '../../../routes/auth_navigation.dart';
+import '../../../routes/app_routes.dart';
 
-class VerifyOtpController extends GetxController {
+class ResetPasswordController extends GetxController {
   static const int otpLength = 4;
   static const int resendCooldown = 60;
 
@@ -18,11 +19,12 @@ class VerifyOtpController extends GetxController {
   final List<FocusNode> focusNodes =
       List.generate(otpLength, (_) => FocusNode());
 
+  final passwordController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
+
   final isLoading = false.obs;
-  final isSendingOtp = false.obs;
   final isResending = false.obs;
   final resendSeconds = 0.obs;
-  final statusMessage = ''.obs;
 
   Timer? _resendTimer;
   final _repo = Get.find<AuthRepository>();
@@ -32,31 +34,10 @@ class VerifyOtpController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _startResendTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!isClosed) focusNodes[0].requestFocus();
     });
-    unawaited(_sendOtpInitial());
-  }
-
-  Future<void> _sendOtpInitial() async {
-    isSendingOtp.value = true;
-    statusMessage.value = 'Sending OTP…';
-    try {
-      await _repo.sendOtp(email: email);
-      if (isClosed) return;
-      statusMessage.value = 'OTP sent to $email';
-      _startResendTimer();
-    } on ApiException catch (e) {
-      if (isClosed) return;
-      statusMessage.value = '';
-      AppSnackbar.error(e.message);
-    } catch (_) {
-      if (isClosed) return;
-      statusMessage.value = '';
-      AppSnackbar.error('Could not send verification code.');
-    } finally {
-      if (!isClosed) isSendingOtp.value = false;
-    }
   }
 
   void onDigitChanged(int index, String value) {
@@ -66,7 +47,6 @@ class VerifyOtpController extends GetxController {
     }
     if (value.length == 1 && index == otpLength - 1) {
       focusNodes[index].unfocus();
-      onVerify();
     }
   }
 
@@ -80,46 +60,64 @@ class VerifyOtpController extends GetxController {
 
   String get _otpCode => digitControllers.map((c) => c.text).join();
 
-  Future<void> onVerify() async {
+  Future<void> onReset() async {
     final code = _otpCode;
+    final password = passwordController.text;
+    final confirm = confirmPasswordController.text;
+
     if (code.length < otpLength) {
       AppSnackbar.error('Please enter the full code.');
+      return;
+    }
+    if (!Validators.isValidPassword(password)) {
+      AppSnackbar.error('Password must be at least 8 characters.');
+      return;
+    }
+    if (password != confirm) {
+      AppSnackbar.error('Passwords do not match.');
       return;
     }
 
     isLoading.value = true;
     try {
-      final user = await _repo.verifyOtp(email: email, otp: code);
+      await _repo.resetPassword(
+        email: email,
+        otp: code,
+        password: password,
+      );
       if (isClosed) return;
+
+      AppSnackbar.success('Password updated. Please sign in.');
       _resendTimer?.cancel();
       unfocusSafely();
-      AuthNavigation.completeSession(user);
+      for (final node in focusNodes) {
+        if (node.hasFocus) node.unfocus();
+      }
+
+      // Wait for TextFields to detach before clearing the navigator stack.
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (isClosed) return;
+      Get.offAllNamed(AppRoutes.signIn);
     } on ApiException catch (e) {
       if (!isClosed) isLoading.value = false;
       AppSnackbar.error(e.message);
     } catch (_) {
       if (!isClosed) isLoading.value = false;
-      AppSnackbar.error('Verification failed.');
+      AppSnackbar.error('Could not reset password.');
     }
   }
 
   Future<void> onResend() async {
-    if (resendSeconds.value > 0 || isResending.value || isSendingOtp.value) {
-      return;
-    }
+    if (resendSeconds.value > 0 || isResending.value) return;
 
     isResending.value = true;
-    statusMessage.value = 'Sending OTP…';
     try {
-      await _repo.sendOtp(email: email);
+      await _repo.forgetPassword(email: email);
       AppSnackbar.success('Code resent to $email');
-      statusMessage.value = 'OTP sent to $email';
       _startResendTimer();
     } on ApiException catch (e) {
-      statusMessage.value = '';
       AppSnackbar.error(e.message);
     } catch (_) {
-      statusMessage.value = '';
       AppSnackbar.error('Could not resend code.');
     } finally {
       if (!isClosed) isResending.value = false;
@@ -147,7 +145,12 @@ class VerifyOtpController extends GetxController {
   void onClose() {
     _resendTimer?.cancel();
     unfocusSafely();
-    disposeAfterDetach([...digitControllers, ...focusNodes]);
+    disposeAfterDetach([
+      ...digitControllers,
+      ...focusNodes,
+      passwordController,
+      confirmPasswordController,
+    ]);
     super.onClose();
   }
 }

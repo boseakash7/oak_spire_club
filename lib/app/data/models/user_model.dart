@@ -15,6 +15,7 @@ class UserModel {
     this.subscriptionStatus,
     this.isFree,
     this.isTrialUsed,
+    this.isEmailVerified,
     this.gender,
     this.packageName,
     this.createdAt,
@@ -36,6 +37,7 @@ class UserModel {
   final String? subscriptionStatus;
   final String? isFree;
   final String? isTrialUsed;
+  final String? isEmailVerified;
   final String? packageName;
   final String? createdAt;
 
@@ -48,6 +50,12 @@ class UserModel {
   /// User already consumed the free trial (`is_trial_used` = `1`).
   bool get hasUsedTrial {
     final raw = isTrialUsed?.trim().toLowerCase();
+    return raw == '1' || raw == 'true';
+  }
+
+  /// Email verified flag (`isEmailVerified` / `is_email_verified` = `1`).
+  bool get emailVerified {
+    final raw = isEmailVerified?.trim().toLowerCase();
     return raw == '1' || raw == 'true';
   }
 
@@ -112,6 +120,8 @@ class UserModel {
       subscriptionStatus: json['subscription_status']?.toString(),
       isFree: json['is_free']?.toString(),
       isTrialUsed: json['is_trial_used']?.toString(),
+      isEmailVerified: (json['isEmailVerified'] ?? json['is_email_verified'])
+          ?.toString(),
       gender: json['gender']?.toString(),
       packageName: json['package_name']?.toString(),
       createdAt: json['created_at']?.toString(),
@@ -122,6 +132,7 @@ class UserModel {
     String? name,
     String? email,
     String? gender,
+    String? isEmailVerified,
   }) {
     return UserModel(
       id: id,
@@ -139,7 +150,10 @@ class UserModel {
       subscriptionStatus: subscriptionStatus,
       isFree: isFree,
       isTrialUsed: isTrialUsed,
+      isEmailVerified: isEmailVerified ?? this.isEmailVerified,
       gender: gender ?? this.gender,
+      packageName: packageName,
+      createdAt: createdAt,
     );
   }
 
@@ -159,9 +173,10 @@ class UserModel {
         'subscription_status': subscriptionStatus,
         'is_free': isFree,
         'is_trial_used': isTrialUsed,
+        'isEmailVerified': isEmailVerified,
+        'is_email_verified': isEmailVerified,
         'gender': gender,
         'package_name': packageName,
         'created_at': createdAt,
       };
 }
-

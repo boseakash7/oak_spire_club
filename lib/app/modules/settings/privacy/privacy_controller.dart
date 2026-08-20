@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/utils/app_snackbar.dart';
+import '../../../core/utils/dispose_after_detach.dart';
 import '../../../core/utils/validators.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../session/user_session_controller.dart';
@@ -60,9 +61,12 @@ class PrivacyController extends GetxController {
 
   @override
   void onClose() {
-    currentPasswordController.dispose();
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
+    unfocusSafely();
+    disposeAfterDetach([
+      currentPasswordController,
+      newPasswordController,
+      confirmPasswordController,
+    ]);
     super.onClose();
   }
 }

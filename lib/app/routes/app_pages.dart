@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../modules/get_started/get_started_view.dart';
 import '../modules/auth/forgot_password/forgot_password_binding.dart';
 import '../modules/auth/forgot_password/forgot_password_view.dart';
+import '../modules/auth/reset_password/reset_password_binding.dart';
+import '../modules/auth/reset_password/reset_password_view.dart';
 import '../modules/auth/sign_in/sign_in_binding.dart';
 import '../modules/auth/sign_in/sign_in_view.dart';
 import '../modules/auth/sign_up/sign_up_binding.dart';
@@ -73,6 +75,11 @@ class AppPages {
       name: AppRoutes.forgotPassword,
       page: () => const ForgotPasswordView(),
       binding: ForgotPasswordBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.resetPassword,
+      page: () => const ResetPasswordView(),
+      binding: ResetPasswordBinding(),
     ),
     GetPage(
       name: AppRoutes.addToCollection,

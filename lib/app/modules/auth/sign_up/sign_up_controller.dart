@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/firebase/firebase_notification_topics.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/utils/app_snackbar.dart';
+import '../../../core/utils/dispose_after_detach.dart';
 import '../../../core/utils/validators.dart';
 import '../../../data/repositories/auth_repository.dart';
-import '../../../routes/app_routes.dart';
+import '../../../routes/auth_navigation.dart';
 
 class SignUpController extends GetxController {
   final fullNameController = TextEditingController();
@@ -47,12 +49,13 @@ class SignUpController extends GetxController {
 
     isLoading.value = true;
     try {
-      await _repo.sendOtp(email: email);
-      Get.toNamed(AppRoutes.verifyOtp, arguments: {
-        'email': email,
-        'fullName': fullName,
-        'password': passwordController.text,
-      });
+      final user = await _repo.register(
+        fullName: fullName,
+        email: email,
+        password: passwordController.text,
+      );
+      await FirebaseNotificationTopics.syncNewRegistrationTopic();
+      AuthNavigation.afterAuth(user);
     } on ApiException catch (e) {
       AppSnackbar.error(e.message);
     } catch (e, st) {
@@ -66,11 +69,13 @@ class SignUpController extends GetxController {
 
   @override
   void onClose() {
-    fullNameController.dispose();
-    emailController.dispose();
-    passwordController.dispose();
-    confirmPasswordController.dispose();
+    unfocusSafely();
+    disposeAfterDetach([
+      fullNameController,
+      emailController,
+      passwordController,
+      confirmPasswordController,
+    ]);
     super.onClose();
   }
 }
-

@@ -12,6 +12,7 @@ import '../../core/storage/app_storage.dart';
 import '../../core/widgets/app_update_dialog.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/user_repository.dart';
+import '../../modules/session/user_session_controller.dart';
 import '../../routes/auth_navigation.dart';
 import '../session/app_config_controller.dart';
 
@@ -102,6 +103,10 @@ class SplashController extends GetxController {
       return null;
     }
 
+    if (local != null && !local.emailVerified) {
+      return _requireVerifiedSession(local);
+    }
+
     if (local != null && AppStorage.userId == null) {
       await AppStorage.saveSession(local.toJson());
     }
@@ -111,13 +116,30 @@ class SplashController extends GetxController {
       if (kDebugMode) {
         debugPrint('[Auth] Auto-login refreshed user_id=${user.id}');
       }
-      return user;
+      return _requireVerifiedSession(user);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[Auth] Auto-login refresh failed, using cache: $e');
       }
-      return local ?? _localUser();
+      return _requireVerifiedSession(local ?? _localUser());
     }
+  }
+
+  /// Unverified accounts must not stay logged in across app restarts.
+  Future<UserModel?> _requireVerifiedSession(UserModel? user) async {
+    if (user == null) return null;
+    if (user.emailVerified) return user;
+
+    if (kDebugMode) {
+      debugPrint(
+        '[Auth] Clearing unverified session user_id=${user.id}',
+      );
+    }
+    await AppStorage.clearSession();
+    if (Get.isRegistered<UserSessionController>()) {
+      Get.find<UserSessionController>().loadFromStorage();
+    }
+    return null;
   }
 
   UserModel? _localUser() {

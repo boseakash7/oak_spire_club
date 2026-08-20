@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/utils/app_snackbar.dart';
+import '../../core/utils/dispose_after_detach.dart';
 import '../../data/models/bluebook_model.dart';
 import '../../data/models/category_model.dart';
 import '../../data/repositories/bluebook_repository.dart';
@@ -49,7 +50,7 @@ class TasteController extends GetxController {
   @override
   void onClose() {
     _debounce?.cancel();
-    searchCtrl.dispose();
+    disposeAfterDetach([searchCtrl]);
     super.onClose();
   }
 
