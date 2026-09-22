@@ -179,5 +179,96 @@ class AppColors {
 
   /// Secondary body copy on delete-account cards.
   static const Color deleteAccountBodyText = Color(0xFF8E8E93);
-}
 
+  // --- Card surfaces ---------------------------------------------------------
+
+  /// Hairline border around elevated cards (home stat / trending, detail tiles).
+  static const Color cardBorder = Color(0xFF4A342E);
+
+  /// Muted label inside stat cards ("Total Collection").
+  static const Color textStatLabel = Color(0xFF997C71);
+
+  /// Secondary line on home trending cards.
+  static const Color textTrendingSubtitle = Color(0xFF87665A);
+
+  /// "Moved … in last 3 months" caption.
+  static const Color textMovedSubtitle = Color(0xFF9D9C9C);
+
+  // --- Skeleton / shimmer ----------------------------------------------------
+
+  static const Color shimmerBase = Color(0xFF2A1E1A);
+  static const Color shimmerHighlight = Color(0xFF3A2A24);
+
+  // --- Onboarding / OTP accents ---------------------------------------------
+
+  /// Primary gold used across get-started and OTP artwork.
+  static const Color goldAccent = Color(0xFFCCA230);
+
+  /// Same gold at ~10% — soft glows behind artwork.
+  static const Color goldAccentGlow = Color(0x1ACCA230);
+
+  static const Color goldSoft = Color(0xFFD4A76A);
+  static const Color goldDeep = Color(0xFF9B6D3B);
+  static const Color goldMid = Color(0xFFC59358);
+  static const Color goldPale = Color(0xFFE8D9A0);
+  static const Color goldEmber = Color(0xFF1A1208);
+
+  // --- Feedback --------------------------------------------------------------
+
+  /// Error text / error snackbar accent.
+  static const Color errorLight = Color(0xFFE57373);
+
+  /// Success snackbar accent.
+  static const Color successLight = Color(0xFFC8E6C9);
+
+  /// Deep red wash behind destructive confirmations.
+  static const Color destructiveDeep = Color(0xFF8B2929);
+
+  static const Color destructiveSurface = Color(0xFF3A1A1A);
+
+  /// WhatsApp brand green (help & support contact row).
+  static const Color whatsappGreen = Color(0xFF25D366);
+
+  // --- Neutral surfaces ------------------------------------------------------
+
+  static const Color surfaceInk = Color(0xFF161010);
+  static const Color surfaceInkSoft = Color(0xFF1A100F);
+  static const Color surfaceInkDeep = Color(0xFF18100E);
+  static const Color surfaceCocoa = Color(0xFF2E211C);
+  static const Color surfaceCocoaDeep = Color(0xFF2A1C16);
+  static const Color borderCocoa = Color(0xFF5C453C);
+  static const Color borderCocoaSoft = Color(0xFF6B5348);
+  static const Color borderNeutral = Color(0xFF3C3B3B);
+
+  /// Near-opaque ink used for dialog / sheet scrims.
+  static const Color scrimInk = Color(0xE8171210);
+
+  // --- Neutral text ----------------------------------------------------------
+
+  static const Color textNeutralBright = Color(0xFFE6E6E6);
+  static const Color textNeutralWarm = Color(0xFFE8E2D6);
+  static const Color textNeutralSoft = Color(0xFFD8D2C6);
+  static const Color textNeutralMuted = Color(0xFFC8C2B6);
+
+  // --- Charts ----------------------------------------------------------------
+
+  /// Area fill under the market-value line (top → transparent).
+  static const LinearGradient chartMarketValueArea = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0x40E8C547), Color(0x00E8C547)],
+  );
+
+  /// Area fill under the BSMI line.
+  static const LinearGradient chartBsmiArea = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0x26A898C8), Color(0x00A898C8)],
+  );
+
+  /// Vertical crosshair drawn while scrubbing a chart.
+  static const Color chartCrosshair = Color(0x66F1E8BE);
+
+  /// Tooltip surface behind chart readouts.
+  static const Color chartTooltipSurface = Color(0xF21F1512);
+}

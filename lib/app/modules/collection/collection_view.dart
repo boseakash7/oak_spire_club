@@ -16,6 +16,8 @@ import '../../core/network/app_cache_manager.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/animated_list_entrance.dart';
+import '../../core/utils/app_haptics.dart';
+import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/app_filter_chip.dart';
 import '../../core/widgets/app_header.dart';
 import '../../data/models/collection_item_display.dart';
@@ -54,6 +56,7 @@ class CollectionView extends GetView<CollectionController> {
               child: InkWell(
                 customBorder: const CircleBorder(),
                 onTap: () async {
+                  AppHaptics.tap();
                   if (Get.isRegistered<AppAnalyticsController>()) {
                     unawaited(
                       AppAnalyticsController.to.logTap(
@@ -164,20 +167,43 @@ class _CollectionBody extends StatelessWidget {
                   Obx(() {
                     final list = controller.filteredItems;
                     if (list.isEmpty) {
+                      final nothingOwned = controller.items.isEmpty;
                       return SliverFillRemaining(
                         hasScrollBody: false,
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(23, 24, 23, 120),
+                          padding: const EdgeInsets.fromLTRB(23, 8, 23, 120),
                           child: Center(
-                            child: Text(
-                              controller.items.isEmpty
-                                  ? 'Your collection is empty.'
-                                  : 'No bottles match this filter.',
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.body16().copyWith(
-                                color: AppColors.textMuted,
-                              ),
-                            ),
+                            child: nothingOwned
+                                // An empty collection is the moment a user is
+                                // most likely to bounce, so send them straight
+                                // to the bottle browser.
+                                ? AppEmptyState(
+                                    icon: Icons.liquor_rounded,
+                                    title: 'Your collection is empty',
+                                    message:
+                                        'Add your first bottle and Oak Spire '
+                                        'will track what it is worth against '
+                                        'the BSMI benchmark.',
+                                    actionLabel: 'Browse bottles',
+                                    onAction: () async {
+                                      final res = await Get.toNamed(
+                                        AppRoutes.tasteBottles,
+                                      );
+                                      if (res == true) {
+                                        await controller.forceReload();
+                                      }
+                                    },
+                                  )
+                                : AppEmptyState(
+                                    icon: Icons.filter_alt_off_rounded,
+                                    title: 'No bottles match this filter',
+                                    message:
+                                        'Clear the filter to see all '
+                                        '${controller.items.length} bottles in '
+                                        'your collection.',
+                                    actionLabel: 'Clear filter',
+                                    onAction: controller.clearFilter,
+                                  ),
                           ),
                         ),
                       );
@@ -627,9 +653,7 @@ class _SortMenuRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: AppTextStyles.body16().copyWith(
-                  fontSize: 12,
-                  fontFamily: 'Inter',
+                style: AppTextStyles.uiCardTitle().copyWith(
                   color: AppColors.white,
                 ),
               ),
@@ -765,39 +789,20 @@ class _BottleCard extends StatelessWidget {
                       item.lineTitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.body16().copyWith(
-                        fontSize: 12,
-                        height: 1.2,
-                        color: AppColors.white,
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w400,
-                      ),
+                      style: AppTextStyles.uiCardTitle(),
                     ),
                     if (item.lineSubtitle.isNotEmpty) ...[
                       Text(
                         item.lineSubtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.body16().copyWith(
-                          fontSize: 12,
-                          height: 1.2,
-                          color: AppColors.white,
-                          fontFamily: 'Inter',
-                          fontWeight: FontWeight.w400,
-                        ),
+                        style: AppTextStyles.uiCardTitle(),
                       ),
                     ],
                     SizedBox(
                       height: item.lineSubtitle.isEmpty ? 6 * scale : 4 * scale,
                     ),
-                    Text(
-                      item.proofLabel,
-                      style: AppTextStyles.body16().copyWith(
-                        fontSize: 10,
-                        color: AppColors.textWolf,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
+                    Text(item.proofLabel, style: AppTextStyles.uiCardMeta()),
                     const Spacer(),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -947,9 +952,8 @@ class _BottleQuickPopupState extends State<_BottleQuickPopup> {
       fit: BoxFit.contain,
       gaplessPlayback: true,
     );
-    final cacheWidthPx = (_kFigmaBottleImage *
-            MediaQuery.devicePixelRatioOf(context))
-        .round();
+    final cacheWidthPx =
+        (_kFigmaBottleImage * MediaQuery.devicePixelRatioOf(context)).round();
 
     return PopScope(
       canPop: false,
@@ -1046,37 +1050,21 @@ class _BottleQuickPopupState extends State<_BottleQuickPopup> {
                             widget.item.lineTitle,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.body16().copyWith(
-                              fontSize: 12,
-                              height: 1.2,
-                              color: AppColors.white,
-                              fontFamily: 'Inter',
-                              fontWeight: FontWeight.w400,
-                            ),
+                            style: AppTextStyles.uiCardTitle(),
                           ),
                           if (widget.item.lineSubtitle.isNotEmpty)
                             Text(
                               widget.item.lineSubtitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.body16().copyWith(
-                                fontSize: 12,
-                                height: 1.2,
-                                color: AppColors.white,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w400,
-                              ),
+                              style: AppTextStyles.uiCardTitle(),
                             ),
                           SizedBox(
                             height: widget.item.lineSubtitle.isEmpty ? 6 : 4,
                           ),
                           Text(
                             widget.item.proofLabel,
-                            style: AppTextStyles.body16().copyWith(
-                              fontSize: 10,
-                              color: AppColors.textWolf,
-                              fontFamily: 'Inter',
-                            ),
+                            style: AppTextStyles.uiCardMeta(),
                           ),
                           const Spacer(),
                           Row(

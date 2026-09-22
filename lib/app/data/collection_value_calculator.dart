@@ -1,3 +1,4 @@
+import 'models/collection_item_display.dart';
 import 'models/collection_item_model.dart';
 
 /// Single source of truth for “money invested in collection” across Home and Collection.
@@ -34,5 +35,28 @@ class CollectionValueCalculator {
       sum += price * qty;
     }
     return sum;
+  }
+
+  /// What the collection is worth today: each row's bluebook average ×
+  /// quantity.
+  ///
+  /// Rows whose bluebook carries no price contribute nothing, so a partially
+  /// priced collection still totals the part we can value. Returns null when
+  /// *no* row has a market price — the caller then has nothing to show and
+  /// should fall back to invested value rather than print `$0`.
+  static double? totalMarketValueFromItems(
+    Iterable<CollectionItemModel> items,
+  ) {
+    var sum = 0.0;
+    var priced = false;
+    for (final item in items) {
+      final unit = item.marketAverageValue;
+      if (unit == null) continue;
+      priced = true;
+      final qtyRaw = int.tryParse(item.quantity ?? '');
+      final qty = (qtyRaw == null || qtyRaw <= 0) ? 1 : qtyRaw;
+      sum += unit * qty;
+    }
+    return priced ? sum : null;
   }
 }

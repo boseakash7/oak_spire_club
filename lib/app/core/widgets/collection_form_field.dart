@@ -41,10 +41,10 @@ class CollectionFormField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final String? errorText;
 
-  static const Color fillColor = Color(0xFF10090B);
-  static const Color borderEnabled = Color(0xFF414141);
-  static const Color borderFocused = Color(0xFF585858);
-  static const Color borderError = Color(0xFFB3261E);
+  static const Color fillColor = AppColors.panel;
+  static const Color borderEnabled = AppColors.border;
+  static const Color borderFocused = AppColors.inputBorderFocused;
+  static const Color borderError = AppColors.destructive;
 
   @override
   Widget build(BuildContext context) {

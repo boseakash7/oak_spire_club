@@ -20,10 +20,7 @@ class SignUpView extends GetView<SignUpController> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            AppAssets.signUpBackground,
-            fit: BoxFit.cover,
-          ),
+          Image.asset(AppAssets.signUpBackground, fit: BoxFit.cover),
           SafeArea(
             child: CustomScrollView(
               slivers: [
@@ -93,8 +90,8 @@ class SignUpView extends GetView<SignUpController> {
                               fillColor: WidgetStateProperty.resolveWith(
                                 (states) =>
                                     states.contains(WidgetState.selected)
-                                        ? const Color(0xFFCCA230)
-                                        : Colors.transparent,
+                                    ? AppColors.goldAccent
+                                    : Colors.transparent,
                               ),
                             ),
                           ),
@@ -110,8 +107,9 @@ class SignUpView extends GetView<SignUpController> {
                         () => CommonPrimaryButton(
                           label: 'Register For FREE',
                           onPressed: controller.onRegister,
-                          textStyle: AppTextStyles.button20Bold()
-                              .copyWith(fontSize: 18),
+                          textStyle: AppTextStyles.button20Bold().copyWith(
+                            fontSize: 18,
+                          ),
                           isLoading: controller.isLoading.value,
                         ),
                       ),
@@ -130,15 +128,16 @@ class SignUpView extends GetView<SignUpController> {
                         children: [
                           Text(
                             'I already have an account.',
-                            style: AppTextStyles.body16()
-                                .copyWith(color: AppColors.white),
+                            style: AppTextStyles.body16().copyWith(
+                              color: AppColors.white,
+                            ),
                           ),
                           GestureDetector(
                             onTap: () => Get.toNamed(AppRoutes.signIn),
                             child: Text(
                               ' Sign In',
                               style: AppTextStyles.body16().copyWith(
-                                color: const Color(0xFFCCA230),
+                                color: AppColors.goldAccent,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),

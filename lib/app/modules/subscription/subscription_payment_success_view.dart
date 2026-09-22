@@ -20,7 +20,8 @@ class SubscriptionPaymentSuccessView extends StatelessWidget {
   Widget build(BuildContext context) {
     final message = SubscriptionPaymentSuccessNavigation.messageFromArguments();
     final receipt = SubscriptionPaymentSuccessNavigation.receiptFromArguments();
-    final succeeded = SubscriptionPaymentSuccessNavigation.isPaymentSuccessful();
+    final succeeded =
+        SubscriptionPaymentSuccessNavigation.isPaymentSuccessful();
 
     return PopScope(
       canPop: false,
@@ -48,21 +49,23 @@ class SubscriptionPaymentSuccessView extends StatelessWidget {
                       height: 64,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: succeeded
-                            ? AppColors.goldGradient
-                            : null,
-                        color: succeeded ? null : const Color(0xFF3A1A1A),
+                        gradient: succeeded ? AppColors.goldGradient : null,
+                        color: succeeded ? null : AppColors.destructiveSurface,
                         border: succeeded
                             ? null
                             : Border.all(
-                                color: const Color(0xFFE57373).withValues(alpha: 0.7),
+                                color: AppColors.errorLight.withValues(
+                                  alpha: 0.7,
+                                ),
                                 width: 1.5,
                               ),
                       ),
                       child: Icon(
                         succeeded ? Icons.check_rounded : Icons.close_rounded,
                         size: 36,
-                        color: succeeded ? AppColors.black : const Color(0xFFE57373),
+                        color: succeeded
+                            ? AppColors.black
+                            : AppColors.errorLight,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -100,7 +103,7 @@ class SubscriptionPaymentSuccessView extends StatelessWidget {
                         style: AppTextStyles.heading32Bold().copyWith(
                           fontSize: 28,
                           height: 1.05,
-                          color: const Color(0xFFE57373),
+                          color: AppColors.errorLight,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -131,8 +134,8 @@ class SubscriptionPaymentSuccessView extends StatelessWidget {
                     const SizedBox(height: 16),
                     CommonPrimaryButton(
                       label: succeeded ? 'Continue' : 'Try again',
-                      onPressed:
-                          SubscriptionPaymentSuccessNavigation.continueAfterPayment,
+                      onPressed: SubscriptionPaymentSuccessNavigation
+                          .continueAfterPayment,
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -167,11 +170,13 @@ class _PaymentReceiptCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
         gradient: AppColors.cardSurfaceGradient,
-        borderRadius: BorderRadius.circular(AppSubscriptionTheme.priceCardRadius),
+        borderRadius: BorderRadius.circular(
+          AppSubscriptionTheme.priceCardRadius,
+        ),
         border: Border.all(
           color: paymentSucceeded
               ? AppColors.gold1.withValues(alpha: 0.45)
-              : const Color(0xFFE57373).withValues(alpha: 0.35),
+              : AppColors.errorLight.withValues(alpha: 0.35),
         ),
         boxShadow: [
           BoxShadow(
@@ -256,8 +261,8 @@ class _ReceiptDivider extends StatelessWidget {
       builder: (context, constraints) {
         const dashWidth = 6.0;
         const dashSpace = 4.0;
-        final dashCount =
-            (constraints.maxWidth / (dashWidth + dashSpace)).floor();
+        final dashCount = (constraints.maxWidth / (dashWidth + dashSpace))
+            .floor();
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(dashCount, (_) {
@@ -314,7 +319,7 @@ class _ReceiptRow extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: highlight ? FontWeight.w600 : FontWeight.w500,
                 color: highlight
-                    ? (failed ? const Color(0xFFE57373) : AppColors.gold2)
+                    ? (failed ? AppColors.errorLight : AppColors.gold2)
                     : AppColors.textCream,
                 height: 1.3,
               ),

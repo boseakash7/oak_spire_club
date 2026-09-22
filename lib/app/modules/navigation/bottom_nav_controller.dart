@@ -39,7 +39,12 @@ class BottomNavController extends GetxController {
     index.value = value;
 
     if (value == 0 && previous != 0 && Get.isRegistered<HomeController>()) {
-      unawaited(Get.find<HomeController>().fetchHomeData(forceRefresh: false));
+      unawaited(
+        Get.find<HomeController>().fetchHomeData(
+          forceRefresh: false,
+          background: true,
+        ),
+      );
     }
   }
 }

@@ -24,19 +24,13 @@ class HomeView extends GetView<HomeController> {
         return const HomeFilledView();
       }
 
-      return _HomeEmptyView(
-        key: key,
-        controller: controller,
-      );
+      return _HomeEmptyView(key: key, controller: controller);
     });
   }
 }
 
 class _HomeEmptyView extends StatelessWidget {
-  const _HomeEmptyView({
-    super.key,
-    required this.controller,
-  });
+  const _HomeEmptyView({super.key, required this.controller});
 
   final HomeController controller;
 
@@ -45,7 +39,7 @@ class _HomeEmptyView extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF080405), Color(0xFF080405)],
+          colors: [AppColors.surfaceDeep, AppColors.surfaceDeep],
         ),
       ),
       child: Stack(
@@ -90,7 +84,9 @@ class _HomeEmptyView extends StatelessWidget {
                                       shape: BoxShape.circle,
                                       gradient: RadialGradient(
                                         colors: [
-                                          AppColors.gold1.withValues(alpha: 0.18),
+                                          AppColors.gold1.withValues(
+                                            alpha: 0.18,
+                                          ),
                                           Colors.transparent,
                                         ],
                                       ),
@@ -108,12 +104,16 @@ class _HomeEmptyView extends StatelessWidget {
                               ),
                               const SizedBox(height: 16),
                               ShaderMask(
-                                shaderCallback: (bounds) => const LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [AppColors.gold2, AppColors.gold1],
-                                  stops: [0.21591, 0.90909],
-                                ).createShader(bounds),
+                                shaderCallback: (bounds) =>
+                                    const LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        AppColors.gold2,
+                                        AppColors.gold1,
+                                      ],
+                                      stops: [0.21591, 0.90909],
+                                    ).createShader(bounds),
                                 blendMode: BlendMode.srcIn,
                                 child: Text(
                                   'Your collection\nis empty.',
@@ -132,13 +132,15 @@ class _HomeEmptyView extends StatelessWidget {
                                   textAlign: TextAlign.center,
                                   style: AppTextStyles.body16().copyWith(
                                     fontSize: 15,
-                                    color: const Color(0xFFF1E8BE),
+                                    color: AppColors.textCream,
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 24),
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 32),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                ),
                                 child: CommonPrimaryButton(
                                   label: 'Add Your First Bottle',
                                   onPressed: () async {

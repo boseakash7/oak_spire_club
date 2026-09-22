@@ -6,7 +6,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_back_button.dart';
 import '../../../core/widgets/gradient_text.dart';
 
-const Color kSettingsCardBorder = Color(0xFF4A342E);
+const Color kSettingsCardBorder = AppColors.cardBorder;
 
 /// Full-screen settings page shell matching app dark + gold styling.
 class SettingsScaffold extends StatelessWidget {

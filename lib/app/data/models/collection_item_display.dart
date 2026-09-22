@@ -118,6 +118,19 @@ extension CollectionItemDisplay on CollectionItemModel {
     _pickBluebook(const ['average', 'avg', 'market_value', 'price']),
   );
 
+  /// Raw per-bottle market average, or null when the bluebook has no price.
+  /// Payloads are stringly-typed, so `'null'` and `''` both mean absent.
+  double? get marketAverageValue {
+    final raw = _pickBluebook(const [
+      'average',
+      'avg',
+      'market_value',
+      'price',
+    ]);
+    if (raw == null || raw == 'null') return null;
+    return double.tryParse(raw.replaceAll(RegExp(r'[^0-9.\-]'), ''));
+  }
+
   /// Primary line (brand / expression name).
   String get lineTitle =>
       _pickBluebook(const ['name', 'title', 'product_name', 'bottle_name']) ??

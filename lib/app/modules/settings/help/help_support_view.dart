@@ -23,9 +23,7 @@ class HelpSupportView extends StatelessWidget {
 
   Future<void> _openEmail() async {
     final subject = Uri.encodeComponent('${AppConstants.appName} — Help');
-    final body = Uri.encodeComponent(
-      'Hi Oak Spire Club support,\n\n\n',
-    );
+    final body = Uri.encodeComponent('Hi Oak Spire Club support,\n\n\n');
     final uri = Uri.parse(
       'mailto:${AppConstants.supportEmail}?subject=$subject&body=$body',
     );
@@ -56,7 +54,7 @@ class HelpSupportView extends StatelessWidget {
           //   index: 0,
           //   child: _ContactCard(
           //     icon: Icons.chat_rounded,
-          //     iconColor: const Color(0xFF25D366),
+          //     iconColor: AppColors.whatsappGreen,
           //     title: 'WhatsApp',
           //     subtitle: 'Chat with support',
           //     detail: '+${AppConstants.supportWhatsApp}',
@@ -120,9 +118,7 @@ class _ContactCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: iconColor.withValues(alpha: 0.35),
-                  ),
+                  border: Border.all(color: iconColor.withValues(alpha: 0.35)),
                 ),
                 child: Icon(icon, color: iconColor, size: 26),
               ),

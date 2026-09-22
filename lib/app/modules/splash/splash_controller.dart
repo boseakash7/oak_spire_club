@@ -116,7 +116,7 @@ class SplashController extends GetxController {
       if (kDebugMode) {
         debugPrint('[Auth] Auto-login refreshed user_id=${user.id}');
       }
-      return _requireVerifiedSession(user);
+      return await _requireVerifiedSession(user);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[Auth] Auto-login refresh failed, using cache: $e');
@@ -131,9 +131,7 @@ class SplashController extends GetxController {
     if (user.emailVerified) return user;
 
     if (kDebugMode) {
-      debugPrint(
-        '[Auth] Clearing unverified session user_id=${user.id}',
-      );
+      debugPrint('[Auth] Clearing unverified session user_id=${user.id}');
     }
     await AppStorage.clearSession();
     if (Get.isRegistered<UserSessionController>()) {

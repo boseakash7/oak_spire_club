@@ -7,10 +7,7 @@ import '../theme/app_colors.dart';
 
 /// Premium OTP verify hero — envelope opens, letter rises, gold rings + sparkles.
 class OtpVerifyAnimation extends StatefulWidget {
-  const OtpVerifyAnimation({
-    super.key,
-    this.size = 180,
-  });
+  const OtpVerifyAnimation({super.key, this.size = 180});
 
   final double size;
 
@@ -55,10 +52,7 @@ class _OtpVerifyAnimationState extends State<OtpVerifyAnimation>
         builder: (context, _) {
           return CustomPaint(
             size: Size.square(size),
-            painter: _OtpScenePainter(
-              t: _loop.value,
-              orbit: _orbit.value,
-            ),
+            painter: _OtpScenePainter(t: _loop.value, orbit: _orbit.value),
           );
         },
       ),
@@ -94,7 +88,16 @@ class _OtpScenePainter extends CustomPainter {
     _paintAmbientGlow(canvas, c, s, breath);
     _paintOrbitRings(canvas, c, s, breath);
     _paintSparkles(canvas, c, s);
-    _paintEnvelope(canvas, c, s, flapOpen, letterRise, digitsOn, settle, breath);
+    _paintEnvelope(
+      canvas,
+      c,
+      s,
+      flapOpen,
+      letterRise,
+      digitsOn,
+      settle,
+      breath,
+    );
   }
 
   void _paintAmbientGlow(Canvas canvas, Offset c, double s, double breath) {
@@ -104,8 +107,8 @@ class _OtpScenePainter extends CustomPainter {
         c,
         r,
         [
-          const Color(0xFFD4AF37).withOpacity(_o(0.28 + breath * 0.1)),
-          const Color(0xFFB9861F).withOpacity(0.12),
+          AppColors.gold2.withValues(alpha: _o(0.28 + breath * 0.1)),
+          AppColors.gold1.withValues(alpha: 0.12),
           Colors.transparent,
         ],
         const [0.0, 0.45, 1.0],
@@ -122,8 +125,11 @@ class _OtpScenePainter extends CustomPainter {
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2
-        ..color = Color.lerp(AppColors.gold1, AppColors.gold2, i / 2)!
-            .withOpacity(opacity);
+        ..color = Color.lerp(
+          AppColors.gold1,
+          AppColors.gold2,
+          i / 2,
+        )!.withValues(alpha: opacity);
       canvas.drawCircle(c, radius, paint);
     }
   }
@@ -136,10 +142,7 @@ class _OtpScenePainter extends CustomPainter {
       final radius = s * (0.34 + rnd.nextDouble() * 0.12);
       final twinkle = _o(
         0.35 +
-            0.65 *
-                (0.5 +
-                    0.5 *
-                        math.sin(t * math.pi * 2 * (1.5 + i % 3) + i)),
+            0.65 * (0.5 + 0.5 * math.sin(t * math.pi * 2 * (1.5 + i % 3) + i)),
       );
       final p = Offset(
         c.dx + math.cos(baseAngle + spin) * radius,
@@ -148,12 +151,15 @@ class _OtpScenePainter extends CustomPainter {
       canvas.drawCircle(
         p,
         math.max(0.5, 1.1 + twinkle * 1.4),
-        Paint()..color = AppColors.gold2.withOpacity(_o(0.15 + twinkle * 0.55)),
+        Paint()
+          ..color = AppColors.gold2.withValues(
+            alpha: _o(0.15 + twinkle * 0.55),
+          ),
       );
 
       if (i % 3 == 0) {
         final cross = Paint()
-          ..color = AppColors.gold2.withOpacity(_o(0.25 + twinkle * 0.4))
+          ..color = AppColors.gold2.withValues(alpha: _o(0.25 + twinkle * 0.4))
           ..strokeWidth = 1
           ..strokeCap = StrokeCap.round;
         final len = 2.5 + twinkle * 2;
@@ -186,7 +192,7 @@ class _OtpScenePainter extends CustomPainter {
 
     canvas.drawRRect(
       cardRect.shift(const Offset(0, 6)),
-      Paint()..color = Colors.black.withOpacity(0.35),
+      Paint()..color = Colors.black.withValues(alpha: 0.35),
     );
 
     final cardPaint = Paint()
@@ -194,9 +200,9 @@ class _OtpScenePainter extends CustomPainter {
         cardRect.outerRect.topLeft,
         cardRect.outerRect.bottomRight,
         const [
-          Color(0xFF1A100F),
-          Color(0xFF10090B),
-          Color(0xFF18100E),
+          AppColors.surfaceInkSoft,
+          AppColors.panel,
+          AppColors.surfaceInkDeep,
         ],
         const [0.0, 0.5, 1.0],
       );
@@ -209,9 +215,9 @@ class _OtpScenePainter extends CustomPainter {
         cardRect.outerRect.topLeft,
         cardRect.outerRect.bottomRight,
         [
-          AppColors.gold1.withOpacity(_o(0.35 + breath * 0.35)),
-          AppColors.gold2.withOpacity(0.85),
-          AppColors.gold1.withOpacity(_o(0.4 + breath * 0.3)),
+          AppColors.gold1.withValues(alpha: _o(0.35 + breath * 0.35)),
+          AppColors.gold2.withValues(alpha: 0.85),
+          AppColors.gold1.withValues(alpha: _o(0.4 + breath * 0.3)),
         ],
         const [0.0, 0.5, 1.0],
       );
@@ -251,8 +257,8 @@ class _OtpScenePainter extends CustomPainter {
             letterRect.outerRect.topCenter,
             letterRect.outerRect.bottomCenter,
             [
-              const Color(0xFFF1E8BE).withOpacity(0.95),
-              const Color(0xFFE8D9A0).withOpacity(0.9),
+              AppColors.textCream.withValues(alpha: 0.95),
+              AppColors.goldPale.withValues(alpha: 0.9),
             ],
           ),
       );
@@ -261,9 +267,7 @@ class _OtpScenePainter extends CustomPainter {
       final digitStartX = midX - cardW * 0.22;
       for (var i = 0; i < 4; i++) {
         final appear = _o(
-          Curves.easeOutCubic.transform(
-            ((digitsOn * 4) - i).clamp(0.0, 1.0),
-          ),
+          Curves.easeOutCubic.transform(((digitsOn * 4) - i).clamp(0.0, 1.0)),
         );
         final dx = digitStartX + i * (cardW * 0.15);
         final r = math.max(0.0, 5.0 * appear);
@@ -283,7 +287,9 @@ class _OtpScenePainter extends CustomPainter {
             Paint()
               ..style = PaintingStyle.stroke
               ..strokeWidth = 1
-              ..color = AppColors.gold2.withOpacity(_o((appear - 0.7) * 1.5)),
+              ..color = AppColors.gold2.withValues(
+                alpha: _o((appear - 0.7) * 1.5),
+              ),
           );
         }
       }
@@ -291,7 +297,7 @@ class _OtpScenePainter extends CustomPainter {
     }
 
     final foldPaint = Paint()
-      ..color = AppColors.gold1.withOpacity(_o(0.25 + breath * 0.15))
+      ..color = AppColors.gold1.withValues(alpha: _o(0.25 + breath * 0.15))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2
       ..strokeJoin = StrokeJoin.round;
@@ -320,28 +326,22 @@ class _OtpScenePainter extends CustomPainter {
     canvas.drawPath(
       flapPath,
       Paint()
-        ..shader = ui.Gradient.linear(
-          Offset.zero,
-          Offset(0, flapHeight),
-          [
-            Color.lerp(const Color(0xFF2A1C16), AppColors.gold1, 0.15)!,
-            const Color(0xFF10090B),
-          ],
-        ),
+        ..shader = ui.Gradient.linear(Offset.zero, Offset(0, flapHeight), [
+          Color.lerp(AppColors.surfaceCocoaDeep, AppColors.gold1, 0.15)!,
+          AppColors.panel,
+        ]),
     );
     canvas.drawPath(
       flapPath,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.3
-        ..color = AppColors.gold2.withOpacity(_o(0.55 + flapOpen * 0.3)),
+        ..color = AppColors.gold2.withValues(alpha: _o(0.55 + flapOpen * 0.3)),
     );
     canvas.restore();
 
     final sealProgress = _o(
-      Curves.easeOutCubic.transform(
-        ((digitsOn - 0.35) / 0.65).clamp(0.0, 1.0),
-      ),
+      Curves.easeOutCubic.transform(((digitsOn - 0.35) / 0.65).clamp(0.0, 1.0)),
     );
     if (sealProgress > 0.01) {
       final sealC = Offset(midX, bottom - cardH * 0.22);
@@ -349,7 +349,8 @@ class _OtpScenePainter extends CustomPainter {
       canvas.drawCircle(
         sealC,
         sealR + 4,
-        Paint()..color = AppColors.gold2.withOpacity(_o(0.2 * sealProgress)),
+        Paint()
+          ..color = AppColors.gold2.withValues(alpha: _o(0.2 * sealProgress)),
       );
       canvas.drawCircle(
         sealC,
@@ -360,7 +361,7 @@ class _OtpScenePainter extends CustomPainter {
           ),
       );
       final check = Paint()
-        ..color = AppColors.black.withOpacity(sealProgress)
+        ..color = AppColors.black.withValues(alpha: sealProgress)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
         ..strokeCap = StrokeCap.round
@@ -375,8 +376,8 @@ class _OtpScenePainter extends CustomPainter {
     final dotsY = bottom + s * 0.09;
     final dotsStart = midX - s * 0.16;
     for (var i = 0; i < 4; i++) {
-      final wave = 0.5 +
-          0.5 * math.sin((t * math.pi * 2) + i * 0.9 + settle * math.pi);
+      final wave =
+          0.5 + 0.5 * math.sin((t * math.pi * 2) + i * 0.9 + settle * math.pi);
       final lit = (digitsOn * 4 - i).clamp(0.0, 1.0);
       final active = _o(math.max(lit, wave * 0.35 * settle.clamp(0.4, 1.0)));
       final dx = dotsStart + i * (s * 0.11);
@@ -384,7 +385,7 @@ class _OtpScenePainter extends CustomPainter {
       canvas.drawCircle(
         Offset(dx, dotsY),
         r + 5,
-        Paint()..color = AppColors.gold2.withOpacity(_o(0.12 * active)),
+        Paint()..color = AppColors.gold2.withValues(alpha: _o(0.12 * active)),
       );
       canvas.drawCircle(
         Offset(dx, dotsY),

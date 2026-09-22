@@ -6,15 +6,19 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/animations/app_motion.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/constants/app_hero_tags.dart';
 import '../../core/network/app_cache_manager.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/app_haptics.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/widgets/app_back_button.dart';
+import '../home/widgets/home_value_chart.dart' show chartCrosshairIndicators;
 import 'benchmark_detail_controller.dart';
 
 FlLine _benchmarkDottedGridLine(double _) => FlLine(
@@ -30,7 +34,10 @@ Widget _chartRangeChip(
   final selected = controller.selectedChartRange.value == range;
   return InkWell(
     borderRadius: BorderRadius.circular(6),
-    onTap: () => unawaited(controller.setChartRange(range)),
+    onTap: () {
+      AppHaptics.selection();
+      unawaited(controller.setChartRange(range));
+    },
     child: Container(
       width: 33,
       height: 33,
@@ -46,10 +53,7 @@ Widget _chartRangeChip(
       alignment: Alignment.center,
       child: Text(
         range.label,
-        style: AppTextStyles.body16().copyWith(
-          fontSize: 13,
-          color: AppColors.white,
-        ),
+        style: AppTextStyles.label().copyWith(color: AppColors.white),
       ),
     ),
   );
@@ -158,336 +162,350 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
               child: ColoredBox(color: AppColors.overlayBlack20),
             ),
             SafeArea(
-              child: SingleChildScrollView(
-                clipBehavior: Clip.none,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(5, 10, 23, 0),
-                      child: Row(
-                        children: [
-                          AppBackButton(
-                            color: AppColors.white,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 30,
-                              height: 30,
-                            ),
-                            onPressed: () {
-                              if (Get.isRegistered<AppAnalyticsController>()) {
-                                unawaited(
-                                  AppAnalyticsController.to.logTap(
-                                    'benchmark_detail_back',
-                                  ),
-                                );
-                              }
-                              Get.back<void>();
-                            },
-                          ),
-                          const Spacer(),
-                          Text(
-                            controller.greetingText,
-                            style: AppTextStyles.body16().copyWith(
-                              fontSize: 14,
-                              color: AppColors.textGreeting,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(23, 22, 23, 12),
-                      child: _TopSummary(
-                        name: controller.productName,
-                        avg: controller.avgFormatted,
-                        low: controller.lowFormatted,
-                        high: controller.highFormatted,
-                        imageUrl: controller.imageUrl,
-                        placeholder: _placeholder(),
-                        ratingChipLabel: controller.ratingDisplay ?? '—',
-                        priceMovementRaw: controller.priceMovementRaw,
-                        proofLine: controller.proofText,
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 16),
-                        const _BenchmarkPriceChart(),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(23, 14, 23, 0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 14,
-                                height: 3,
-                                decoration: BoxDecoration(
-                                  color: AppColors.chartLineMarketValue,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
+              child: RefreshIndicator(
+                color: AppColors.gold1,
+                onRefresh: controller.reload,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  clipBehavior: Clip.none,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(5, 10, 23, 0),
+                        child: Row(
+                          children: [
+                            AppBackButton(
+                              color: AppColors.white,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 30,
+                                height: 30,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Market Value',
-                                style: AppTextStyles.body16().copyWith(
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(width: 22),
-                              Container(
-                                width: 14,
-                                height: 3,
-                                decoration: BoxDecoration(
-                                  color: AppColors.chartLineBsmi,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'BSMI',
-                                style: AppTextStyles.body16().copyWith(
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(23, 16, 23, 0),
-                          child: Row(
-                            children: [
-                              Obx(() {
-                                return Row(
-                                  children: [
-                                    for (
-                                      var i = 0;
-                                      i <
-                                          BenchmarkDetailChartRange
-                                              .values
-                                              .length;
-                                      i++
-                                    ) ...[
-                                      if (i > 0) const SizedBox(width: 10),
-                                      _chartRangeChip(
-                                        controller,
-                                        BenchmarkDetailChartRange.values[i],
-                                      ),
-                                    ],
-                                  ],
-                                );
-                              }),
-                              const Spacer(),
-                              GestureDetector(
-                                onTap: () async {
-                                  if (Get.isRegistered<
-                                    AppAnalyticsController
-                                  >()) {
-                                    unawaited(
-                                      AppAnalyticsController.to.logTap(
-                                        'benchmark_detail_add_to_collection',
-                                      ),
-                                    );
-                                  }
-                                  await controller.openAddToCollection();
-                                },
-                                child: Container(
-                                  height: 33,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                  ),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(6),
-                                    gradient: AppColors.goldGradient,
-                                  ),
-                                  child: Obx(() {
-                                    final inCollection =
-                                        controller.hasInCollection.value;
-                                    final label = inCollection
-                                        ? 'Edit collection'
-                                        : '+ Add to collection';
-                                    final textStyle = AppTextStyles.body16()
-                                        .copyWith(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.black,
-                                        );
-                                    if (!inCollection) {
-                                      return Text(label, style: textStyle);
-                                    }
-                                    return Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.edit_outlined,
-                                          size: 14,
-                                          color: AppColors.black,
-                                        ),
-                                        const SizedBox(width: 5),
-                                        Text(label, style: textStyle),
-                                      ],
-                                    );
-                                  }),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(23, 16, 23, 24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    'Details',
-                                    style: AppTextStyles.body16().copyWith(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
+                              onPressed: () {
+                                if (Get.isRegistered<
+                                  AppAnalyticsController
+                                >()) {
+                                  unawaited(
+                                    AppAnalyticsController.to.logTap(
+                                      'benchmark_detail_back',
                                     ),
-                                  ),
-                                  if (controller.descriptionText != null &&
-                                      controller
-                                          .descriptionText!
-                                          .isNotEmpty) ...[
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      width: 19,
-                                      height: 19,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.surfaceChip,
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          'AI',
-                                          style: AppTextStyles.body16()
-                                              .copyWith(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                controller.descriptionText?.trim().isNotEmpty ==
-                                        true
-                                    ? controller.descriptionText!.trim()
-                                    : 'No description available.',
-                                style: AppTextStyles.body16().copyWith(
-                                  fontSize: 14,
-                                  height: 1.1,
-                                  color:
-                                      controller.descriptionText
-                                              ?.trim()
-                                              .isNotEmpty ==
-                                          true
-                                      ? AppColors.white
-                                      : AppColors.textWolf,
-                                ),
-                              ),
-                              Obx(() {
-                                if (!controller.hasInCollection.value) {
-                                  return const SizedBox.shrink();
+                                  );
                                 }
-                                const fillBarWidth = 110.0;
-                                final fillW =
-                                    (fillBarWidth *
-                                            controller
-                                                .collectionFillRatio
-                                                .value)
-                                        .clamp(4.0, fillBarWidth);
-                                final movementRaw =
-                                    controller.collectionPriceMovementRaw.value;
-                                final movementColor =
-                                    PriceFormatter.priceMovementColor(
-                                      movementRaw,
-                                    );
-                                final movementLabel =
-                                    PriceFormatter.formatPriceMovementLabel(
-                                      movementRaw,
-                                    );
-                                final gain =
-                                    controller.collectionGainDollars.value;
-
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                Get.back<void>();
+                              },
+                            ),
+                            const Spacer(),
+                            Text(
+                              controller.greetingText,
+                              style: AppTextStyles.body16().copyWith(
+                                fontSize: 14,
+                                color: AppColors.textGreeting,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(23, 22, 23, 12),
+                        child: _TopSummary(
+                          name: controller.productName,
+                          avg: controller.avgFormatted,
+                          low: controller.lowFormatted,
+                          high: controller.highFormatted,
+                          imageUrl: controller.imageUrl,
+                          placeholder: _placeholder(),
+                          ratingChipLabel: controller.ratingDisplay ?? '—',
+                          heroBottleId: controller.bottleId,
+                          priceMovementRaw: controller.priceMovementRaw,
+                          proofLine: controller.proofText,
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: 16),
+                          const _BenchmarkPriceChart(),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(23, 14, 23, 0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 14,
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.chartLineMarketValue,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Market Value',
+                                  style: AppTextStyles.body16().copyWith(
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(width: 22),
+                                Container(
+                                  width: 14,
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.chartLineBsmi,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'BSMI',
+                                  style: AppTextStyles.body16().copyWith(
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(23, 16, 23, 0),
+                            child: Row(
+                              children: [
+                                Obx(() {
+                                  return Row(
+                                    children: [
+                                      for (
+                                        var i = 0;
+                                        i <
+                                            BenchmarkDetailChartRange
+                                                .values
+                                                .length;
+                                        i++
+                                      ) ...[
+                                        if (i > 0) const SizedBox(width: 10),
+                                        _chartRangeChip(
+                                          controller,
+                                          BenchmarkDetailChartRange.values[i],
+                                        ),
+                                      ],
+                                    ],
+                                  );
+                                }),
+                                const Spacer(),
+                                GestureDetector(
+                                  onTap: () async {
+                                    if (Get.isRegistered<
+                                      AppAnalyticsController
+                                    >()) {
+                                      unawaited(
+                                        AppAnalyticsController.to.logTap(
+                                          'benchmark_detail_add_to_collection',
+                                        ),
+                                      );
+                                    }
+                                    await controller.openAddToCollection();
+                                  },
+                                  child: Container(
+                                    height: 33,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                    ),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(6),
+                                      gradient: AppColors.goldGradient,
+                                    ),
+                                    child: Obx(() {
+                                      final inCollection =
+                                          controller.hasInCollection.value;
+                                      final label = inCollection
+                                          ? 'Edit collection'
+                                          : '+ Add to collection';
+                                      final textStyle = AppTextStyles.body16()
+                                          .copyWith(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.black,
+                                          );
+                                      if (!inCollection) {
+                                        return Text(label, style: textStyle);
+                                      }
+                                      return Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.edit_outlined,
+                                            size: 14,
+                                            color: AppColors.black,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(label, style: textStyle),
+                                        ],
+                                      );
+                                    }),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(23, 16, 23, 24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    const SizedBox(height: 16),
                                     Text(
-                                      'You have this',
+                                      'Details',
                                       style: AppTextStyles.body16().copyWith(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Text(
-                                          'Bought at',
-                                          style: AppTextStyles.body16()
-                                              .copyWith(
-                                                fontSize: 12,
-                                                color: AppColors.textOwnedLabel,
-                                              ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          '${controller.collectionPaidLabel.value} (${controller.collectionQuantity.value})',
-                                          style: AppTextStyles.body16()
-                                              .copyWith(
-                                                fontSize: 12,
-                                                color: AppColors.textCream,
-                                              ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        ..._collectionTrendWidgets(
-                                          movementRaw: movementRaw,
-                                          movementLabel: movementLabel,
-                                          movementColor: movementColor,
-                                          gainDollars: gain,
-                                        ),
-                                        const Spacer(),
-                                        Container(
-                                          width: fillBarWidth,
-                                          height: 9,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.fillBarTrack,
-                                            borderRadius: BorderRadius.circular(
-                                              27,
-                                            ),
-                                          ),
-                                          child: Align(
-                                            alignment: Alignment.centerLeft,
-                                            child: Container(
-                                              width: fillW,
-                                              height: 9,
-                                              decoration: BoxDecoration(
-                                                color: AppColors.goldRich,
-                                                borderRadius:
-                                                    BorderRadius.circular(27),
-                                              ),
-                                            ),
+                                    if (controller.descriptionText != null &&
+                                        controller
+                                            .descriptionText!
+                                            .isNotEmpty) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        width: 19,
+                                        height: 19,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surfaceChip,
+                                          borderRadius: BorderRadius.circular(
+                                            2,
                                           ),
                                         ),
-                                      ],
-                                    ),
+                                        child: Center(
+                                          child: Text(
+                                            'AI',
+                                            style: AppTextStyles.body16()
+                                                .copyWith(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                );
-                              }),
-                            ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  controller.descriptionText
+                                              ?.trim()
+                                              .isNotEmpty ==
+                                          true
+                                      ? controller.descriptionText!.trim()
+                                      : 'No description available.',
+                                  style: AppTextStyles.body16().copyWith(
+                                    fontSize: 14,
+                                    height: 1.1,
+                                    color:
+                                        controller.descriptionText
+                                                ?.trim()
+                                                .isNotEmpty ==
+                                            true
+                                        ? AppColors.white
+                                        : AppColors.textWolf,
+                                  ),
+                                ),
+                                Obx(() {
+                                  if (!controller.hasInCollection.value) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  const fillBarWidth = 110.0;
+                                  final fillW =
+                                      (fillBarWidth *
+                                              controller
+                                                  .collectionFillRatio
+                                                  .value)
+                                          .clamp(4.0, fillBarWidth);
+                                  final movementRaw = controller
+                                      .collectionPriceMovementRaw
+                                      .value;
+                                  final movementColor =
+                                      PriceFormatter.priceMovementColor(
+                                        movementRaw,
+                                      );
+                                  final movementLabel =
+                                      PriceFormatter.formatPriceMovementLabel(
+                                        movementRaw,
+                                      );
+                                  final gain =
+                                      controller.collectionGainDollars.value;
+
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'You have this',
+                                        style: AppTextStyles.body16().copyWith(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'Bought at',
+                                            style: AppTextStyles.body16()
+                                                .copyWith(
+                                                  fontSize: 12,
+                                                  color:
+                                                      AppColors.textOwnedLabel,
+                                                ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${controller.collectionPaidLabel.value} (${controller.collectionQuantity.value})',
+                                            style: AppTextStyles.body16()
+                                                .copyWith(
+                                                  fontSize: 12,
+                                                  color: AppColors.textCream,
+                                                ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          ..._collectionTrendWidgets(
+                                            movementRaw: movementRaw,
+                                            movementLabel: movementLabel,
+                                            movementColor: movementColor,
+                                            gainDollars: gain,
+                                          ),
+                                          const Spacer(),
+                                          Container(
+                                            width: fillBarWidth,
+                                            height: 9,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.fillBarTrack,
+                                              borderRadius:
+                                                  BorderRadius.circular(27),
+                                            ),
+                                            child: Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Container(
+                                                width: fillW,
+                                                height: 9,
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.goldRich,
+                                                  borderRadius:
+                                                      BorderRadius.circular(27),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  );
+                                }),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -512,7 +530,8 @@ class _BenchmarkPriceChart extends GetView<BenchmarkDetailController> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 188,
+      // Taller than the plot alone: the value and date axes now take a gutter.
+      height: 218,
       child: Obx(() {
         if (controller.chartLoading.value) {
           return const Center(
@@ -604,8 +623,92 @@ class _BenchmarkPriceChart extends GetView<BenchmarkDetailController> {
             maxX: maxXSafe,
             minY: minY,
             maxY: maxY,
-            lineTouchData: const LineTouchData(enabled: false),
-            titlesData: const FlTitlesData(show: false),
+            // This is the screen where a user most wants to read exact
+            // values, so the plot is scrubbable with a crosshair readout.
+            lineTouchData: LineTouchData(
+              handleBuiltInTouches: true,
+              getTouchedSpotIndicator: chartCrosshairIndicators,
+              touchTooltipData: LineTouchTooltipData(
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+                getTooltipColor: (_) => AppColors.chartTooltipSurface,
+                tooltipBorderRadius: BorderRadius.circular(8),
+                tooltipPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                getTooltipItems: (touchedSpots) {
+                  return touchedSpots.map((spot) {
+                    final i = spot.x.round().clamp(0, pts.length - 1);
+                    final isBsmi =
+                        spot.barIndex == 1 && bsmiVals.length == pts.length;
+                    final value = isBsmi ? bsmiVals[i] : pts[i].price;
+                    final label = isBsmi ? 'BSMI' : 'Market Value';
+                    final color = isBsmi
+                        ? AppColors.chartLineBsmi
+                        : AppColors.chartLineMarketValue;
+                    final dateLabel = DateFormat(
+                      'MMM d, yyyy',
+                    ).format(pts[i].date);
+                    final priceText = PriceFormatter.format(
+                      value.round().toString(),
+                    );
+                    return LineTooltipItem(
+                      '$dateLabel\n$label: $priceText',
+                      AppTextStyles.caption().copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  }).toList();
+                },
+              ),
+            ),
+            titlesData: FlTitlesData(
+              show: true,
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 46,
+                  interval: hInterval > 0 ? hInterval : 1,
+                  getTitlesWidget: (value, meta) => SideTitleWidget(
+                    meta: meta,
+                    space: 6,
+                    child: Text(
+                      PriceFormatter.format(value.round().toString()),
+                      style: AppTextStyles.micro(),
+                    ),
+                  ),
+                ),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 22,
+                  interval: vInterval > 0 ? vInterval : 1,
+                  getTitlesWidget: (value, meta) {
+                    final i = value.round();
+                    if (i < 0 || i >= pts.length) {
+                      return const SizedBox.shrink();
+                    }
+                    return SideTitleWidget(
+                      meta: meta,
+                      space: 4,
+                      child: Text(
+                        DateFormat('MMM d').format(pts[i].date),
+                        style: AppTextStyles.micro(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
             extraLinesData: ExtraLinesData(
               horizontalLines: [
                 HorizontalLine(
@@ -647,6 +750,10 @@ class _BenchmarkPriceChart extends GetView<BenchmarkDetailController> {
                     );
                   },
                 ),
+                belowBarData: BarAreaData(
+                  show: true,
+                  gradient: AppColors.chartMarketValueArea,
+                ),
               ),
               if (bsmiSpots.isNotEmpty)
                 LineChartBarData(
@@ -662,6 +769,10 @@ class _BenchmarkPriceChart extends GetView<BenchmarkDetailController> {
                         color: AppColors.chartLineBsmi,
                       );
                     },
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: AppColors.chartBsmiArea,
                   ),
                 ),
             ],
@@ -684,6 +795,7 @@ class _TopSummary extends StatelessWidget {
     required this.imageUrl,
     required this.placeholder,
     required this.ratingChipLabel,
+    this.heroBottleId,
     this.priceMovementRaw,
     this.proofLine,
   });
@@ -695,6 +807,9 @@ class _TopSummary extends StatelessWidget {
   final String? imageUrl;
   final Widget placeholder;
   final String ratingChipLabel;
+
+  /// Matches the market row's Hero tag so the bottle art flies in.
+  final String? heroBottleId;
   final String? priceMovementRaw;
   final String? proofLine;
 
@@ -782,26 +897,29 @@ class _TopSummary extends StatelessWidget {
                 child: SizedBox(
                   width: 77,
                   height: 77,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: AppColors.bottleRadialGlow,
+                  child: _MaybeHero(
+                    tag: AppHeroTags.bottleImage(heroBottleId),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: AppColors.bottleRadialGlow,
+                          ),
                         ),
-                      ),
-                      if (imageUrl != null)
-                        CachedNetworkImage(
-                          imageUrl: imageUrl!,
-                          cacheManager: AppCacheManager.images,
-                          fit: BoxFit.contain,
-                          placeholder: (context, _) => placeholder,
-                          errorWidget: (context, error, stackTrace) =>
-                              placeholder,
-                        )
-                      else
-                        placeholder,
-                    ],
+                        if (imageUrl != null)
+                          CachedNetworkImage(
+                            imageUrl: imageUrl!,
+                            cacheManager: AppCacheManager.images,
+                            fit: BoxFit.contain,
+                            placeholder: (context, _) => placeholder,
+                            errorWidget: (context, error, stackTrace) =>
+                                placeholder,
+                          )
+                        else
+                          placeholder,
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -889,6 +1007,26 @@ class _TopSummary extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Wraps [child] in a [Hero] only when a unique [tag] is available.
+class _MaybeHero extends StatelessWidget {
+  const _MaybeHero({required this.tag, required this.child});
+
+  final String? tag;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final heroTag = tag;
+    if (heroTag == null) return child;
+    return Hero(
+      tag: heroTag,
+      flightShuttleBuilder: (context, animation, direction, from, toHero) =>
+          toHero.widget,
+      child: child,
     );
   }
 }

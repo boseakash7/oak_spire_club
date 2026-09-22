@@ -99,38 +99,39 @@ class TasteView extends GetView<TasteController> {
                             },
                             child: Obx(
                               () => ListView(
-                                physics:
-                                    const AlwaysScrollableScrollPhysics(),
+                                physics: const AlwaysScrollableScrollPhysics(),
                                 padding: const EdgeInsets.only(bottom: 24),
                                 children: [
                                   ...controller.visibleBottles
                                       .asMap()
                                       .entries
                                       .map(
-                                    (e) => Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 6),
-                                      child: AnimatedListEntrance(
-                                        index: e.key,
-                                        child: _BottleRow(
-                                          bottle: e.value,
-                                          onAdd: () async {
-                                            final res = await controller
-                                                .addBottleToCollection(
-                                              e.value,
-                                            );
-                                            if (res == true) {
-                                              await _handleAddedSuccess();
-                                            }
-                                          },
+                                        (e) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 6,
+                                          ),
+                                          child: AnimatedListEntrance(
+                                            index: e.key,
+                                            child: _BottleRow(
+                                              bottle: e.value,
+                                              onAdd: () async {
+                                                final res = await controller
+                                                    .addBottleToCollection(
+                                                      e.value,
+                                                    );
+                                                if (res == true) {
+                                                  await _handleAddedSuccess();
+                                                }
+                                              },
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
                                   if (controller.isLoadingMore.value)
                                     const Padding(
-                                      padding:
-                                          EdgeInsets.symmetric(vertical: 14),
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
                                       child: Center(
                                         child: SizedBox(
                                           width: 18,
@@ -166,10 +167,7 @@ class TasteView extends GetView<TasteController> {
 }
 
 class _SearchInput extends StatelessWidget {
-  const _SearchInput({
-    required this.controller,
-    required this.onChanged,
-  });
+  const _SearchInput({required this.controller, required this.onChanged});
 
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
@@ -197,14 +195,14 @@ class _SearchInput extends StatelessWidget {
             vertical: 0,
           ),
           filled: true,
-          fillColor: const Color(0xFF10090B),
+          fillColor: AppColors.panel,
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(9),
-            borderSide: const BorderSide(color: Color(0xFF414141)),
+            borderSide: const BorderSide(color: AppColors.border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(9),
-            borderSide: const BorderSide(color: Color(0xFF585858)),
+            borderSide: const BorderSide(color: AppColors.inputBorderFocused),
           ),
         ),
       ),
@@ -256,7 +254,7 @@ class _BottleRow extends StatelessWidget {
     final imageUrl = _imageUrl;
     return Container(
       decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFF3C3B3B))),
+        border: Border(top: BorderSide(color: AppColors.borderNeutral)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,7 +306,7 @@ class _BottleRow extends StatelessWidget {
                     ProofFormatter.formatLabelOrFallback(bottle.proof),
                     style: AppTextStyles.body16().copyWith(
                       fontSize: 10,
-                      color: const Color(0xFF89746D),
+                      color: AppColors.textWolf,
                     ),
                   ),
                 ],
@@ -353,7 +351,7 @@ class _BottleRow extends StatelessWidget {
     width: 56,
     height: 56,
     decoration: BoxDecoration(
-      color: const Color(0x33000000),
+      color: AppColors.overlayBlack20,
       borderRadius: BorderRadius.circular(8),
     ),
     alignment: Alignment.center,
@@ -378,7 +376,7 @@ class _AddOwnBottleRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: Color(0xFF3C3B3B))),
+          border: Border(top: BorderSide(color: AppColors.borderNeutral)),
         ),
         child: Row(
           children: [

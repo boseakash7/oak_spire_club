@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../animations/app_motion.dart';
 import '../theme/app_colors.dart';
+import '../utils/app_haptics.dart';
 import '../theme/app_text_styles.dart';
 
 /// Horizontal filter chip (Collection / Market category rows).
@@ -22,7 +23,10 @@ class AppFilterChip extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          AppHaptics.selection();
+          onTap();
+        },
         borderRadius: BorderRadius.circular(42),
         child: AnimatedContainer(
           duration: AppMotion.chip,
@@ -49,10 +53,7 @@ class AppFilterChip extends StatelessWidget {
           child: AnimatedDefaultTextStyle(
             duration: AppMotion.chip,
             curve: AppMotion.standard,
-            style: AppTextStyles.body16().copyWith(
-              fontSize: 14,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w400,
+            style: AppTextStyles.uiChip().copyWith(
               color: selected ? AppColors.black : AppColors.textCream,
             ),
             child: Text(

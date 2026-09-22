@@ -19,12 +19,10 @@ class GetStartedView extends StatelessWidget {
   static const double _buttonRadius = 12;
 
   // Design-matched onboarding palette.
-  static const Color _goldAccent = Color(0xFFC59358);
-  static const Color _goldLight = Color(0xFFD4A76A);
-  static const Color _goldDark = Color(0xFF9B6D3B);
-  static const Color _creamTitle = Color(0xFFE8E2D6);
-  static const Color _creamBody = Color(0xFFD8D2C6);
-  static const Color _featureDescription = Color(0xFFC8C2B6);
+  static const Color _goldAccent = AppColors.goldMid;
+  static const Color _creamTitle = AppColors.textNeutralWarm;
+  static const Color _creamBody = AppColors.textNeutralSoft;
+  static const Color _featureDescription = AppColors.textNeutralMuted;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +48,9 @@ class GetStartedView extends StatelessWidget {
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: _horizontalPadding),
+              padding: const EdgeInsets.symmetric(
+                horizontal: _horizontalPadding,
+              ),
               child: Column(
                 children: [
                   Expanded(
@@ -221,9 +221,7 @@ class GetStartedView extends StatelessWidget {
           textColor: AppColors.textCream,
           onPressed: () {
             if (Get.isRegistered<AppAnalyticsController>()) {
-              unawaited(
-                AppAnalyticsController.to.logTap('get_started_log_in'),
-              );
+              unawaited(AppAnalyticsController.to.logTap('get_started_log_in'));
             }
             Get.toNamed(AppRoutes.signIn);
           },
@@ -358,11 +356,11 @@ class _TaperedGoldLinePainter extends CustomPainter {
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          Color(0xFF9B6D3B),
-          Color(0xFFD4A76A),
-          Color(0xFFC59358),
-          Color(0xFFD4A76A),
-          Color(0xFF9B6D3B),
+          AppColors.goldDeep,
+          AppColors.goldSoft,
+          AppColors.goldMid,
+          AppColors.goldSoft,
+          AppColors.goldDeep,
         ],
         stops: [0.0, 0.25, 0.5, 0.75, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, w, size.height))
@@ -415,18 +413,9 @@ class _FeatureColumn extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Column(
         children: [
-          Image.asset(
-            feature.icon,
-            width: 56,
-            height: 56,
-            fit: BoxFit.contain,
-          ),
+          Image.asset(feature.icon, width: 56, height: 56, fit: BoxFit.contain),
           const SizedBox(height: 8),
-          Text(
-            feature.title,
-            style: titleStyle,
-            textAlign: TextAlign.center,
-          ),
+          Text(feature.title, style: titleStyle, textAlign: TextAlign.center),
           const SizedBox(height: 4),
           Text(
             feature.description,
@@ -498,7 +487,7 @@ class _GoldPillButtonState extends State<_GoldPillButton> {
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: widget.filled
-                        ? const Color(0xFF1A1208)
+                        ? AppColors.goldEmber
                         : (widget.textColor ?? GetStartedView._goldAccent),
                   ),
                 ),

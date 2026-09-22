@@ -1,16 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
-import '../../core/animations/app_motion.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/price_formatter.dart';
+import '../../core/widgets/animated_count_text.dart';
+import '../../core/widgets/animated_list_entrance.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/app_header.dart';
-import '../../data/collection_value_calculator.dart';
 import '../../data/models/collection_item_display.dart';
 import 'home_controller.dart';
 import 'widgets/home_chart_footer.dart';
 import 'widgets/home_value_chart.dart';
+
+/// One Quick Stats tile. Modelled as data so the row is a list, not a switch
+/// over hard-coded indices.
+class _QuickStat {
+  const _QuickStat.count(this.label, int this.count)
+    : ratingText = null,
+      isRating = false;
+
+  const _QuickStat.rating(this.label, String this.ratingText)
+    : count = null,
+      isRating = true;
+
+  final String label;
+  final int? count;
+  final String? ratingText;
+  final bool isRating;
+}
+
+List<_QuickStat> _quickStats(HomeController home) => [
+  _QuickStat.count('Total\nCollection', home.totalCollectionCount.value),
+  _QuickStat.count('Total\nDrunk', home.totalDrunkCount.value),
+  _QuickStat.rating('Collection\nRating', home.collectionRatingText.value),
+  _QuickStat.count('Rare\nBottles', home.totalRareCount.value),
+];
 
 /// Space between Top moved heading and its horizontal cards.
 /// Keep consistent with Quick Stats spacing.
@@ -32,7 +59,7 @@ class HomeFilledView extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF080405), Color(0xFF080405)],
+          colors: [AppColors.surfaceDeep, AppColors.surfaceDeep],
         ),
       ),
       child: Stack(
@@ -69,7 +96,10 @@ class HomeFilledView extends StatelessWidget {
                     Obx(() {
                       final bottles = home.topMovedBottles;
                       if (bottles.isEmpty) {
-                        return const SizedBox.shrink();
+                        return const Padding(
+                          padding: EdgeInsets.only(right: 23),
+                          child: _NoMovementYet(),
+                        );
                       }
                       return SizedBox(
                         height: 68,
@@ -86,16 +116,19 @@ class HomeFilledView extends StatelessWidget {
                                 ? item.lineSubtitle.trim()
                                 : item.proofLabel;
                             final movementRaw = item.priceMovementRaw;
-                            return _TrendingCard(
-                              title: item.lineTitle,
-                              subtitle: subtitle,
-                              price: item.marketAverageLabel,
-                              changeText:
-                                  PriceFormatter.formatPriceMovementLabel(
-                                    movementRaw,
-                                  ),
-                              changeColor: PriceFormatter.priceMovementColor(
-                                movementRaw,
+                            return AnimatedListEntrance(
+                              index: index,
+                              child: _TrendingCard(
+                                title: item.lineTitle,
+                                subtitle: subtitle,
+                                price: item.marketAverageLabel,
+                                changeText:
+                                    PriceFormatter.formatPriceMovementLabel(
+                                      movementRaw,
+                                    ),
+                                changeColor: PriceFormatter.priceMovementColor(
+                                  movementRaw,
+                                ),
                               ),
                             );
                           },
@@ -110,41 +143,32 @@ class HomeFilledView extends StatelessWidget {
                     const SizedBox(height: _kQuickStatsHeadingToCardsGap),
                     SizedBox(
                       height: 100,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        clipBehavior: Clip.none,
-                        padding: const EdgeInsets.only(left: 0, right: 8),
-                        itemCount: 4,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(width: 14),
-                        itemBuilder: (context, index) {
-                          if (index == 2) {
-                            return Obx(
-                              () => _StatCardRating(
-                                label: 'Collection\nRating',
-                                value: home.collectionRatingText.value,
-                              ),
+                      child: Obx(() {
+                        final stats = _quickStats(home);
+                        return ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          clipBehavior: Clip.none,
+                          padding: const EdgeInsets.only(left: 0, right: 8),
+                          itemCount: stats.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(width: 14),
+                          itemBuilder: (context, index) {
+                            final stat = stats[index];
+                            return AnimatedListEntrance(
+                              index: index,
+                              child: stat.isRating
+                                  ? _StatCardRating(
+                                      label: stat.label,
+                                      value: stat.ratingText ?? '—',
+                                    )
+                                  : _StatCard(
+                                      label: stat.label,
+                                      count: stat.count ?? 0,
+                                    ),
                             );
-                          }
-                          final label = switch (index) {
-                            0 => 'Total\nCollection',
-                            1 => 'Total\nDrunk',
-                            3 => 'Rare\nBottles',
-                            _ => 'Total\nCollection',
-                          };
-                          return Obx(
-                            () => _StatCard(
-                              label: label,
-                              value: switch (index) {
-                                0 => home.totalCollectionCount.value,
-                                1 => home.totalDrunkCount.value,
-                                3 => home.totalRareCount.value,
-                                _ => home.totalCollectionCount.value,
-                              }.toString(),
-                            ),
-                          );
-                        },
-                      ),
+                          },
+                        );
+                      }),
                     ),
                     const SizedBox(height: 18),
                     // Full-bleed chart (~2px from screen edges), like benchmark detail.
@@ -197,12 +221,15 @@ class _CollectionValue extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Collection Value',
-          style: AppTextStyles.body16().copyWith(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFFF1E8BE),
+        // The heading has to match the number below it: when no bottle in the
+        // collection carries a bluebook price there is no market value to
+        // show, and calling cost basis "value" would be wrong.
+        Obx(
+          () => Text(
+            home.showingInvestedAsValue.value
+                ? 'Total Invested'
+                : 'Collection Value',
+            style: AppTextStyles.titleL(),
           ),
         ),
         const SizedBox(height: 8),
@@ -219,30 +246,39 @@ class _CollectionValue extends StatelessWidget {
                         .collectionValueGradient
                         .createShader(bounds),
                     child: Obx(
-                      () => Text(
-                        home.collectionValueText.value,
-                        style: AppTextStyles.button20Bold().copyWith(
-                          fontSize: 36,
-                          height: 1.12,
-                        ),
+                      () => AnimatedCountText(
+                        value: home.collectionValue.value,
+                        format: _formatWholeDollars,
+                        style: AppTextStyles.displayXl(),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // Cost basis, shown only when it is the supporting figure
+                  // rather than the headline.
+                  Obx(() {
+                    if (home.showingInvestedAsValue.value) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'Invested ${home.investedValueText.value}',
+                        style: AppTextStyles.caption(),
+                      ),
+                    );
+                  }),
                   Obx(() => _HomeMovedLine(text: home.movedText.value)),
                 ],
               ),
             ),
             const SizedBox(width: 14),
-            Obx(() {
-              final percent = home.collectionMovedPercent.value;
-              return _CollectionValueMiniBars(
-                movedFraction:
-                    CollectionValueCalculator.movedBarFractionFromPercent(
-                      percent,
-                    ),
-              );
-            }),
+            Obx(
+              () => _GainChip(
+                gain: home.unrealisedGain.value,
+                label: home.unrealisedGainText.value,
+              ),
+            ),
           ],
         ),
       ],
@@ -250,104 +286,79 @@ class _CollectionValue extends StatelessWidget {
   }
 }
 
-/// Mini bars beside collection value: left = moved %, right = 100% reference.
-class _CollectionValueMiniBars extends StatefulWidget {
-  const _CollectionValueMiniBars({required this.movedFraction});
+/// Whole-dollar formatting for the counting hero value. Kept local so the
+/// count-up animation does not rebuild a NumberFormat every frame.
+final _wholeDollars = NumberFormat.currency(
+  locale: 'en_US',
+  symbol: r'$',
+  decimalDigits: 0,
+);
 
-  /// Same % as “Moved +64% …” (0–1).
-  final double movedFraction;
+String _formatWholeDollars(double v) =>
+    v <= 0 ? r'$ —' : _wholeDollars.format(v);
 
-  @override
-  State<_CollectionValueMiniBars> createState() =>
-      _CollectionValueMiniBarsState();
-}
+/// Unrealised gain / loss beside the hero value: the one figure on this screen
+/// that is not shown anywhere else. Hidden when market value is unknown.
+class _GainChip extends StatelessWidget {
+  const _GainChip({required this.gain, required this.label});
 
-class _CollectionValueMiniBarsState extends State<_CollectionValueMiniBars>
-    with SingleTickerProviderStateMixin {
-  static const double _maxHeight = 52;
-  static const double _barWidth = 16;
-  static const double _gap = 8;
-  static const double _barRadius = 1;
-
-  static const Color _barColor = AppColors.gold2;
-
-  late final AnimationController _fillController;
-  double _leftBegin = 0;
-  double _leftEnd = 0;
-  double _rightBegin = 0;
-  double _rightEnd = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    _fillController = AnimationController(
-      vsync: this,
-      duration: AppMotion.chartDraw,
-    )..addListener(() => setState(() {}));
-    _leftEnd = widget.movedFraction;
-    _rightEnd = 1;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _fillController.forward(from: 0);
-    });
-  }
-
-  @override
-  void didUpdateWidget(covariant _CollectionValueMiniBars oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.movedFraction == widget.movedFraction) return;
-    final t = AppMotion.chart.transform(_fillController.value);
-    _leftBegin = _lerp(_leftBegin, _leftEnd, t);
-    _rightBegin = _lerp(_rightBegin, _rightEnd, t);
-    _leftEnd = widget.movedFraction;
-    _rightEnd = 1;
-    _fillController.forward(from: 0);
-  }
-
-  @override
-  void dispose() {
-    _fillController.dispose();
-    super.dispose();
-  }
-
-  static double _lerp(double a, double b, double t) => a + (b - a) * t;
-
-  double _animatedLeftHeight(double t) =>
-      _maxHeight * _lerp(_leftBegin, _leftEnd, t);
-
-  double _animatedRightHeight(double t) =>
-      _maxHeight * _lerp(_rightBegin, _rightEnd, t);
+  final double? gain;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final t = AppMotion.chart.transform(_fillController.value);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _MiniBar(height: _animatedLeftHeight(t)),
-        const SizedBox(width: _gap),
-        _MiniBar(height: _animatedRightHeight(t)),
-      ],
+    final value = gain;
+    if (value == null || label.isEmpty) return const SizedBox.shrink();
+
+    final up = value >= 0;
+    final tint = up ? AppColors.trendPositive : AppColors.trendNegative;
+
+    return AppCard(
+      radius: 12,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text('Unrealised', style: AppTextStyles.micro()),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                up ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                size: 16,
+                color: tint,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: AppTextStyles.bodyM().copyWith(
+                  color: tint,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _MiniBar extends StatelessWidget {
-  const _MiniBar({required this.height});
-
-  final double height;
+/// Shown when the collection has no price movement to rank yet.
+class _NoMovementYet extends StatelessWidget {
+  const _NoMovementYet();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: _CollectionValueMiniBarsState._barWidth,
-      height: height,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(
-          _CollectionValueMiniBarsState._barRadius,
-        ),
-        color: _CollectionValueMiniBarsState._barColor,
-      ),
+    return const AppEmptyState(
+      compact: true,
+      icon: Icons.show_chart_rounded,
+      title: 'No movement yet',
+      message:
+          'Once your bottles have tracked price history, the biggest movers '
+          'show up here.',
     );
   }
 }
@@ -408,10 +419,7 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: AppTextStyles.body16().copyWith(color: AppColors.white),
-    );
+    return Text(title, style: AppTextStyles.bodyL());
   }
 }
 
@@ -432,19 +440,10 @@ class _TrendingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppCard(
       width: 262,
       height: 68,
       padding: const EdgeInsets.fromLTRB(13, 10, 13, 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF4A342E)),
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF271C16), Color(0xFF201512)],
-        ),
-      ),
       child: Row(
         children: [
           Expanded(
@@ -455,18 +454,15 @@ class _TrendingCard extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.body16().copyWith(
-                    color: AppColors.white,
-                  ),
+                  style: AppTextStyles.bodyL(),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.body16().copyWith(
-                    fontSize: 14,
-                    color: const Color(0xFF87665A),
+                  style: AppTextStyles.bodyS().copyWith(
+                    color: AppColors.textTrendingSubtitle,
                   ),
                 ),
               ],
@@ -478,17 +474,13 @@ class _TrendingCard extends StatelessWidget {
             children: [
               Text(
                 changeText,
-                style: AppTextStyles.body16().copyWith(
-                  fontSize: 15,
-                  color: changeColor,
-                ),
+                style: AppTextStyles.bodyM().copyWith(color: changeColor),
               ),
               const Spacer(),
               Text(
                 price,
-                style: AppTextStyles.body16().copyWith(
-                  fontSize: 15,
-                  color: const Color(0xFFF1E8BE),
+                style: AppTextStyles.bodyM().copyWith(
+                  color: AppColors.textCream,
                 ),
               ),
             ],
@@ -499,47 +491,33 @@ class _TrendingCard extends StatelessWidget {
   }
 }
 
+/// Shared geometry + label treatment for the Quick Stats tiles.
+const double _kStatCardSide = 100;
+const EdgeInsets _kStatCardPadding = EdgeInsets.fromLTRB(13, 12, 13, 14);
+
+TextStyle _statLabelStyle() => AppTextStyles.label().copyWith(
+  color: AppColors.textStatLabel,
+  height: 1.05,
+);
+
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value});
+  const _StatCard({required this.label, required this.count});
 
   final String label;
-  final String value;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 100,
-      height: 100,
-      padding: const EdgeInsets.fromLTRB(13, 12, 13, 14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF4A342E)),
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF271C16), Color(0xFF201512)],
-        ),
-      ),
+    return AppCard(
+      width: _kStatCardSide,
+      height: _kStatCardSide,
+      padding: _kStatCardPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: AppTextStyles.body16().copyWith(
-              fontSize: 13,
-              color: const Color(0xFF997C71),
-              height: 1.05,
-            ),
-          ),
+          Text(label, style: _statLabelStyle()),
           const Spacer(),
-          Text(
-            value,
-            style: AppTextStyles.body16().copyWith(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFFF1E8BE),
-            ),
-          ),
+          AnimatedCountInt(value: count, style: AppTextStyles.numberL()),
         ],
       ),
     );
@@ -554,30 +532,14 @@ class _StatCardRating extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 100,
-      height: 100,
-      padding: const EdgeInsets.fromLTRB(13, 12, 13, 14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF4A342E)),
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF271C16), Color(0xFF201512)],
-        ),
-      ),
+    return AppCard(
+      width: _kStatCardSide,
+      height: _kStatCardSide,
+      padding: _kStatCardPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: AppTextStyles.body16().copyWith(
-              fontSize: 13,
-              color: const Color(0xFF997C71),
-              height: 1.05,
-            ),
-          ),
+          Text(label, style: _statLabelStyle()),
           const Spacer(),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -586,20 +548,12 @@ class _StatCardRating extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  value,
-                  style: AppTextStyles.body16().copyWith(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFFF1E8BE),
-                    height: 1.0,
-                  ),
-                ),
+                Text(value, style: AppTextStyles.numberL()),
                 const SizedBox(width: 6),
-                Icon(
+                const Icon(
                   Icons.star_rounded,
                   size: 22,
-                  color: const Color(0xFFF1E8BE),
+                  color: AppColors.textCream,
                 ),
               ],
             ),

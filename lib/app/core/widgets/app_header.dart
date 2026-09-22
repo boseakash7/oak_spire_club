@@ -96,7 +96,7 @@ class _GreetingText extends StatelessWidget {
           fontSize: 13,
           fontWeight: FontWeight.w500,
           height: 1.0,
-          color: const Color(0xFFF5F5F5),
+          color: AppColors.textGreeting,
         ),
       ),
     );

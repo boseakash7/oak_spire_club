@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../animations/app_motion.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import 'shake_on_trigger.dart';
 
 /// Animated 4-digit OTP boxes used across auth flows.
 class OtpDigitBoxes extends StatelessWidget {
@@ -14,6 +15,7 @@ class OtpDigitBoxes extends StatelessWidget {
     required this.onChanged,
     required this.onBackspace,
     this.length = 4,
+    this.shakeTrigger,
   });
 
   final List<TextEditingController> controllers;
@@ -22,19 +24,25 @@ class OtpDigitBoxes extends StatelessWidget {
   final void Function(int index) onBackspace;
   final int length;
 
+  /// Changes whenever the entered code is rejected; see [ShakeOnTrigger].
+  final Object? shakeTrigger;
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        length,
-        (i) => Padding(
-          padding: EdgeInsets.only(right: i < length - 1 ? 16 : 0),
-          child: _OtpBox(
-            controller: controllers[i],
-            focusNode: focusNodes[i],
-            onChanged: (v) => onChanged(i, v),
-            onBackspace: () => onBackspace(i),
+    return ShakeOnTrigger(
+      trigger: shakeTrigger,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          length,
+          (i) => Padding(
+            padding: EdgeInsets.only(right: i < length - 1 ? 16 : 0),
+            child: _OtpBox(
+              controller: controllers[i],
+              focusNode: focusNodes[i],
+              onChanged: (v) => onChanged(i, v),
+              onBackspace: () => onBackspace(i),
+            ),
           ),
         ),
       ),
@@ -71,9 +79,10 @@ class _OtpBoxState extends State<_OtpBox> with SingleTickerProviderStateMixin {
     super.initState();
     _keyboardFocusNode = FocusNode();
     _anim = AnimationController(vsync: this, duration: AppMotion.medium);
-    _scale = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(parent: _anim, curve: AppMotion.standard),
-    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 1.08,
+    ).animate(CurvedAnimation(parent: _anim, curve: AppMotion.standard));
     widget.focusNode.addListener(_onFocusChange);
     widget.controller.addListener(_onTextChange);
   }
@@ -110,8 +119,8 @@ class _OtpBoxState extends State<_OtpBox> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final hasValue = widget.controller.text.isNotEmpty;
-    final borderColor = _focused ? const Color(0xFFCCA230) : AppColors.border;
-    final fillColor = _focused ? const Color(0x1ACCA230) : AppColors.panel;
+    final borderColor = _focused ? AppColors.goldAccent : AppColors.border;
+    final fillColor = _focused ? AppColors.goldAccentGlow : AppColors.panel;
 
     return ScaleTransition(
       scale: _scale,
@@ -123,14 +132,11 @@ class _OtpBoxState extends State<_OtpBox> with SingleTickerProviderStateMixin {
         decoration: BoxDecoration(
           color: fillColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: borderColor,
-            width: _focused ? 1.8 : 1,
-          ),
+          border: Border.all(color: borderColor, width: _focused ? 1.8 : 1),
           boxShadow: _focused
               ? [
                   BoxShadow(
-                    color: const Color(0xFFCCA230).withOpacity(0.15),
+                    color: AppColors.goldAccent.withValues(alpha: 0.15),
                     blurRadius: 12,
                     spreadRadius: 1,
                   ),
@@ -157,7 +163,7 @@ class _OtpBoxState extends State<_OtpBox> with SingleTickerProviderStateMixin {
               fontSize: 24,
               color: hasValue ? AppColors.white : AppColors.border,
             ),
-            cursorColor: const Color(0xFFCCA230),
+            cursorColor: AppColors.goldAccent,
             decoration: const InputDecoration(
               counterText: '',
               border: InputBorder.none,

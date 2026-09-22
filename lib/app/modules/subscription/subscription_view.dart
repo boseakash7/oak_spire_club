@@ -74,9 +74,8 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     return user?.hasUsedTrial != true;
   }
 
-  String get _checkoutButtonLabel => _isTrialOffer
-      ? 'Continue Free trial before expires'
-      : 'Subscribe';
+  String get _checkoutButtonLabel =>
+      _isTrialOffer ? 'Continue Free trial before expires' : 'Subscribe';
 
   void _openSkipConfirmation() {
     Get.toNamed(
@@ -934,8 +933,7 @@ class _ActiveSubscriptionBody extends StatelessWidget {
               actionLabel: 'Cancel subscription',
               onAction: onCancel,
               actionLoading: loading,
-              actionEnabled:
-                  canCancel && (!needsHistory || !historyLoading),
+              actionEnabled: canCancel && (!needsHistory || !historyLoading),
               showAction: subscription.canShowCancelSubscription,
             ),
           );
@@ -1060,7 +1058,7 @@ class _CurrentPlanSummaryCard extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                             color: actionEnabled
                                 ? (isDestructiveAction
-                                      ? const Color(0xFFE57373)
+                                      ? AppColors.errorLight
                                       : AppColors.subscriptionSkipLink)
                                 : AppColors.textWolf.withValues(alpha: 0.5),
                           ),

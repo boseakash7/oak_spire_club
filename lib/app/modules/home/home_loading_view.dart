@@ -12,7 +12,7 @@ class HomeLoadingView extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF080405), Color(0xFF080405)],
+          colors: [AppColors.surfaceDeep, AppColors.surfaceDeep],
         ),
       ),
       child: Stack(
@@ -88,7 +88,11 @@ class HomeLoadingView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 26),
-                  const ShimmerBox(height: 216, width: double.infinity, radius: 16),
+                  const ShimmerBox(
+                    height: 216,
+                    width: double.infinity,
+                    radius: 16,
+                  ),
                   const SizedBox(height: 10),
                   Container(
                     height: 1,
@@ -103,4 +107,3 @@ class HomeLoadingView extends StatelessWidget {
     );
   }
 }
-

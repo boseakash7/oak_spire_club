@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import '../../../core/analytics/app_analytics_controller.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_haptics.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../routes/app_routes.dart';
 import '../home_controller.dart';
@@ -31,9 +32,10 @@ class HomeChartFooter extends StatelessWidget {
                     selected:
                         home.selectedChartRange.value ==
                         HomeChartRange.values[i],
-                    onTap: () => unawaited(
-                      home.setChartRange(HomeChartRange.values[i]),
-                    ),
+                    onTap: () {
+                      AppHaptics.selection();
+                      unawaited(home.setChartRange(HomeChartRange.values[i]));
+                    },
                   ),
                 ],
               ],
@@ -42,6 +44,7 @@ class HomeChartFooter extends StatelessWidget {
           const Spacer(),
           GestureDetector(
             onTap: () async {
+              AppHaptics.tap();
               if (Get.isRegistered<AppAnalyticsController>()) {
                 unawaited(
                   AppAnalyticsController.to.logTap('home_add_to_collection'),
@@ -62,8 +65,7 @@ class HomeChartFooter extends StatelessWidget {
               ),
               child: Text(
                 '+ Add to collection',
-                style: AppTextStyles.body16().copyWith(
-                  fontSize: 12,
+                style: AppTextStyles.caption().copyWith(
                   fontWeight: FontWeight.w700,
                   color: AppColors.black,
                 ),
@@ -107,10 +109,7 @@ class _RangeChip extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(
           range.label,
-          style: AppTextStyles.body16().copyWith(
-            fontSize: 13,
-            color: AppColors.white,
-          ),
+          style: AppTextStyles.label().copyWith(color: AppColors.white),
         ),
       ),
     );

@@ -37,7 +37,7 @@ class ForgotPasswordView extends GetView<ForgotPasswordController> {
                   Text(
                     'Enter your email and we will send a verification code to reset your password.',
                     style: AppTextStyles.body16().copyWith(
-                      color: const Color(0xFFBAB59F),
+                      color: AppColors.textMuted,
                       height: 1.35,
                     ),
                   ),
@@ -69,7 +69,7 @@ class ForgotPasswordView extends GetView<ForgotPasswordController> {
                           TextSpan(
                             text: 'Sign In',
                             style: AppTextStyles.body16().copyWith(
-                              color: const Color(0xFFCCA230),
+                              color: AppColors.goldAccent,
                               fontWeight: FontWeight.w700,
                             ),
                             recognizer: TapGestureRecognizer()

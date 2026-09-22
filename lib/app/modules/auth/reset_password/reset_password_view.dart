@@ -37,10 +37,10 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
+                              color: Colors.white.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.25),
+                                color: Colors.white.withValues(alpha: 0.25),
                               ),
                             ),
                             child: const Icon(
@@ -100,8 +100,9 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
                         () => CommonPrimaryButton(
                           label: 'Reset Password',
                           onPressed: controller.onReset,
-                          textStyle: AppTextStyles.button20Bold()
-                              .copyWith(fontSize: 18),
+                          textStyle: AppTextStyles.button20Bold().copyWith(
+                            fontSize: 18,
+                          ),
                           isLoading: controller.isLoading.value,
                         ),
                       ),
@@ -115,15 +116,16 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.2,
-                                color: Color(0xFFCCA230),
+                                color: AppColors.goldAccent,
                               ),
                             );
                           }
                           if (seconds > 0) {
                             return Text(
                               'Resend code in ${seconds}s',
-                              style: AppTextStyles.body16()
-                                  .copyWith(color: AppColors.textMuted),
+                              style: AppTextStyles.body16().copyWith(
+                                color: AppColors.textMuted,
+                              ),
                             );
                           }
                           return GestureDetector(
@@ -131,7 +133,7 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
                             child: Text(
                               'Resend Code',
                               style: AppTextStyles.body16().copyWith(
-                                color: const Color(0xFFCCA230),
+                                color: AppColors.goldAccent,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),

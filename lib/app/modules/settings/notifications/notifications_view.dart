@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/widgets/animated_list_entrance.dart';
 import '../widgets/settings_scaffold.dart';
 import '../widgets/settings_toggle_row.dart';
 import 'notifications_controller.dart';

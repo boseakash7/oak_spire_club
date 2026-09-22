@@ -59,8 +59,9 @@ class SignInView extends GetView<SignInController> {
                       onTap: () {
                         if (Get.isRegistered<AppAnalyticsController>()) {
                           unawaited(
-                            AppAnalyticsController.to
-                                .logTap('sign_in_forgot_password'),
+                            AppAnalyticsController.to.logTap(
+                              'sign_in_forgot_password',
+                            ),
                           );
                         }
                         Get.toNamed(AppRoutes.forgotPassword);
@@ -68,11 +69,11 @@ class SignInView extends GetView<SignInController> {
                       child: Text(
                         'Forgot password?',
                         style: AppTextStyles.body16().copyWith(
-                          color: const Color(0xFFCCA230),
+                          color: AppColors.goldAccent,
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                           decoration: TextDecoration.underline,
-                          decorationColor: const Color(0xFFCCA230),
+                          decorationColor: AppColors.goldAccent,
                         ),
                       ),
                     ),
@@ -101,8 +102,9 @@ class SignInView extends GetView<SignInController> {
                           onTap: () {
                             if (Get.isRegistered<AppAnalyticsController>()) {
                               unawaited(
-                                AppAnalyticsController.to
-                                    .logTap('sign_in_go_sign_up'),
+                                AppAnalyticsController.to.logTap(
+                                  'sign_in_go_sign_up',
+                                ),
                               );
                             }
                             if (Get.previousRoute == AppRoutes.signUp) {
@@ -114,7 +116,7 @@ class SignInView extends GetView<SignInController> {
                           child: Text(
                             'Sign up',
                             style: AppTextStyles.body16().copyWith(
-                              color: const Color(0xFFCCA230),
+                              color: AppColors.goldAccent,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

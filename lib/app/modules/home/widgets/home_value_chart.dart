@@ -11,8 +11,15 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/price_formatter.dart';
 import '../home_controller.dart';
 
-/// Horizontal inset from screen edge (parent cancels 23px content pad + this).
-const double kHomeChartHorizontalInset = 2;
+/// Horizontal inset from screen edge. Wide enough that the value-axis labels
+/// clear the screen edge while the plot still reads as near-full-bleed.
+const double kHomeChartHorizontalInset = 12;
+
+/// Gutter reserved for the "% since window start" labels on the left.
+const double _kValueAxisWidth = 38;
+
+/// Gutter reserved for the date labels under the plot.
+const double _kDateAxisHeight = 22;
 
 FlLine _homeDottedGridLine(double _) => FlLine(
   color: AppColors.chartGridLine,
@@ -52,13 +59,7 @@ class HomeChartLegend extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          label,
-          style: AppTextStyles.body16().copyWith(
-            fontSize: 14,
-            color: AppColors.white,
-          ),
-        ),
+        Text(label, style: AppTextStyles.bodyS()),
       ],
     );
   }
@@ -129,7 +130,7 @@ class _HomeValueChartState extends State<HomeValueChart>
   Widget build(BuildContext context) {
     final home = Get.find<HomeController>();
     return SizedBox(
-      height: 188,
+      height: 210,
       width: double.infinity,
       child: Obx(() {
         final series = home.chartSeriesK.toList(growable: false);
@@ -144,23 +145,14 @@ class _HomeValueChartState extends State<HomeValueChart>
           }
           return ColoredBox(
             color: AppColors.chartPlotBackground,
-            child: loading
-                ? const Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.gold1,
-                      ),
-                    ),
-                  )
-                : const Center(
-                    child: Text(
-                      'No chart data',
-                      style: TextStyle(color: AppColors.textWolf, fontSize: 12),
-                    ),
-                  ),
+            child: Center(
+              child: Text(
+                loading ? 'Loading chart' : 'No chart data',
+                style: AppTextStyles.caption().copyWith(
+                  color: AppColors.textWolf,
+                ),
+              ),
+            ),
           );
         }
 
@@ -217,7 +209,33 @@ class _HomeValueChartState extends State<HomeValueChart>
             minY: minY,
             maxY: maxY,
             backgroundColor: AppColors.chartPlotBackground,
-            titlesData: const FlTitlesData(show: false),
+            titlesData: FlTitlesData(
+              show: true,
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: _kValueAxisWidth,
+                  interval: hInterval > 0 ? hInterval : 1,
+                  getTitlesWidget: (value, meta) =>
+                      _valueAxisLabel(value, meta, minY: minY, maxY: maxY),
+                ),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: _kDateAxisHeight,
+                  interval: vInterval > 0 ? vInterval : 1,
+                  getTitlesWidget: (value, meta) =>
+                      _dateAxisLabel(value, meta, dates: dates),
+                ),
+              ),
+            ),
             borderData: FlBorderData(show: false),
             clipData: const FlClipData.all(),
             extraLinesData: ExtraLinesData(
@@ -247,9 +265,12 @@ class _HomeValueChartState extends State<HomeValueChart>
             ),
             lineTouchData: LineTouchData(
               handleBuiltInTouches: true,
+              getTouchedSpotIndicator: chartCrosshairIndicators,
               touchTooltipData: LineTouchTooltipData(
                 fitInsideHorizontally: true,
                 fitInsideVertically: true,
+                getTooltipColor: (_) => AppColors.chartTooltipSurface,
+                tooltipBorderRadius: BorderRadius.circular(8),
                 tooltipPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
@@ -257,7 +278,7 @@ class _HomeValueChartState extends State<HomeValueChart>
                 getTooltipItems: (touchedSpots) {
                   return touchedSpots.map((spot) {
                     final i = spot.x.round().clamp(0, series.length - 1);
-                    final dateLabel = _formatChartDate(
+                    final dateLabel = formatChartTooltipDate(
                       i < dates.length ? dates[i] : '',
                     );
                     final String label;
@@ -280,9 +301,8 @@ class _HomeValueChartState extends State<HomeValueChart>
                     );
                     return LineTooltipItem(
                       '$dateLabel\n$label: $priceText',
-                      TextStyle(
+                      AppTextStyles.caption().copyWith(
                         color: color,
-                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
                     );
@@ -308,7 +328,10 @@ class _HomeValueChartState extends State<HomeValueChart>
                     );
                   },
                 ),
-                belowBarData: BarAreaData(show: false),
+                belowBarData: BarAreaData(
+                  show: true,
+                  gradient: AppColors.chartMarketValueArea,
+                ),
               ),
               if (bsmiSpots.isNotEmpty)
                 LineChartBarData(
@@ -326,7 +349,10 @@ class _HomeValueChartState extends State<HomeValueChart>
                       );
                     },
                   ),
-                  belowBarData: BarAreaData(show: false),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: AppColors.chartBsmiArea,
+                  ),
                 ),
             ],
           ),
@@ -334,33 +360,86 @@ class _HomeValueChartState extends State<HomeValueChart>
           duration: Duration.zero,
         );
 
-        if (!loading) return chart;
-
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            chart,
-            ColoredBox(
-              color: AppColors.chartPlotBackground.withValues(alpha: 0.45),
-            ),
-            const Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.gold1,
-                ),
-              ),
-            ),
-          ],
+        // A range switch dims the existing line and lets the new one sweep in,
+        // rather than covering the plot with a spinner.
+        return AnimatedOpacity(
+          opacity: loading ? 0.4 : 1,
+          duration: AppMotion.fast,
+          curve: AppMotion.standard,
+          child: chart,
         );
       }),
     );
   }
 }
 
-String _formatChartDate(String raw) {
+/// Gold crosshair plus an enlarged dot for the scrubbed point.
+/// Shared with the benchmark detail chart.
+List<TouchedSpotIndicatorData?> chartCrosshairIndicators(
+  LineChartBarData bar,
+  List<int> indexes,
+) {
+  return indexes.map((_) {
+    return TouchedSpotIndicatorData(
+      const FlLine(
+        color: AppColors.chartCrosshair,
+        strokeWidth: 1,
+        dashArray: [3, 3],
+      ),
+      FlDotData(
+        getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+          radius: 4,
+          color: barData.color ?? AppColors.chartLineMarketValue,
+          strokeWidth: 2,
+          strokeColor: AppColors.chartPlotBackground,
+        ),
+      ),
+    );
+  }).toList();
+}
+
+/// Both series are rebased to 100 at the window start, so the value axis reads
+/// most clearly as percent change from that start, not as raw index points.
+Widget _valueAxisLabel(
+  double value,
+  TitleMeta meta, {
+  required double minY,
+  required double maxY,
+}) {
+  // Skip the extremes: the dashed bounding lines already mark them.
+  if ((value - minY).abs() < 0.001 || (value - maxY).abs() < 0.001) {
+    return const SizedBox.shrink();
+  }
+  final delta = value - 100;
+  final label = '${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(0)}%';
+  return SideTitleWidget(
+    meta: meta,
+    space: 6,
+    child: Text(label, style: AppTextStyles.micro()),
+  );
+}
+
+Widget _dateAxisLabel(
+  double value,
+  TitleMeta meta, {
+  required List<String> dates,
+}) {
+  final i = value.round();
+  if (i < 0 || i >= dates.length) return const SizedBox.shrink();
+  final parsed = DateTime.tryParse(dates[i].trim());
+  if (parsed == null) return const SizedBox.shrink();
+  return SideTitleWidget(
+    meta: meta,
+    space: 4,
+    child: Text(
+      DateFormat('MMM d').format(parsed),
+      style: AppTextStyles.micro(),
+    ),
+  );
+}
+
+/// Tooltip date label, shared with the benchmark detail chart.
+String formatChartTooltipDate(String raw) {
   final trimmed = raw.trim();
   if (trimmed.isEmpty) return '—';
   final parsed = DateTime.tryParse(trimmed);

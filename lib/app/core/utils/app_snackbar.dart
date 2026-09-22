@@ -5,15 +5,16 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 
 import '../constants/app_assets.dart';
+import '../theme/app_colors.dart';
 
 /// Toast-style messages with app icon (custom overlay — native toast APIs cannot show an asset icon).
 class AppSnackbar {
   AppSnackbar._();
 
-  static const Color _bg = Color(0xE8171210);
-  static const Color _textError = Color(0xFFF1E8BE);
-  static const Color _textSuccess = Color(0xFFC8E6C9);
-  static const Color _textInfo = Color(0xFFE6E6E6);
+  static const Color _bg = AppColors.scrimInk;
+  static const Color _textError = AppColors.textCream;
+  static const Color _textSuccess = AppColors.successLight;
+  static const Color _textInfo = AppColors.textNeutralBright;
 
   static OverlayEntry? _entry;
   static Timer? _hideTimer;

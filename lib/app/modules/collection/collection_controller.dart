@@ -45,8 +45,7 @@ class CollectionController extends GetxController {
         symbol: r'$',
         decimalDigits: 0,
       );
-      final localTotal =
-          CollectionValueCalculator.totalInvestedFromItems(list);
+      final localTotal = CollectionValueCalculator.totalInvestedFromItems(list);
 
       final chart = await _repo.fetchChartData(
         lookBackDays: 90,
@@ -67,8 +66,7 @@ class CollectionController extends GetxController {
             first: first,
             last: last,
           )!;
-          trendShort.value =
-              '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%';
+          trendShort.value = '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%';
         } else {
           trendShort.value = '—';
         }
@@ -79,11 +77,7 @@ class CollectionController extends GetxController {
     } catch (_) {
       _applyFallbackValue(
         items,
-        NumberFormat.currency(
-          locale: 'en_US',
-          symbol: r'$',
-          decimalDigits: 0,
-        ),
+        NumberFormat.currency(locale: 'en_US', symbol: r'$', decimalDigits: 0),
       );
     } finally {
       isLoading.value = false;
@@ -92,9 +86,7 @@ class CollectionController extends GetxController {
 
   void _syncHomeAfterCollectionLoad() {
     if (!Get.isRegistered<HomeController>()) return;
-    unawaited(
-      Get.find<HomeController>().fetchHomeData(forceRefresh: false),
-    );
+    unawaited(Get.find<HomeController>().fetchHomeData(forceRefresh: false));
   }
 
   void _applyFallbackValue(
@@ -102,14 +94,16 @@ class CollectionController extends GetxController {
     NumberFormat formatter,
   ) {
     final total = CollectionValueCalculator.totalInvestedFromItems(list);
-    valueText.value =
-        total > 0 ? formatter.format(total) : r'$ —';
+    valueText.value = total > 0 ? formatter.format(total) : r'$ —';
     trendShort.value = '—';
   }
 
   Future<void> forceReload() => load(forceRefresh: true);
 
   void setFilter(CollectionFilter value) => filter.value = value;
+
+  /// Back to "All" — used by the no-results empty state.
+  void clearFilter() => filter.value = CollectionFilter.all;
 
   bool get hasActiveSort =>
       sort.value != CollectionSort.name || !sortAscending.value;
@@ -151,9 +145,11 @@ class CollectionController extends GetxController {
         res = a.fillRatio.compareTo(b.fillRatio);
         break;
       case CollectionSort.addedTime:
-        final da = DateTime.tryParse(a.createdAt ?? '') ??
+        final da =
+            DateTime.tryParse(a.createdAt ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
-        final db = DateTime.tryParse(b.createdAt ?? '') ??
+        final db =
+            DateTime.tryParse(b.createdAt ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
         res = da.compareTo(db);
         break;

@@ -90,18 +90,18 @@ enum BenchmarkDetailChartRange {
   y1;
 
   String get label => switch (this) {
-        BenchmarkDetailChartRange.m1 => '1M',
-        BenchmarkDetailChartRange.m3 => '3M',
-        BenchmarkDetailChartRange.m6 => '6M',
-        BenchmarkDetailChartRange.y1 => '1Y',
-      };
+    BenchmarkDetailChartRange.m1 => '1M',
+    BenchmarkDetailChartRange.m3 => '3M',
+    BenchmarkDetailChartRange.m6 => '6M',
+    BenchmarkDetailChartRange.y1 => '1Y',
+  };
 
   int get _approxDays => switch (this) {
-        BenchmarkDetailChartRange.m1 => 30,
-        BenchmarkDetailChartRange.m3 => 90,
-        BenchmarkDetailChartRange.m6 => 182,
-        BenchmarkDetailChartRange.y1 => 365,
-      };
+    BenchmarkDetailChartRange.m1 => 30,
+    BenchmarkDetailChartRange.m3 => 90,
+    BenchmarkDetailChartRange.m6 => 182,
+    BenchmarkDetailChartRange.y1 => 365,
+  };
 
   /// Inclusive calendar day for `endDate`; `fromDate` is `end` minus [_approxDays].
   (DateTime from, DateTime to) dateBoundsToToday() {
@@ -120,7 +120,7 @@ class BenchmarkDetailController extends GetxController {
     required CollectionRepository collectionRepo,
     required BluebookPriceHistoryRepository priceHistoryRepo,
   }) : _collectionRepo = collectionRepo,
-        _priceHistoryRepo = priceHistoryRepo;
+       _priceHistoryRepo = priceHistoryRepo;
 
   final CollectionRepository _collectionRepo;
   final BluebookPriceHistoryRepository _priceHistoryRepo;
@@ -141,6 +141,7 @@ class BenchmarkDetailController extends GetxController {
   final chartLoading = false.obs;
   final chartError = RxnString();
   final chartPoints = <BluebookPriceChartPoint>[].obs;
+
   /// Y values for BSMI line (same length as [chartPoints] when loaded).
   final chartBsmiValues = <double>[].obs;
 
@@ -184,6 +185,14 @@ class BenchmarkDetailController extends GetxController {
     unawaited(_loadCollectionOwnership());
   }
 
+  /// Pull-to-refresh: re-pull the price chart and this user's ownership rows.
+  Future<void> reload() async {
+    await Future.wait([
+      if (_canLoadPriceChart) fetchPriceChart(),
+      _loadCollectionOwnership(),
+    ]);
+  }
+
   Future<void> _loadCollectionOwnership() async {
     collectionLoading.value = true;
     try {
@@ -225,8 +234,8 @@ class BenchmarkDetailController extends GetxController {
         (rawAverage ?? '').replaceAll(RegExp(r'[^\d.-]'), ''),
       );
       if (marketUnit != null && totalPaid > 0) {
-        collectionGainDollars.value =
-            (marketUnit * totalQty - totalPaid).roundToDouble();
+        collectionGainDollars.value = (marketUnit * totalQty - totalPaid)
+            .roundToDouble();
       } else {
         collectionGainDollars.value = null;
       }
@@ -247,9 +256,7 @@ class BenchmarkDetailController extends GetxController {
     try {
       final all = await _collectionRepo.fetchMyCollection(forceRefresh: false);
       return all
-          .where(
-            (item) => _resolveCollectionBottleId(item) == selectedBottleId,
-          )
+          .where((item) => _resolveCollectionBottleId(item) == selectedBottleId)
           .toList();
     } catch (_) {
       return const [];
@@ -317,7 +324,9 @@ class BenchmarkDetailController extends GetxController {
     }
 
     final avgStr = row?.bluebook?.average;
-    final avg = double.tryParse((avgStr ?? '').replaceAll(RegExp(r'[^\d.-]'), ''));
+    final avg = double.tryParse(
+      (avgStr ?? '').replaceAll(RegExp(r'[^\d.-]'), ''),
+    );
     if (avg != null) {
       chartBsmiValues.addAll(List<double>.filled(pts.length, avg));
       return;

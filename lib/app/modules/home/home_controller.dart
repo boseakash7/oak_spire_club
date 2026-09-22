@@ -19,34 +19,52 @@ enum HomeChartRange {
   y1;
 
   String get label => switch (this) {
-        HomeChartRange.m1 => '1M',
-        HomeChartRange.m3 => '3M',
-        HomeChartRange.m6 => '6M',
-        HomeChartRange.y1 => '1Y',
-      };
+    HomeChartRange.m1 => '1M',
+    HomeChartRange.m3 => '3M',
+    HomeChartRange.m6 => '6M',
+    HomeChartRange.y1 => '1Y',
+  };
 
   int get lookBackDays => switch (this) {
-        HomeChartRange.m1 => 30,
-        HomeChartRange.m3 => 90,
-        HomeChartRange.m6 => 182,
-        HomeChartRange.y1 => 365,
-      };
+    HomeChartRange.m1 => 30,
+    HomeChartRange.m3 => 90,
+    HomeChartRange.m6 => 182,
+    HomeChartRange.y1 => 365,
+  };
 
   /// Max points to plot for this filter (was hard-coded to 9 for all ranges).
   int get chartPointLimit => lookBackDays;
 
   String get movedPeriodLabel => switch (this) {
-        HomeChartRange.m1 => 'last month',
-        HomeChartRange.m3 => 'last 3 months',
-        HomeChartRange.m6 => 'last 6 months',
-        HomeChartRange.y1 => 'last year',
-      };
+    HomeChartRange.m1 => 'last month',
+    HomeChartRange.m3 => 'last 3 months',
+    HomeChartRange.m6 => 'last 6 months',
+    HomeChartRange.y1 => 'last year',
+  };
 }
 
 class HomeController extends GetxController {
   final hasCollection = false.obs;
 
+  /// Hero figure — what the collection is worth today (bluebook average ×
+  /// quantity). Falls back to invested value when no row carries a market
+  /// price, in which case [showingInvestedAsValue] is true.
   final collectionValueText = r'$ —'.obs;
+
+  /// Raw hero value, for the count-up animation.
+  final collectionValue = 0.0.obs;
+
+  /// True when the hero number is cost basis rather than market value, so the
+  /// UI can label it honestly instead of calling spend "value".
+  final showingInvestedAsValue = false.obs;
+
+  /// Cost basis — what the user paid in total.
+  final investedValueText = r'$ —'.obs;
+
+  /// Market value minus invested; null when either side is unknown.
+  final unrealisedGain = Rxn<double>();
+  final unrealisedGainText = ''.obs;
+
   final movedText = 'Moved — in last 3 months'.obs;
 
   /// Movement % from chart `first_price` / `last_price`; null → left bar at 0%.
@@ -64,8 +82,10 @@ class HomeController extends GetxController {
 
   /// Market value line — index-style (first point in window = 100).
   final chartSeriesK = <double>[].obs;
+
   /// BSMI line — same rebasing (`index_data` aligned to market dates).
   final chartBsmiSeriesK = <double>[].obs;
+
   /// Raw prices + dates for chart touch tooltips (aligned to [chartSeriesK]).
   final chartPointDates = <String>[].obs;
   final chartMarketPrices = <double>[].obs;
@@ -74,6 +94,7 @@ class HomeController extends GetxController {
   final chartMaxYk = 110.0.obs;
   final selectedChartRange = HomeChartRange.m3.obs;
   final chartLoading = false.obs;
+
   /// Bumps when chart series reload so [LineChart] rebuilds on filter change.
   final chartRevision = 0.obs;
 
@@ -94,9 +115,16 @@ class HomeController extends GetxController {
     }
   }
 
-  Future<void> fetchHomeData({bool forceRefresh = false}) async {
+  /// [background] keeps the current screen on-screen while refetching. Used
+  /// when returning to the Home tab, where flashing the skeleton over content
+  /// the user was just looking at reads as a glitch.
+  Future<void> fetchHomeData({
+    bool forceRefresh = false,
+    bool background = false,
+  }) async {
     unawaited(_syncNotificationTopics());
-    isLoading.value = true;
+    final showSkeleton = !background || !hasCollection.value;
+    if (showSkeleton) isLoading.value = true;
     final list = <CollectionItemModel>[];
     try {
       final fetched = await _repo.fetchMyCollection(forceRefresh: forceRefresh);
@@ -115,14 +143,7 @@ class HomeController extends GetxController {
         decimalDigits: 0,
       );
 
-      final localTotal =
-          CollectionValueCalculator.totalInvestedFromItems(fetched);
-
-      if (localTotal > 0) {
-        collectionValueText.value = formatter.format(localTotal);
-      } else {
-        collectionValueText.value = r'$ —';
-      }
+      _applyValueFigures(fetched, formatter);
 
       await _loadChart(formatter: formatter, forceRefresh: forceRefresh);
     } catch (_) {
@@ -132,14 +153,10 @@ class HomeController extends GetxController {
       _clearChartSeries();
       _applyFallbackValue(
         list,
-        NumberFormat.currency(
-          locale: 'en_US',
-          symbol: r'$',
-          decimalDigits: 0,
-        ),
+        NumberFormat.currency(locale: 'en_US', symbol: r'$', decimalDigits: 0),
       );
     } finally {
-      isLoading.value = false;
+      if (showSkeleton) isLoading.value = false;
     }
   }
 
@@ -167,6 +184,38 @@ class HomeController extends GetxController {
     return out;
   }
 
+  /// Sets the hero value, the invested line and the unrealised gain.
+  ///
+  /// Market value leads because that is what the app is for; invested value is
+  /// the supporting figure. When no row has a bluebook price there is no market
+  /// value to show, so invested takes the hero slot and is labelled as such.
+  void _applyValueFigures(
+    Iterable<CollectionItemModel> items,
+    NumberFormat formatter,
+  ) {
+    final invested = CollectionValueCalculator.totalInvestedFromItems(items);
+    final market = CollectionValueCalculator.totalMarketValueFromItems(items);
+
+    investedValueText.value = invested > 0
+        ? formatter.format(invested)
+        : r'$ —';
+
+    final hero = market ?? invested;
+    showingInvestedAsValue.value = market == null;
+    collectionValue.value = hero;
+    collectionValueText.value = hero > 0 ? formatter.format(hero) : r'$ —';
+
+    if (market != null && invested > 0) {
+      final gain = market - invested;
+      unrealisedGain.value = gain;
+      unrealisedGainText.value =
+          '${gain >= 0 ? '+' : '-'}${formatter.format(gain.abs())}';
+    } else {
+      unrealisedGain.value = null;
+      unrealisedGainText.value = '';
+    }
+  }
+
   void _applyFallbackValue(
     Iterable<CollectionItemModel> list,
     NumberFormat formatter,
@@ -175,9 +224,7 @@ class HomeController extends GetxController {
     totalDrunkCount.value = list.where((item) => item.isDrunk).length;
     totalRareCount.value = list.where((item) => item.isRareFind).length;
     _clearChartSeries();
-    final total = CollectionValueCalculator.totalInvestedFromItems(list);
-    collectionValueText.value =
-        total > 0 ? formatter.format(total) : r'$ —';
+    _applyValueFigures(list, formatter);
     movedText.value = 'Moved — in last 3 months';
     collectionMovedPercent.value = null;
   }
@@ -197,10 +244,7 @@ class HomeController extends GetxController {
     collectionMovedPercent.value = null;
   }
 
-  void _applyMovedForRange({
-    required double? percent,
-    required String period,
-  }) {
+  void _applyMovedForRange({required double? percent, required String period}) {
     collectionMovedPercent.value = percent;
     if (!hasCollection.value) {
       movedText.value = 'Moved — in $period';
@@ -247,8 +291,9 @@ class HomeController extends GetxController {
 
     final marketPoints = ChartIndexComparison.parsePriceSeries(chart['data']);
     if (marketPoints.isNotEmpty) {
-      final indexPoints =
-          ChartIndexComparison.parsePriceSeries(chart['index_data']);
+      final indexPoints = ChartIndexComparison.parsePriceSeries(
+        chart['index_data'],
+      );
       final compared = ChartIndexComparison.buildComparedSeries(
         marketPoints: marketPoints,
         indexPoints: indexPoints,
@@ -308,4 +353,3 @@ class HomeController extends GetxController {
     return onFiveScale.toStringAsFixed(1);
   }
 }
-

@@ -149,7 +149,7 @@ class _SettingsMenuDialogState extends State<_SettingsMenuDialog> {
                     gradient: const LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Color(0xFF2E211C), Color(0xFF161010)],
+                      colors: [AppColors.surfaceCocoa, AppColors.surfaceInk],
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -528,8 +528,9 @@ class _SettingsMenuRow extends StatelessWidget {
                         padding: EdgeInsets.all(10),
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation(AppColors.goldBright),
+                          valueColor: AlwaysStoppedAnimation(
+                            AppColors.goldBright,
+                          ),
                         ),
                       )
                     : Icon(data.icon, color: iconColor, size: 22),

@@ -8,8 +8,11 @@ import 'package:get/get.dart';
 import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/app_hero_tags.dart';
 import '../../core/network/app_cache_manager.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/utils/app_haptics.dart';
+import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/animated_list_entrance.dart';
 import '../../core/widgets/app_filter_chip.dart';
 import '../../core/theme/app_colors.dart';
@@ -78,6 +81,12 @@ class MarketView extends GetView<MarketController> {
                         return _Header(controller: controller);
                       }
 
+                      // Checked before the trailing loader slot, which would
+                      // otherwise claim index 1 on an empty result.
+                      if (controller.visibleBottles.isEmpty) {
+                        return const _NoBottlesFound();
+                      }
+
                       if (index == controller.visibleBottles.length + 1) {
                         return Obx(() {
                           if (!controller.isLoadingMore.value) {
@@ -127,15 +136,13 @@ class _Header extends StatelessWidget {
       children: [
         TextField(
           onChanged: controller.onSearchChanged,
-          style: AppTextStyles.body16().copyWith(
-            fontSize: 16,
-            color: AppColors.white,
-          ),
+          textInputAction: TextInputAction.search,
+          style: AppTextStyles.bodyL(),
           decoration: InputDecoration(
-            hintText: 'Search from 10000+ bottoles',
-            hintStyle: AppTextStyles.body16().copyWith(
-              fontSize: 16,
-              color: AppColors.white,
+            hintText: 'Search 10,000+ bottles',
+            // Muted, so the placeholder never reads as an entered query.
+            hintStyle: AppTextStyles.bodyL().copyWith(
+              color: AppColors.textMuted,
             ),
             prefixIcon: const Icon(
               Icons.search,
@@ -192,12 +199,12 @@ class _CategoryRow extends StatelessWidget {
               onTap: () {
                 if (Get.isRegistered<AppAnalyticsController>()) {
                   unawaited(
-                    AppAnalyticsController.to.logTap(
-                      'market_category_select',
-                      {'category_id': id},
-                    ),
+                    AppAnalyticsController.to.logTap('market_category_select', {
+                      'category_id': id,
+                    }),
                   );
                 }
+                AppHaptics.selection();
                 controller.selectCategory(id);
               },
             );
@@ -220,21 +227,23 @@ class _BenchmarkCard extends StatelessWidget {
     final imageUrl = _resolveImageUrl(bottle.image);
     final proofLabel = ProofFormatter.formatLabelOrFallback(bottle.proof);
     final ratingLabel = bottle.rating ?? '—';
-    final movementLabel =
-        PriceFormatter.formatPriceMovementLabel(bottle.priceMovement);
-    final movementColor =
-        PriceFormatter.priceMovementColor(bottle.priceMovement);
+    final movementLabel = PriceFormatter.formatPriceMovementLabel(
+      bottle.priceMovement,
+    );
+    final movementColor = PriceFormatter.priceMovementColor(
+      bottle.priceMovement,
+    );
     return InkWell(
       borderRadius: BorderRadius.circular(9),
       onTap: () {
         if (Get.isRegistered<AppAnalyticsController>()) {
           unawaited(
-            AppAnalyticsController.to.logTap(
-              'market_benchmark_open',
-              {'bottle_id': bottle.id},
-            ),
+            AppAnalyticsController.to.logTap('market_benchmark_open', {
+              'bottle_id': bottle.id,
+            }),
           );
         }
+        AppHaptics.tap();
         Get.toNamed(
           AppRoutes.benchmarkDetail,
           arguments: {
@@ -267,26 +276,29 @@ class _BenchmarkCard extends StatelessWidget {
                 child: SizedBox(
                   width: 62.62,
                   height: 62.62,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: AppColors.bottleRadialGlow,
+                  child: _MaybeHero(
+                    tag: AppHeroTags.bottleImage(bottle.id),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: AppColors.bottleRadialGlow,
+                          ),
                         ),
-                      ),
-                      if (imageUrl != null)
-                        CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          cacheManager: AppCacheManager.images,
-                          fit: BoxFit.contain,
-                          placeholder: (context, _) => _placeholder(),
-                          errorWidget: (context, error, stackTrace) =>
-                              _placeholder(),
-                        )
-                      else
-                        _placeholder(),
-                    ],
+                        if (imageUrl != null)
+                          CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            cacheManager: AppCacheManager.images,
+                            fit: BoxFit.contain,
+                            placeholder: (context, _) => _placeholder(),
+                            errorWidget: (context, error, stackTrace) =>
+                                _placeholder(),
+                          )
+                        else
+                          _placeholder(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -434,5 +446,55 @@ class _BenchmarkCard extends StatelessWidget {
       port: api.hasPort ? api.port : null,
       path: raw.startsWith('/') ? raw : '/$raw',
     ).toString();
+  }
+}
+
+/// No results for the current search / category.
+class _NoBottlesFound extends StatelessWidget {
+  const _NoBottlesFound();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = Get.find<MarketController>();
+    final searching = controller.keyword.value.trim().isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 32),
+      child: AppEmptyState(
+        icon: searching ? Icons.search_off_rounded : Icons.liquor_rounded,
+        title: searching ? 'No bottles found' : 'Nothing in this category',
+        message: searching
+            ? 'Try a shorter search, or check the spelling of the distillery '
+                  'or expression.'
+            : 'We have not benchmarked any bottles here yet. Try another '
+                  'category.',
+        actionLabel: searching ? 'Clear search' : null,
+        onAction: searching ? () => controller.onSearchChanged('') : null,
+      ),
+    );
+  }
+}
+
+/// Wraps [child] in a [Hero] only when a unique [tag] is available.
+///
+/// Rows without a stable bottle id simply cross-fade with the page instead of
+/// flying, which is better than risking duplicate Hero tags on one screen.
+class _MaybeHero extends StatelessWidget {
+  const _MaybeHero({required this.tag, required this.child});
+
+  final String? tag;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final heroTag = tag;
+    if (heroTag == null) return child;
+    return Hero(
+      tag: heroTag,
+      // Keep the bottle art from being letterboxed mid-flight.
+      flightShuttleBuilder: (context, animation, direction, from, toHero) =>
+          toHero.widget,
+      child: child,
+    );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/utils/app_haptics.dart';
 import '../../../core/utils/app_snackbar.dart';
 import '../../../core/utils/dispose_after_detach.dart';
 import '../../../data/repositories/auth_repository.dart';
@@ -13,16 +14,23 @@ class VerifyOtpController extends GetxController {
   static const int otpLength = 4;
   static const int resendCooldown = 60;
 
-  final List<TextEditingController> digitControllers =
-      List.generate(otpLength, (_) => TextEditingController());
-  final List<FocusNode> focusNodes =
-      List.generate(otpLength, (_) => FocusNode());
+  final List<TextEditingController> digitControllers = List.generate(
+    otpLength,
+    (_) => TextEditingController(),
+  );
+  final List<FocusNode> focusNodes = List.generate(
+    otpLength,
+    (_) => FocusNode(),
+  );
 
   final isLoading = false.obs;
   final isSendingOtp = false.obs;
   final isResending = false.obs;
   final resendSeconds = 0.obs;
   final statusMessage = ''.obs;
+
+  /// Bumped on every rejected code so the digit boxes shake in place.
+  final errorShake = 0.obs;
 
   Timer? _resendTimer;
   final _repo = Get.find<AuthRepository>();
@@ -83,6 +91,7 @@ class VerifyOtpController extends GetxController {
   Future<void> onVerify() async {
     final code = _otpCode;
     if (code.length < otpLength) {
+      _rejectCode(clear: false);
       AppSnackbar.error('Please enter the full code.');
       return;
     }
@@ -96,11 +105,26 @@ class VerifyOtpController extends GetxController {
       AuthNavigation.completeSession(user);
     } on ApiException catch (e) {
       if (!isClosed) isLoading.value = false;
+      _rejectCode();
       AppSnackbar.error(e.message);
     } catch (_) {
       if (!isClosed) isLoading.value = false;
+      _rejectCode();
       AppSnackbar.error('Verification failed.');
     }
+  }
+
+  /// Shake the boxes, buzz, and (for a wrong code) clear them ready for a
+  /// retry — a toast alone leaves the user staring at digits that look fine.
+  void _rejectCode({bool clear = true}) {
+    if (isClosed) return;
+    AppHaptics.error();
+    errorShake.value++;
+    if (!clear) return;
+    for (final c in digitControllers) {
+      c.clear();
+    }
+    focusNodes.first.requestFocus();
   }
 
   Future<void> onResend() async {

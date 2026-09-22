@@ -202,9 +202,9 @@ class _ImagePreview extends StatelessWidget {
     return Container(
       height: 235,
       decoration: BoxDecoration(
-        color: const Color(0xFF10090B),
+        color: AppColors.panel,
         borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: const Color(0xFF414141)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Stack(
         clipBehavior: Clip.none,
@@ -228,8 +228,8 @@ class _ChangeImageButton extends StatelessWidget {
 
   final VoidCallback onTap;
 
-  static const Color _gradientTop = Color(0xFF271C16);
-  static const Color _gradientBottom = Color(0xFF201512);
+  static const Color _gradientTop = AppColors.cardSurfaceTop;
+  static const Color _gradientBottom = AppColors.cardSurfaceBottom;
 
   @override
   Widget build(BuildContext context) {
@@ -386,4 +386,3 @@ class FillPercentInputFormatter extends TextInputFormatter {
     return newValue;
   }
 }
-

@@ -45,11 +45,11 @@ class _AppConfirmDialogBody extends StatelessWidget {
   final String cancelLabel;
   final bool confirmIsDestructive;
 
-  static const Color _cardTop = Color(0xFF271C16);
-  static const Color _cardBottom = Color(0xFF161010);
-  static const Color _border = Color(0xFF4A342E);
-  static const Color _cream = Color(0xFFF1E8BE);
-  static const Color _muted = Color(0xFF9D9C9C);
+  static const Color _cardTop = AppColors.cardSurfaceTop;
+  static const Color _cardBottom = AppColors.surfaceInk;
+  static const Color _border = AppColors.cardBorder;
+  static const Color _cream = AppColors.textCream;
+  static const Color _muted = AppColors.textMovedSubtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +134,7 @@ class _AppConfirmDialogBody extends StatelessWidget {
                             ? null
                             : AppColors.goldGradient,
                         color: confirmIsDestructive
-                            ? const Color(0xFF8B2929)
+                            ? AppColors.destructiveDeep
                             : null,
                         borderRadius: BorderRadius.circular(12),
                       ),

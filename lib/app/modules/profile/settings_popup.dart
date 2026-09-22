@@ -28,8 +28,8 @@ import '../../modules/session/user_session_controller.dart';
 import '../../routes/app_routes.dart';
 
 const Color _kPopupBackdropOverlay = Color.fromRGBO(0, 0, 0, 0.72);
-const Color _kPanelBorder = Color(0xFF6B5348);
-const Color _kCardBorder = Color(0xFF5C453C);
+const Color _kPanelBorder = AppColors.borderCocoaSoft;
+const Color _kCardBorder = AppColors.borderCocoa;
 
 /// Opens settings as an overlay (does not switch bottom-nav tab).
 Future<void> showSettingsPopup(BuildContext context) async {

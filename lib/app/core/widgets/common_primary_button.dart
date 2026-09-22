@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../animations/app_motion.dart';
 import '../theme/app_colors.dart';
+import '../utils/app_haptics.dart';
 import '../theme/app_text_styles.dart';
 
 class CommonPrimaryButton extends StatefulWidget {
@@ -45,9 +46,18 @@ class _CommonPrimaryButtonState extends State<CommonPrimaryButton> {
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: enabled ? widget.onPressed : null,
-              onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-              onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+              onTap: enabled
+                  ? () {
+                      AppHaptics.tap();
+                      widget.onPressed!();
+                    }
+                  : null,
+              onTapDown: enabled
+                  ? (_) => setState(() => _pressed = true)
+                  : null,
+              onTapCancel: enabled
+                  ? () => setState(() => _pressed = false)
+                  : null,
               onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
               child: Center(
                 child: widget.isLoading
@@ -63,8 +73,7 @@ class _CommonPrimaryButtonState extends State<CommonPrimaryButton> {
                       )
                     : Text(
                         widget.label,
-                        style:
-                            widget.textStyle ?? AppTextStyles.button20Bold(),
+                        style: widget.textStyle ?? AppTextStyles.button20Bold(),
                       ),
               ),
             ),
