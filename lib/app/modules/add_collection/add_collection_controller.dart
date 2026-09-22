@@ -9,6 +9,7 @@ import '../../core/storage/app_storage.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/limit_exceeded_exception.dart';
 import '../../core/utils/app_snackbar.dart';
+import '../../core/utils/dispose_after_detach.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/utils/validators.dart';
 import '../../data/models/bluebook_model.dart';
@@ -72,12 +73,15 @@ class AddCollectionController extends GetxController {
 
   @override
   void onClose() {
-    bottleNameCtrl.dispose();
-    priceCtrl.dispose();
-    qtyCtrl.dispose();
-    fillCtrl.dispose();
-    dateAcquiredCtrl.dispose();
-    notesCtrl.dispose();
+    unfocusSafely();
+    disposeAfterDetach([
+      bottleNameCtrl,
+      priceCtrl,
+      qtyCtrl,
+      fillCtrl,
+      dateAcquiredCtrl,
+      notesCtrl,
+    ]);
     super.onClose();
   }
 

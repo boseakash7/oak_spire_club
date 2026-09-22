@@ -35,7 +35,7 @@ class ForgotPasswordView extends GetView<ForgotPasswordController> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Enter your email and we will send you reset instructions.',
+                    'Enter your email and we will send a verification code to reset your password.',
                     style: AppTextStyles.body16().copyWith(
                       color: const Color(0xFFBAB59F),
                       height: 1.35,
@@ -52,7 +52,7 @@ class ForgotPasswordView extends GetView<ForgotPasswordController> {
                   const SizedBox(height: 33),
                   Obx(
                     () => CommonPrimaryButton(
-                      label: 'Send instructions',
+                      label: 'Send Code',
                       onPressed: controller.onSubmit,
                       isLoading: controller.isLoading.value,
                     ),

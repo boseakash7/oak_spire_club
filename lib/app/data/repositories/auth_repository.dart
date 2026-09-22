@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 
+import '../../core/firebase/firebase_notification_topics.dart';
+import '../../core/firebase/fcm_token_sync_service.dart';
 import '../../core/storage/app_storage.dart';
 import '../../modules/session/user_session_controller.dart';
 import '../datasources/auth_remote_datasource.dart';
@@ -21,9 +25,9 @@ class AuthRepository {
     required String password,
   }) async {
     final user = await _remote.login(email: email, password: password);
-    await AppStorage.setUserId(user.id);
-    await AppStorage.setUser(user.toJson());
-    _session().setUser(user);
+    if (user.emailVerified) {
+      await _persistSession(user);
+    }
     return user;
   }
 
@@ -39,10 +43,16 @@ class AuthRepository {
       password: password,
       subscribe: subscribe,
     );
-    await AppStorage.setUserId(user.id);
-    await AppStorage.setUser(user.toJson());
-    _session().setUser(user);
+    if (user.emailVerified) {
+      await _persistSession(user);
+    }
     return user;
+  }
+
+  Future<void> _persistSession(UserModel user) async {
+    await AppStorage.saveSession(user.toJson());
+    _session().setUser(user);
+    unawaited(FcmTokenSyncService.syncIfLoggedIn());
   }
 
   Future<void> updateProfile({
@@ -66,7 +76,7 @@ class AuthRepository {
         name: name,
         gender: gender,
       );
-      await AppStorage.setUser(updated.toJson());
+      await AppStorage.saveSession(updated.toJson());
       if (gender != null) {
         await AppStorage.setUserGender(gender);
       }
@@ -74,8 +84,35 @@ class AuthRepository {
     }
   }
 
+  Future<void> sendOtp({required String email}) async {
+    await _remote.sendOtp(email: email);
+  }
+
+  Future<UserModel> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final user = await _remote.verifyOtp(email: email, otp: otp);
+    await _persistSession(user);
+    return user;
+  }
+
+  Future<void> forgetPassword({required String email}) async {
+    await _remote.forgetPassword(email: email);
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String password,
+  }) async {
+    await _remote.resetPassword(email: email, otp: otp, password: password);
+  }
+
   Future<void> deleteAccount({required String userId}) async {
     await _remote.deleteAccount(userId: userId);
+    await FcmTokenSyncService.clearOnLogout();
+    await FirebaseNotificationTopics.syncLogoutTopic();
     await AppStorage.clearSession();
     _session().loadFromStorage();
   }

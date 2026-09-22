@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/firebase/firebase_notification_topics.dart';
 import '../../data/chart_index_comparison.dart';
 import '../../data/collection_value_calculator.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import '../../data/repositories/collection_repository.dart';
+import '../session/user_session_controller.dart';
 
 /// Collection value chart lookback (Figma home — 1M / 3M / 6M / 1Y chips).
 enum HomeChartRange {
@@ -83,7 +87,15 @@ class HomeController extends GetxController {
     fetchHomeData();
   }
 
+  Future<void> _syncNotificationTopics() async {
+    if (Get.isRegistered<UserSessionController>()) {
+      final user = Get.find<UserSessionController>().user.value;
+      await FirebaseNotificationTopics.syncUserTierTopic(user);
+    }
+  }
+
   Future<void> fetchHomeData({bool forceRefresh = false}) async {
+    unawaited(_syncNotificationTopics());
     isLoading.value = true;
     final list = <CollectionItemModel>[];
     try {

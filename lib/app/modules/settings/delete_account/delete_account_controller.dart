@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/utils/app_snackbar.dart';
+import '../../../core/utils/dispose_after_detach.dart';
 import '../../../data/repositories/auth_repository.dart';
-import '../../../routes/app_routes.dart';
+import '../../../routes/auth_navigation.dart';
 import '../../session/user_session_controller.dart';
 
 class DeleteAccountController extends GetxController {
@@ -62,7 +63,7 @@ class DeleteAccountController extends GetxController {
     try {
       await _auth.deleteAccount(userId: user.id);
       await AppSnackbar.success('Your account has been deleted.');
-      Get.offAllNamed(AppRoutes.signIn);
+      AuthNavigation.openWelcome();
     } catch (e) {
       await AppSnackbar.error(e.toString());
     } finally {
@@ -72,7 +73,8 @@ class DeleteAccountController extends GetxController {
 
   @override
   void onClose() {
-    challengeAnswerController.dispose();
+    unfocusSafely();
+    disposeAfterDetach([challengeAnswerController]);
     super.onClose();
   }
 }

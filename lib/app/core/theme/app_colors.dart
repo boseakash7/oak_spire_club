@@ -147,12 +147,37 @@ class AppColors {
 
   /// Plan card border (selected / unselected).
   static const Color subscriptionPlanBorderSelected = Color(0xFFC89D2D);
-  static const Color subscriptionPlanBorderUnselected = Color(0xFF060304);
+  static const Color subscriptionPlanBorderUnselected = Color(0xFF422E27);
+
+  /// “Billed every …” on plan cards.
+  static const Color subscriptionBillingSubtitle = Color(0xFF787878);
+
+  /// Trial countdown digits.
+  static const Color subscriptionTrialTime = Color(0xFFD0A934);
+
+  /// Trial progress track.
+  static const Color subscriptionTrialTrack = Color(0xFF201116);
 
   /// Plan price label (Playfair).
   static const Color subscriptionPriceLabel = Color(0xFFCA9F2E);
 
   /// Skip confirmation dismiss icon (Figma 129:320).
   static const Color subscriptionSkipDismiss = Color(0xFFC89D2C);
+
+  // --- Delete account --------------------------------------------------------
+
+  /// Destructive actions (delete button, permanent warnings).
+  static const Color destructive = Color(0xFFB3261E);
+
+  /// Neutral card surface (Figma delete-account flow).
+  static const Color deleteAccountCardBackground = Color(0xFF1C1C1E);
+
+  static const Color deleteAccountCardBorder = Color(0xFF2C2C2E);
+
+  /// Nested inset surface inside delete-account cards.
+  static const Color deleteAccountNestedSurface = Color(0xFF141416);
+
+  /// Secondary body copy on delete-account cards.
+  static const Color deleteAccountBodyText = Color(0xFF8E8E93);
 }
 

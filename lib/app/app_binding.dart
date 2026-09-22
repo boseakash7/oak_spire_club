@@ -9,7 +9,9 @@ import 'data/datasources/categories_remote_datasource.dart';
 import 'data/datasources/collection_remote_datasource.dart';
 import 'data/datasources/config_remote_datasource.dart';
 import 'data/datasources/package_remote_datasource.dart';
+import 'core/firebase/fcm_token_sync_service.dart';
 import 'data/datasources/user_remote_datasource.dart';
+import 'data/datasources/user_token_remote_datasource.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/bluebook_price_history_repository.dart';
 import 'data/repositories/bluebook_repository.dart';
@@ -18,6 +20,7 @@ import 'data/repositories/collection_repository.dart';
 import 'data/repositories/config_repository.dart';
 import 'data/repositories/package_repository.dart';
 import 'data/repositories/user_repository.dart';
+import 'data/repositories/user_token_repository.dart';
 import 'modules/session/app_config_controller.dart';
 import 'modules/session/user_session_controller.dart';
 
@@ -96,6 +99,15 @@ class AppBinding extends Bindings {
       fenix: true,
     );
 
+    Get.lazyPut<UserTokenRemoteDataSource>(
+      () => UserTokenRemoteDataSource(Get.find<ApiClient>()),
+      fenix: true,
+    );
+    Get.lazyPut<UserTokenRepository>(
+      () => UserTokenRepository(Get.find<UserTokenRemoteDataSource>()),
+      fenix: true,
+    );
+
     Get.lazyPut<UserRemoteDataSource>(
       () => UserRemoteDataSource(Get.find<ApiClient>()),
       fenix: true,
@@ -105,6 +117,7 @@ class AppBinding extends Bindings {
       fenix: true,
     );
 
+    FcmTokenSyncService.start();
   }
 }
 

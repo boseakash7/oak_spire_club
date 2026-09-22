@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/network/app_cache_manager.dart';
-import '../../core/widgets/animated_list_entrance.dart';
-import '../../core/widgets/app_back_button.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/animated_list_entrance.dart';
+import '../../core/widgets/app_back_button.dart';
 import '../../data/models/category_bottle_model.dart';
 import 'category_detail_controller.dart';
 
@@ -19,7 +19,8 @@ class CategoryDetailView extends GetView<CategoryDetailController> {
       backgroundColor: AppColors.surfaceDeep,
       appBar: AppScreenAppBar(
         title: Obx(() {
-          final name = controller.detail.value?.category.name ??
+          final name =
+              controller.detail.value?.category.name ??
               controller.initialName ??
               'Category';
           return Text(
@@ -30,12 +31,15 @@ class CategoryDetailView extends GetView<CategoryDetailController> {
       ),
       body: Container(
         decoration: const BoxDecoration(
-          gradient:
-              LinearGradient(colors: [AppColors.surfaceDeep, AppColors.surfaceDeep]),
+          gradient: LinearGradient(
+            colors: [AppColors.surfaceDeep, AppColors.surfaceDeep],
+          ),
         ),
         child: Stack(
           children: [
-            const Positioned.fill(child: ColoredBox(color: AppColors.overlayBlack20)),
+            const Positioned.fill(
+              child: ColoredBox(color: AppColors.overlayBlack20),
+            ),
             SafeArea(
               top: false,
               child: Obx(() {
@@ -269,4 +273,3 @@ class _Chip extends StatelessWidget {
     );
   }
 }
-

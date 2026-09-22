@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 
 import '../../core/constants/payment_currency.dart';
@@ -17,6 +19,7 @@ class PackageRemoteDataSource {
   static const String _paymentVerify = 'package/payment-verify';
   static const String _transactionHistory = 'package/transaction-history';
   static const String _cancelSubscription = 'package/cancel-subscription';
+  static const String _subscribe = 'package/subscribe';
 
   /// Bourboneur `PackageApi.all()` → GET `package/get-all`.
   Future<List<SubscriptionPackageModel>> getAll() async {
@@ -29,9 +32,8 @@ class PackageRemoteDataSource {
     return data
         .whereType<Map>()
         .map(
-          (e) => SubscriptionPackageModel.fromJson(
-            Map<String, dynamic>.from(e),
-          ),
+          (e) =>
+              SubscriptionPackageModel.fromJson(Map<String, dynamic>.from(e)),
         )
         .where((p) => p.id.isNotEmpty)
         .toList();
@@ -59,9 +61,7 @@ class PackageRemoteDataSource {
     if (data is! Map) {
       throw ApiException('Unexpected server response.');
     }
-    return RazorpayPaymentCreateModel.fromJson(
-      Map<String, dynamic>.from(data),
-    );
+    return RazorpayPaymentCreateModel.fromJson(Map<String, dynamic>.from(data));
   }
 
   Future<RazorpayPaymentVerifyModel> verifyPayment({
@@ -70,6 +70,7 @@ class PackageRemoteDataSource {
     required String razorpayOrderId,
     required String razorpayPaymentId,
     required String razorpayPlanId,
+    String razorpaySubscriptionId = '',
     required String message,
   }) async {
     final response = await _client.post(
@@ -80,6 +81,8 @@ class PackageRemoteDataSource {
         'razorpay_order_id': razorpayOrderId,
         'razorpay_payment_id': razorpayPaymentId,
         'razorpay_plan_id': razorpayPlanId,
+        if (razorpaySubscriptionId.trim().isNotEmpty)
+          'razorpay_subscription_id': razorpaySubscriptionId,
         'message': message,
       }),
     );
@@ -88,9 +91,7 @@ class PackageRemoteDataSource {
     if (data is! Map) {
       throw ApiException('Unexpected server response.');
     }
-    return RazorpayPaymentVerifyModel.fromJson(
-      Map<String, dynamic>.from(data),
-    );
+    return RazorpayPaymentVerifyModel.fromJson(Map<String, dynamic>.from(data));
   }
 
   /// POST `package/transaction-history` with `user_id`.
@@ -115,7 +116,7 @@ class PackageRemoteDataSource {
   }) async {
     final json = await _client.postJson(_cancelSubscription, {
       'razorpay_subscription_id': razorpaySubscriptionId,
-      'cancel_at_cycle_end': 'false',
+      'cancel_at_cycle_end': 'true',
     });
     final data = json['data'];
     if (data is Map) {
@@ -128,5 +129,30 @@ class PackageRemoteDataSource {
       return data.trim();
     }
     return 'Subscription cancelled.';
+  }
+
+  /// Bourboneur `PackageApi.subscribe()` → POST `package/subscribe` (iOS IAP).
+  Future<String> subscribeApple({
+    required String userId,
+    required String packageId,
+    required String uniqueId,
+  }) async {
+    final json = await _client.postJson(_subscribe, {
+      'user_id': userId,
+      'package_id': packageId,
+      'unique_id': uniqueId,
+      'payment_method': Platform.isIOS ? 'apple_in_app' : 'razorpay',
+    });
+    final data = json['data'];
+    if (data is Map) {
+      final message = data['message']?.toString();
+      if (message != null && message.trim().isNotEmpty) {
+        return message.trim();
+      }
+    }
+    if (data is String && data.trim().isNotEmpty) {
+      return data.trim();
+    }
+    return 'Subscription activated.';
   }
 }

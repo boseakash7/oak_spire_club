@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import '../../../core/analytics/app_analytics_controller.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/utils/app_snackbar.dart';
+import '../../../core/utils/dispose_after_detach.dart';
 import '../../../core/utils/validators.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../routes/auth_navigation.dart';
@@ -41,7 +42,7 @@ class SignInController extends GetxController {
       if (kDebugMode) {
         debugPrint('[Auth] Login success user_id=${user.id}');
       }
-      AuthNavigation.completeSession(user);
+      AuthNavigation.afterAuth(user);
     } on ApiException catch (e) {
       AppSnackbar.error(e.message);
     } catch (e, st) {
@@ -55,8 +56,11 @@ class SignInController extends GetxController {
 
   @override
   void onClose() {
-    emailController.dispose();
-    passwordController.dispose();
+    unfocusSafely();
+    disposeAfterDetach([
+      emailController,
+      passwordController,
+    ]);
     super.onClose();
   }
 }

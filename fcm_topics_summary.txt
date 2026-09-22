@@ -1,0 +1,55 @@
+================================================================================
+                    OAK SPIRE CLUB - FCM TOPICS REFERENCE
+================================================================================
+
+All Firebase Cloud Messaging (FCM) topics used in the application follow the 
+prefix: `oakspire_`
+
+--------------------------------------------------------------------------------
+1. REGISTRATION STATE TOPICS
+--------------------------------------------------------------------------------
+• oakspire_unregistered_users
+  - Assigned on: Fresh app launch / unauthenticated state (`user == null`).
+  - Target: Users who have not yet created an account or signed in.
+
+• oakspire_registered_users
+  - Assigned ONLY on: New User Sign-Up / Registration (`SignUpController.onRegister()`).
+  - NOTE: NOT assigned on login! Used specifically for welcoming brand-new registrants.
+
+• oakspire_topic_logout
+  - Assigned on: Explicit User Logout or Account Deletion.
+  - Target: Devices where a user has logged out. (All other topics are unsubscribed).
+
+
+--------------------------------------------------------------------------------
+2. USER SUBSCRIPTION TIER TOPICS
+--------------------------------------------------------------------------------
+• oakspire_free_user
+  - Assigned on: Home page evaluation when `user.isFreeUser == true`.
+  - Target: Users granted free premium access directly from backend without payment.
+
+• oakspire_paid_user
+  - Assigned on: Home page evaluation when `user.hasActiveSubscription == true`.
+  - Target: Members with an active paid subscription plan.
+
+• oakspire_trial_user
+  - Assigned on: Home page evaluation when user is non-premium / trial user.
+  - Target: Standard members / trial users who do not have paid or free premium access.
+
+
+--------------------------------------------------------------------------------
+3. ALERT NOTIFICATION PREFERENCE TOPICS
+--------------------------------------------------------------------------------
+• oakspire_collection
+  - Managed by: User Notification Preference toggle "Collection Value".
+
+• oakspire_market
+  - Managed by: User Notification Preference toggle "Market Benchmarks".
+
+• oakspire_price_movement
+  - Managed by: User Notification Preference toggle "Price Movement".
+
+• oakspire_tips
+  - Managed by: User Notification Preference toggle "Tips & Product Updates".
+
+================================================================================

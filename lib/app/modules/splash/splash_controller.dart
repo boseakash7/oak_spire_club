@@ -1,11 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/firebase/firebase_notification_topics.dart';
+import '../../core/firebase/fcm_token_sync_service.dart';
+import '../../core/services/app_store_launcher.dart';
+import '../../core/services/app_update_checker.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/widgets/app_update_dialog.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../routes/app_routes.dart';
+import '../../modules/session/user_session_controller.dart';
 import '../../routes/auth_navigation.dart';
+import '../session/app_config_controller.dart';
 
 class SplashController extends GetxController {
   final isChecking = true.obs;
@@ -23,25 +32,83 @@ class SplashController extends GetxController {
 
   Future<void> _boot() async {
     final userFuture = _resolveUser();
+    final configFuture = Get.find<AppConfigController>().refresh();
 
-    await Future.delayed(_minSplashVisible);
+    await Future.wait([Future<void>.delayed(_minSplashVisible), configFuture]);
+
     final user = await userFuture;
+
+    if (user == null) {
+      unawaited(FirebaseNotificationTopics.syncUnregisteredTopic());
+    }
+
+    final canContinue = await _checkAppUpdate();
+    if (!canContinue) return;
 
     isChecking.value = false;
     if (user == null) {
-      Get.offAllNamed(AppRoutes.signUp);
+      AuthNavigation.openWelcome();
     } else {
+      unawaited(FcmTokenSyncService.syncIfLoggedIn());
       AuthNavigation.completeSession(user);
     }
   }
 
+  Future<bool> _checkAppUpdate() async {
+    final config = Get.find<AppConfigController>();
+    final result = await AppUpdateChecker.evaluate(config.currentVersion.value);
+    if (!result.needsUpdate) return true;
+
+    final context = Get.context;
+    if (context == null || !context.mounted) return true;
+
+    if (Get.isRegistered<AppAnalyticsController>()) {
+      AppAnalyticsController.to.logTap('app_update_prompt');
+    }
+
+    return showAppUpdateDialog(
+      context,
+      isForced: result.isForced,
+      onUpdate: () {
+        if (Get.isRegistered<AppAnalyticsController>()) {
+          AppAnalyticsController.to.logTap('app_update_confirm');
+        }
+        AppStoreLauncher.openStoreListing();
+      },
+    ).then((continueApp) {
+      if (continueApp) {
+        if (Get.isRegistered<AppAnalyticsController>()) {
+          AppAnalyticsController.to.logTap('app_update_later');
+        }
+      }
+      return continueApp;
+    });
+  }
+
   Future<UserModel?> _resolveUser() async {
-    final id = AppStorage.userId;
+    await AppStorage.ensureReady();
+    await AppStorage.repairUserIdFromUser();
+
+    final local = _localUser();
+    final id = AppStorage.userId ?? local?.id;
+
+    if (kDebugMode) {
+      debugPrint(
+        '[Auth] Boot session userId=$id localUser=${local?.id} '
+        'hasStoredUser=${AppStorage.user != null}',
+      );
+    }
+
     if (id == null || id.isEmpty) {
       return null;
     }
-    if (kDebugMode) {
-      debugPrint('[Auth] Auto-login stored user_id=$id');
+
+    if (local != null && !local.emailVerified) {
+      return _requireVerifiedSession(local);
+    }
+
+    if (local != null && AppStorage.userId == null) {
+      await AppStorage.saveSession(local.toJson());
     }
 
     try {
@@ -49,10 +116,40 @@ class SplashController extends GetxController {
       if (kDebugMode) {
         debugPrint('[Auth] Auto-login refreshed user_id=${user.id}');
       }
+      return _requireVerifiedSession(user);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[Auth] Auto-login refresh failed, using cache: $e');
+      }
+      return _requireVerifiedSession(local ?? _localUser());
+    }
+  }
+
+  /// Unverified accounts must not stay logged in across app restarts.
+  Future<UserModel?> _requireVerifiedSession(UserModel? user) async {
+    if (user == null) return null;
+    if (user.emailVerified) return user;
+
+    if (kDebugMode) {
+      debugPrint(
+        '[Auth] Clearing unverified session user_id=${user.id}',
+      );
+    }
+    await AppStorage.clearSession();
+    if (Get.isRegistered<UserSessionController>()) {
+      Get.find<UserSessionController>().loadFromStorage();
+    }
+    return null;
+  }
+
+  UserModel? _localUser() {
+    final json = AppStorage.user;
+    if (json == null) return null;
+    try {
+      final user = UserModel.fromJson(json);
+      if (user.id.isEmpty) return null;
       return user;
     } catch (_) {
-      await AppStorage.clearUserId();
-      await AppStorage.clearUser();
       return null;
     }
   }

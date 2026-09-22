@@ -1,7 +1,5 @@
-// Generated from `android/app/google-services.json` for package `com.oak.spireclub`.
-// To add iOS / Web / desktop, register those apps in the Firebase console and run:
-//   dart pub global activate flutterfire_cli
-//   flutterfire configure
+// Firebase options for Android (`google-services.json`) and iOS (`GoogleService-Info.plist`).
+// Re-run `flutterfire configure` after adding platforms in the Firebase console.
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
@@ -20,10 +18,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for iOS — '
-          'add GoogleService-Info.plist and run `flutterfire configure`.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macOS — '
@@ -48,5 +43,14 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1078950606869',
     projectId: 'oakspireclub',
     storageBucket: 'oakspireclub.firebasestorage.app',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCSpCdjwqnY8HlIxOVk99DDGi9Dyq18sI8',
+    appId: '1:1078950606869:ios:5ae6112900b6c689e5761c',
+    messagingSenderId: '1078950606869',
+    projectId: 'oakspireclub',
+    storageBucket: 'oakspireclub.firebasestorage.app',
+    iosBundleId: 'com.oak.spireclub',
   );
 }

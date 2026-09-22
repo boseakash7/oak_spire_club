@@ -105,7 +105,7 @@ class SignInView extends GetView<SignInController> {
                                     .logTap('sign_in_go_sign_up'),
                               );
                             }
-                            if (Navigator.of(context).canPop()) {
+                            if (Get.previousRoute == AppRoutes.signUp) {
                               Get.back();
                             } else {
                               Get.offNamed(AppRoutes.signUp);

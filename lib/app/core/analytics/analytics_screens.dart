@@ -23,6 +23,8 @@ abstract final class AnalyticsScreens {
         return 'splash';
       case AppRoutes.shell:
         return 'main_home';
+      case AppRoutes.getStarted:
+        return 'get_started';
       case AppRoutes.signIn:
         return 'sign_in';
       case AppRoutes.signUp:

@@ -32,6 +32,7 @@ class PackageRepository {
     required String razorpayOrderId,
     required String razorpayPaymentId,
     required String razorpayPlanId,
+    String razorpaySubscriptionId = '',
     String message = 'Payment completed from app',
   }) =>
       _remote.verifyPayment(
@@ -40,6 +41,7 @@ class PackageRepository {
         razorpayOrderId: razorpayOrderId,
         razorpayPaymentId: razorpayPaymentId,
         razorpayPlanId: razorpayPlanId,
+        razorpaySubscriptionId: razorpaySubscriptionId,
         message: message,
       );
 
@@ -53,5 +55,16 @@ class PackageRepository {
   }) =>
       _remote.cancelSubscription(
         razorpaySubscriptionId: razorpaySubscriptionId,
+      );
+
+  Future<String> subscribeApple({
+    required String userId,
+    required String packageId,
+    required String uniqueId,
+  }) =>
+      _remote.subscribeApple(
+        userId: userId,
+        packageId: packageId,
+        uniqueId: uniqueId,
       );
 }

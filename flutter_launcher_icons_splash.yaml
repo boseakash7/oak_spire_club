@@ -1,0 +1,7 @@
+# Splash-only launcher mipmaps from the old logo (native splash, not app icon).
+# Regenerate: dart run flutter_launcher_icons -f flutter_launcher_icons_splash.yaml
+flutter_launcher_icons:
+  android: "splash_icon"
+  ios: false
+  image_path: assets/images/app_ic.png
+  min_sdk_android: 21

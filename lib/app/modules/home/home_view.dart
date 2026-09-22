@@ -58,83 +58,108 @@ class _HomeEmptyView extends StatelessWidget {
             child: RefreshIndicator(
               color: AppColors.gold1,
               onRefresh: controller.forceReload,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: MediaQuery.sizeOf(context).height -
-                        MediaQuery.paddingOf(context).top -
-                        MediaQuery.paddingOf(context).bottom,
-                  ),
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        0,
-                        kShellTabBodyContentTopGap,
-                        0,
-                        66,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                    SizedBox(
-                      height: 270,
-                      width: 270,
-                      child: Image.asset(
-                        AppAssets.homeBottle,
-                        fit: BoxFit.contain,
-                      ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
                     ),
-                    const SizedBox(height: 18),
-                    ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [AppColors.gold2, AppColors.gold1],
-                        stops: [0.21591, 0.90909],
-                      ).createShader(bounds),
-                      blendMode: BlendMode.srcIn,
-                      child: Text(
-                        'Your collection\nis empty.',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.button20Bold().copyWith(
-                          fontSize: 36,
-                          height: 1.05,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: IntrinsicHeight(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            24,
+                            kShellTabBodyContentTopGap + 8,
+                            24,
+                            24,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Spacer(),
+                              Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: 180,
+                                    height: 180,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: RadialGradient(
+                                        colors: [
+                                          AppColors.gold1.withValues(alpha: 0.18),
+                                          Colors.transparent,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    height: 200,
+                                    width: 200,
+                                    child: Image.asset(
+                                      AppAssets.homeBottle,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              ShaderMask(
+                                shaderCallback: (bounds) => const LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [AppColors.gold2, AppColors.gold1],
+                                  stops: [0.21591, 0.90909],
+                                ).createShader(bounds),
+                                blendMode: BlendMode.srcIn,
+                                child: Text(
+                                  'Your collection\nis empty.',
+                                  textAlign: TextAlign.center,
+                                  style: AppTextStyles.button20Bold().copyWith(
+                                    fontSize: 32,
+                                    height: 1.1,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: 300,
+                                child: Text(
+                                  'Add your first bottle and be a part of this wonderful journey.',
+                                  textAlign: TextAlign.center,
+                                  style: AppTextStyles.body16().copyWith(
+                                    fontSize: 15,
+                                    color: const Color(0xFFF1E8BE),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 32),
+                                child: CommonPrimaryButton(
+                                  label: 'Add Your First Bottle',
+                                  onPressed: () async {
+                                    final res = await Get.toNamed(
+                                      AppRoutes.tasteBottles,
+                                      arguments: {'autoCloseOnAdded': true},
+                                    );
+                                    if (res == true) {
+                                      await controller.forceReload();
+                                    }
+                                  },
+                                ),
+                              ),
+                              const Spacer(),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: 312,
-                      child: Text(
-                        'Add your first bottle and be a part of this wonderfull journey.',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.body16().copyWith(
-                          color: const Color(0xFFF1E8BE),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 58),
-                      child: CommonPrimaryButton(
-                        label: 'Add Your First Bottle',
-                        onPressed: () async {
-                          final res = await Get.toNamed(
-                            AppRoutes.tasteBottles,
-                            arguments: {'autoCloseOnAdded': true},
-                          );
-                          if (res == true) {
-                            await controller.forceReload();
-                          }
-                        },
-                      ),
-                    ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ),

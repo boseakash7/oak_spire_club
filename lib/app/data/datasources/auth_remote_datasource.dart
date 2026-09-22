@@ -10,6 +10,10 @@ class AuthRemoteDataSource {
   static const String _login = 'auth/login';
   static const String _update = 'auth/update';
   static const String _delete = 'auth/delete';
+  static const String _sendOtp = 'auth/send-otp';
+  static const String _verifyOtp = 'auth/verify-otp';
+  static const String _forgetPassword = 'auth/forget-password';
+  static const String _resetPassword = 'auth/reset-password';
 
   Future<UserModel> login({
     required String email,
@@ -69,6 +73,42 @@ class AuthRemoteDataSource {
     }
 
     await _client.postJson(_update, body);
+  }
+
+  Future<void> sendOtp({required String email}) async {
+    await _client.postJson(_sendOtp, {'email': email.trim()});
+  }
+
+  Future<UserModel> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final json = await _client.postJson(_verifyOtp, {
+      'email': email.trim(),
+      'otp': otp,
+    });
+
+    final data = json['data'];
+    if (data is! Map) {
+      throw ApiException('Unexpected server response.');
+    }
+    return UserModel.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  Future<void> forgetPassword({required String email}) async {
+    await _client.postJson(_forgetPassword, {'email': email.trim()});
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String password,
+  }) async {
+    await _client.postJson(_resetPassword, {
+      'email': email.trim(),
+      'otp': otp,
+      'password': password,
+    });
   }
 
   Future<void> deleteAccount({required String userId}) async {

@@ -3,10 +3,12 @@ import 'package:get/get.dart';
 
 import '../../../core/storage/app_storage.dart';
 import '../../../core/utils/app_snackbar.dart';
+import '../../../core/utils/dispose_after_detach.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/repositories/user_repository.dart';
 import '../widgets/gender_radio_group.dart';
 import '../../session/user_session_controller.dart';
+
 class AccountController extends GetxController {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
@@ -71,8 +73,11 @@ class AccountController extends GetxController {
 
   @override
   void onClose() {
-    nameController.dispose();
-    emailController.dispose();
+    unfocusSafely();
+    disposeAfterDetach([
+      nameController,
+      emailController,
+    ]);
     super.onClose();
   }
 }
