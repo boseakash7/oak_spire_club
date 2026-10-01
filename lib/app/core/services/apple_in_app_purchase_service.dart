@@ -87,7 +87,10 @@ class AppleInAppPurchaseService {
       productForAppleId(appleProductId)?.price;
 
   Future<bool> purchase(ProductDetails product) async {
-    developer.log('[IAP] Starting purchase for ${product.id}', name: 'AppleIAP');
+    developer.log(
+      '[IAP] Starting purchase for ${product.id}',
+      name: 'AppleIAP',
+    );
     return _iap.buyNonConsumable(
       purchaseParam: PurchaseParam(productDetails: product),
     );

@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/animations/staggered_entrance.dart';
+import '../../../core/widgets/app_pressable.dart';
 import '../../../core/analytics/app_analytics_controller.dart';
 import '../../../core/constants/app_assets.dart';
+import '../../../core/widgets/app_backdrop_image.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -23,11 +26,16 @@ class SignInView extends GetView<SignInController> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(AppAssets.signInBackground, fit: BoxFit.cover),
+          const AppBackdropImage(AppAssets.signInBackground),
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(35, 185, 35, 24),
-              child: Column(
+              padding: EdgeInsets.fromLTRB(
+                35,
+                MediaQuery.sizeOf(context).height * 0.2,
+                35,
+                24,
+              ),
+              child: StaggeredColumn(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Sign In to', style: AppTextStyles.heading32Bold()),
@@ -55,7 +63,7 @@ class SignInView extends GetView<SignInController> {
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: GestureDetector(
+                    child: AppPressable(
                       onTap: () {
                         if (Get.isRegistered<AppAnalyticsController>()) {
                           unawaited(
@@ -98,7 +106,7 @@ class SignInView extends GetView<SignInController> {
                             color: AppColors.white,
                           ),
                         ),
-                        GestureDetector(
+                        AppPressable(
                           onTap: () {
                             if (Get.isRegistered<AppAnalyticsController>()) {
                               unawaited(

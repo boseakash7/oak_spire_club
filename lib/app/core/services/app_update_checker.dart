@@ -10,9 +10,7 @@ class AppUpdateCheckResult {
     this.isForced = false,
   });
 
-  const AppUpdateCheckResult.upToDate()
-      : needsUpdate = false,
-        isForced = false;
+  const AppUpdateCheckResult.upToDate() : needsUpdate = false, isForced = false;
 
   final bool needsUpdate;
   final bool isForced;
@@ -35,9 +33,6 @@ abstract final class AppUpdateChecker {
       return const AppUpdateCheckResult.upToDate();
     }
 
-    return AppUpdateCheckResult(
-      needsUpdate: true,
-      isForced: remote.isForced,
-    );
+    return AppUpdateCheckResult(needsUpdate: true, isForced: remote.isForced);
   }
 }

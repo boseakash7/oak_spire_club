@@ -7,9 +7,7 @@ import 'core/firebase/firebase_bootstrap.dart';
 import 'core/constants/app_constants.dart';
 import 'core/theme/app_colors.dart';
 import 'core/animations/app_motion.dart';
-import 'core/animations/app_page_transition.dart';
-import 'core/theme/app_theme.dart';
-import 'routes/app_pages.dart';
+import 'core/theme/app_theme.dart';import 'routes/app_pages.dart';
 import 'routes/app_routes.dart';
 
 class OakSpireApp extends StatelessWidget {
@@ -21,8 +19,9 @@ class OakSpireApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: AppConstants.appName,
       theme: AppTheme.dark,
-      defaultTransition: Transition.fade,
-      customTransition: AppFadeSlideTransition(),
+      // Each GetPage carries AppPageTransition (see AppPages.pages); this only
+      // covers a route pushed without one.
+      defaultTransition: Transition.native,
       transitionDuration: AppMotion.page,
       navigatorObservers: firebaseAnalyticsNavObservers(),
       initialBinding: AppBinding(),

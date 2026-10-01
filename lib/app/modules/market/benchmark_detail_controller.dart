@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/utils/app_image_url.dart';
 import '../../core/utils/greeting_formatter.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/utils/proof_formatter.dart';
 import '../session/user_session_controller.dart';
 import '../../data/models/bluebook_price_history_chart_model.dart';
+import '../../data/models/bottle_pricing.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import '../../data/repositories/bluebook_price_history_repository.dart';
@@ -63,23 +64,6 @@ class BenchmarkDetailRouteArgs {
   final String? description;
   final String? rating;
   final String? priceMovement;
-}
-
-String? resolveBenchmarkDetailImageUrl(String? raw0) {
-  final raw = raw0?.trim();
-  if (raw == null || raw.isEmpty || raw == 'null') return null;
-  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-  final uploadUrl = AppStorage.uploadUrl;
-  if (uploadUrl != null && uploadUrl.trim().isNotEmpty) {
-    return '${uploadUrl.trim().replaceAll(RegExp(r'/+$'), '')}/$raw';
-  }
-  final api = Uri.parse(AppConstants.apiBaseUrl);
-  return Uri(
-    scheme: api.scheme,
-    host: api.host,
-    port: api.hasPort ? api.port : null,
-    path: raw.startsWith('/') ? raw : '/$raw',
-  ).toString();
 }
 
 /// Price chart range for [bluebook-price-history/chart-data-dashboard].
@@ -142,8 +126,19 @@ class BenchmarkDetailController extends GetxController {
   final chartError = RxnString();
   final chartPoints = <BluebookPriceChartPoint>[].obs;
 
-  /// Y values for BSMI line (same length as [chartPoints] when loaded).
+  /// Y values for the BSMI line, same length as [chartPoints] — only when the
+  /// API sends a per-point `bsmi`. Empty means "no benchmark to compare", and
+  /// the chart hides that series rather than inventing one.
   final chartBsmiValues = <double>[].obs;
+
+  /// What this bottle's price rests on (from the chart endpoint's bottle).
+  final pricing = Rxn<BottlePricing>();
+
+  /// Chart / legend name for the price line. An admin-entered price is an
+  /// Oak Spire price, never "market value" (ai-features-plan.md §2.5).
+  String get marketSeriesLabel => pricing.value?.isOakSpirePrice == true
+      ? 'Oak Spire price'
+      : 'Market Value';
 
   final collectionLoading = false.obs;
   final hasInCollection = false.obs;
@@ -174,7 +169,7 @@ class BenchmarkDetailController extends GetxController {
     lowFormatted = PriceFormatter.format(args.lowRaw);
     highFormatted = PriceFormatter.format(args.highRaw);
     imagePathOrUrl = args.imagePathOrUrl;
-    imageUrl = resolveBenchmarkDetailImageUrl(args.imagePathOrUrl);
+    imageUrl = AppImageUrl.resolve(args.imagePathOrUrl);
     proofText = ProofFormatter.formatLabel(_nullableRouteString(args.proof));
     descriptionText = _nullableRouteString(args.description);
     ratingDisplay = _nullableRouteString(args.rating);
@@ -300,39 +295,23 @@ class BenchmarkDetailController extends GetxController {
         next = rows.first.sortedPrices;
       }
       chartPoints.assignAll(next);
-      _syncBsmiSeries(matched, next);
+      _syncBsmiSeries(next);
+      pricing.value = matched?.bluebook?.pricing ?? pricing.value;
     } catch (e) {
-      chartError.value = e.toString();
-      chartPoints.clear();
-      chartBsmiValues.clear();
+      // Keep the last good series on screen; only an empty chart shows the
+      // error.
+      if (chartPoints.isEmpty) chartError.value = e.toString();
     } finally {
       chartLoading.value = false;
     }
   }
 
-  void _syncBsmiSeries(
-    BluebookPriceHistoryDashboardRow? row,
-    List<BluebookPriceChartPoint> pts,
-  ) {
-    chartBsmiValues.clear();
-    if (pts.isEmpty) return;
-
-    final hasPerPoint = pts.every((p) => p.bsmi != null);
-    if (hasPerPoint) {
-      chartBsmiValues.addAll(pts.map((p) => p.bsmi!));
-      return;
+  void _syncBsmiSeries(List<BluebookPriceChartPoint> pts) {
+    if (pts.isNotEmpty && pts.every((p) => p.bsmi != null)) {
+      chartBsmiValues.assignAll(pts.map((p) => p.bsmi!));
+    } else {
+      chartBsmiValues.clear();
     }
-
-    final avgStr = row?.bluebook?.average;
-    final avg = double.tryParse(
-      (avgStr ?? '').replaceAll(RegExp(r'[^\d.-]'), ''),
-    );
-    if (avg != null) {
-      chartBsmiValues.addAll(List<double>.filled(pts.length, avg));
-      return;
-    }
-
-    chartBsmiValues.addAll(pts.map((p) => p.price * 0.97));
   }
 
   static String? _nullableRouteString(String? value) {

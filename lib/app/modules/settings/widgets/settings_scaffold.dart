@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/animations/staggered_entrance.dart';
+import '../../../core/platform/app_platform.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_back_button.dart';
@@ -41,15 +43,17 @@ class SettingsScaffold extends StatelessWidget {
                       AppBackButton(onPressed: () => Get.back<void>()),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: GradientText(
-                          title,
-                          style: AppTextStyles.heading32Bold().copyWith(
-                            fontSize: 22,
-                            height: 1.0,
+                        child: FadeSlideEntrance(
+                          child: GradientText(
+                            title,
+                            style: AppTextStyles.heading32Bold().copyWith(
+                              fontSize: 22,
+                              height: 1.0,
+                            ),
+                            gradient: AppColors.goldGradient,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          gradient: AppColors.goldGradient,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -57,8 +61,9 @@ class SettingsScaffold extends StatelessWidget {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
+                    physics: AppPlatform.scrollPhysics,
                     padding: const EdgeInsets.fromLTRB(23, 16, 23, 24),
-                    child: child,
+                    child: FadeSlideEntrance(index: 2, child: child),
                   ),
                 ),
                 if (bottom != null)
@@ -69,7 +74,7 @@ class SettingsScaffold extends StatelessWidget {
                       23,
                       16 + MediaQuery.paddingOf(context).bottom,
                     ),
-                    child: bottom!,
+                    child: FadeSlideEntrance(index: 4, child: bottom!),
                   ),
               ],
             ),

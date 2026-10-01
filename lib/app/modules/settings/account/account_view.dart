@@ -20,8 +20,7 @@ class AccountView extends GetView<AccountController> {
         () => CommonPrimaryButton(
           label: 'Save changes',
           isLoading: controller.isSaving.value,
-          onPressed:
-              controller.isSaving.value ? null : controller.save,
+          onPressed: controller.isSaving.value ? null : controller.save,
         ),
       ),
       child: Column(

@@ -7,7 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/app_snackbar.dart';
-import '../../../core/widgets/animated_list_entrance.dart';
+import '../../../core/animations/staggered_entrance.dart';
 import '../widgets/settings_scaffold.dart';
 
 class HelpSupportView extends StatelessWidget {
@@ -50,7 +50,7 @@ class HelpSupportView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          // AnimatedListEntrance(
+          // StaggeredEntrance(
           //   index: 0,
           //   child: _ContactCard(
           //     icon: Icons.chat_rounded,
@@ -62,7 +62,7 @@ class HelpSupportView extends StatelessWidget {
           //   ),
           // ),
           // const SizedBox(height: 14),
-          AnimatedListEntrance(
+          StaggeredEntrance(
             index: 0,
             child: _ContactCard(
               icon: Icons.mail_outline_rounded,

@@ -101,11 +101,7 @@ class _GenderTile extends StatelessWidget {
                   ),
                 ),
                 child: selected
-                    ? const Icon(
-                        Icons.circle,
-                        size: 10,
-                        color: AppColors.black,
-                      )
+                    ? const Icon(Icons.circle, size: 10, color: AppColors.black)
                     : null,
               ),
               const SizedBox(width: 12),

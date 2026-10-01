@@ -13,7 +13,7 @@ class AnimatedCountText extends StatelessWidget {
     required this.value,
     required this.format,
     this.style,
-    this.duration = AppMotion.chartDraw,
+    this.duration = AppMotion.countUp,
     this.textAlign,
   });
 
@@ -27,8 +27,8 @@ class AnimatedCountText extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: value),
-      duration: duration,
-      curve: AppMotion.standard,
+      duration: AppMotion.of(context, duration),
+      curve: AppMotion.emphasizedDecelerate,
       builder: (context, animated, _) {
         return Text(format(animated), style: style, textAlign: textAlign);
       },

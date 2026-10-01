@@ -4,13 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/analytics/app_analytics_controller.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/utils/app_haptics.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/app_add_pill.dart';
+import '../../../core/widgets/app_segmented_range.dart';
 import '../../../routes/app_routes.dart';
 import '../home_controller.dart';
 
-/// Figma home — range chips + add to collection below chart legend.
+/// Below the home chart: the range selector and "Add to collection".
 class HomeChartFooter extends StatelessWidget {
   const HomeChartFooter({super.key});
 
@@ -20,31 +19,18 @@ class HomeChartFooter extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Obx(
-            () => Row(
-              children: [
-                for (var i = 0; i < HomeChartRange.values.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 10),
-                  _RangeChip(
-                    range: HomeChartRange.values[i],
-                    selected:
-                        home.selectedChartRange.value ==
-                        HomeChartRange.values[i],
-                    onTap: () {
-                      AppHaptics.selection();
-                      unawaited(home.setChartRange(HomeChartRange.values[i]));
-                    },
-                  ),
-                ],
-              ],
+            () => AppSegmentedRange<HomeChartRange>(
+              values: HomeChartRange.values,
+              selected: home.selectedChartRange.value,
+              labelOf: (r) => r.label,
+              onChanged: (r) => unawaited(home.setChartRange(r)),
             ),
           ),
           const Spacer(),
-          GestureDetector(
+          AppAddPill(
             onTap: () async {
-              AppHaptics.tap();
               if (Get.isRegistered<AppAnalyticsController>()) {
                 unawaited(
                   AppAnalyticsController.to.logTap('home_add_to_collection'),
@@ -55,62 +41,8 @@ class HomeChartFooter extends StatelessWidget {
                 await home.forceReload();
               }
             },
-            child: Container(
-              height: 33,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                gradient: AppColors.goldGradient,
-              ),
-              child: Text(
-                '+ Add to collection',
-                style: AppTextStyles.caption().copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.black,
-                ),
-              ),
-            ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _RangeChip extends StatelessWidget {
-  const _RangeChip({
-    required this.range,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final HomeChartRange range;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        width: 33,
-        height: 33,
-        decoration: BoxDecoration(
-          color: selected ? AppColors.gold2 : AppColors.surfaceChip,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: selected
-                ? AppColors.tagGoldBorder
-                : AppColors.tagInactiveBorder,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          range.label,
-          style: AppTextStyles.label().copyWith(color: AppColors.white),
-        ),
       ),
     );
   }

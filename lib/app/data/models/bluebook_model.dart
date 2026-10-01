@@ -1,3 +1,4 @@
+import 'bottle_pricing.dart';
 import 'proof_json.dart';
 
 class BluebookModel {
@@ -14,6 +15,7 @@ class BluebookModel {
     this.rating,
     this.priceMovement,
     this.isRare,
+    this.pricing,
   });
 
   final String id;
@@ -31,6 +33,9 @@ class BluebookModel {
   /// From API `is_rare`: `"1"` / `"true"` → true, `"0"` / `"false"` → false.
   final bool? isRare;
 
+  /// What the price rests on; null from endpoints that do not send it.
+  final BottlePricing? pricing;
+
   factory BluebookModel.fromJson(Map<String, dynamic> json) {
     return BluebookModel(
       id: json['id'].toString(),
@@ -45,6 +50,7 @@ class BluebookModel {
       rating: _nullableString(json['rating']),
       priceMovement: _nullableString(json['price_movement']),
       isRare: _nullableBool01(json['is_rare']),
+      pricing: BottlePricing.fromJson(json['pricing']),
     );
   }
 

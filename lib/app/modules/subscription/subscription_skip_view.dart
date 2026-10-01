@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/animations/staggered_entrance.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/widgets/app_backdrop_image.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_subscription_theme.dart';
@@ -17,8 +19,7 @@ class SubscriptionSkipView extends StatelessWidget {
 
   bool get _isPostAuth {
     final args = Get.arguments;
-    return args is Map &&
-        args[AuthNavigation.postAuthSubscriptionArg] == true;
+    return args is Map && args[AuthNavigation.postAuthSubscriptionArg] == true;
   }
 
   Future<void> _continueWithLimitedAccess() async {
@@ -38,11 +39,9 @@ class SubscriptionSkipView extends StatelessWidget {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
+            const AppBackdropImage(
               AppAssets.subscriptionBackground,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  Image.asset(AppAssets.signUpBackground, fit: BoxFit.cover),
+              fallbackAsset: AppAssets.signUpBackground,
             ),
             SafeArea(
               child: Column(
@@ -56,7 +55,7 @@ class SubscriptionSkipView extends StatelessWidget {
                         AppSubscriptionTheme.horizontalPadding,
                         24,
                       ),
-                      child: Column(
+                      child: StaggeredColumn(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
@@ -119,7 +118,9 @@ class SubscriptionSkipView extends StatelessWidget {
                           Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 12,
-                            color: AppColors.subscriptionSkipLink.withValues(alpha: 0.9),
+                            color: AppColors.subscriptionSkipLink.withValues(
+                              alpha: 0.9,
+                            ),
                           ),
                           const SizedBox(width: 6),
                           Text(

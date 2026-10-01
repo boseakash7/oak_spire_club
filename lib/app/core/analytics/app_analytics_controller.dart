@@ -38,10 +38,7 @@ class AppAnalyticsController extends GetxController {
   }
 
   /// Logs custom event `{buttonKey}_click` with `button_name` and optional params.
-  Future<void> logTap(
-    String buttonKey, [
-    Map<String, Object>? extra,
-  ]) async {
+  Future<void> logTap(String buttonKey, [Map<String, Object>? extra]) async {
     final base = sanitizeKey(buttonKey);
     final name = '${base}_click';
     final params = <String, Object>{'button_name': buttonKey};

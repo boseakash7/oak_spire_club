@@ -5,7 +5,10 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/animations/app_motion.dart';
+import '../../core/animations/staggered_entrance.dart';
 import '../../core/constants/app_assets.dart';
+import '../../core/widgets/app_backdrop_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../routes/app_routes.dart';
@@ -31,7 +34,7 @@ class GetStartedView extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(AppAssets.onboardingBackground, fit: BoxFit.cover),
+          const _KenBurns(asset: AppAssets.onboardingBackground),
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -59,24 +62,26 @@ class GetStartedView extends StatelessWidget {
                       padding: const EdgeInsets.only(top: _topOffset),
                       child: Column(
                         children: [
-                          Image.asset(
-                            AppAssets.appIc,
-                            width: _logoSize,
-                            height: _logoSize,
-                            fit: BoxFit.contain,
+                          FadeSlideEntrance(
+                            child: Image.asset(
+                              AppAssets.appIc,
+                              width: _logoSize,
+                              height: _logoSize,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                           const SizedBox(height: 16),
-                          _welcomeHeader(),
+                          FadeSlideEntrance(index: 2, child: _welcomeHeader()),
                           const SizedBox(height: 8),
-                          _featuresRow(),
+                          FadeSlideEntrance(index: 4, child: _featuresRow()),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 10),
-                  _ctaText(),
+                  FadeSlideEntrance(index: 6, child: _ctaText()),
                   const SizedBox(height: 26),
-                  _bottomButtons(context),
+                  FadeSlideEntrance(index: 7, child: _bottomButtons(context)),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -496,6 +501,55 @@ class _GoldPillButtonState extends State<_GoldPillButton> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A slow, endless push-in and drift on the background photo.
+class _KenBurns extends StatefulWidget {
+  const _KenBurns({required this.asset});
+
+  final String asset;
+
+  @override
+  State<_KenBurns> createState() => _KenBurnsState();
+}
+
+class _KenBurnsState extends State<_KenBurns>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 18),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (AppMotion.reduced(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, child) {
+        final t = Curves.easeInOut.transform(_c.value);
+        return Transform.translate(
+          offset: Offset(-12 * t, -8 * t),
+          child: Transform.scale(scale: 1.04 + 0.06 * t, child: child),
+        );
+      },
+      child: AppBackdropImage(widget.asset),
     );
   }
 }

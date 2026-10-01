@@ -24,11 +24,11 @@ abstract final class FirebasePushNotifications {
 
   static const AndroidNotificationChannel _androidChannel =
       AndroidNotificationChannel(
-    _androidChannelId,
-    'Oak Spire Alerts',
-    description: 'Collection, market, and account notifications',
-    importance: Importance.high,
-  );
+        _androidChannelId,
+        'Oak Spire Alerts',
+        description: 'Collection, market, and account notifications',
+        importance: Importance.high,
+      );
 
   static bool _initialized = false;
 
@@ -43,10 +43,10 @@ abstract final class FirebasePushNotifications {
     if (Platform.isIOS) {
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+            alert: true,
+            badge: true,
+            sound: true,
+          );
     }
 
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
@@ -62,8 +62,10 @@ abstract final class FirebasePushNotifications {
     );
 
     if (Platform.isAndroid) {
-      final androidPlugin = _local.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _local
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       await androidPlugin?.createNotificationChannel(_androidChannel);
       await androidPlugin?.requestNotificationsPermission();
     }
@@ -81,7 +83,8 @@ abstract final class FirebasePushNotifications {
     final body = _resolveBody(message);
     if (title == null && body == null) return;
 
-    final id = message.messageId?.hashCode ??
+    final id =
+        message.messageId?.hashCode ??
         message.sentTime?.millisecondsSinceEpoch ??
         DateTime.now().millisecondsSinceEpoch;
 

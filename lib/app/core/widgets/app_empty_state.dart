@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/app_haptics.dart';
-import 'animated_pressable.dart';
+import 'app_pressable.dart';
+import '../animations/staggered_entrance.dart';
 
 /// Shared empty / no-results placeholder.
 ///
@@ -76,7 +77,7 @@ class AppEmptyState extends StatelessWidget {
             ],
             if (showAction) ...[
               SizedBox(height: compact ? 14 : 22),
-              AnimatedPressable(
+              AppPressable(
                 onTap: () {
                   AppHaptics.tap();
                   onAction!();

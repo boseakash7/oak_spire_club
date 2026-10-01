@@ -4,8 +4,12 @@ class AppConstants {
   /// MaterialApp / window title and in-app branding.
   static const String appName = 'Oak Spire Club';
 
-  /// From `bourboneur-app/lib/Core/Constants.dart`
-  static const String apiBaseUrl = 'https://www.oakspireclub.com/v2/api/';
+  /// Production by default. Point a debug build at a local backend with
+  /// `flutter run --dart-define=API_BASE_URL=http://10.0.2.2/v2/api/`.
+  static const String apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://www.oakspireclub.com/v2/api/',
+  );
 
   /// Razorpay keys come from `config/all` → `razorpay_key_id` / `razorpay_key_secret`.
   /// See [AppStorage.razorpayKeyId] after [AppConfigController.refresh].

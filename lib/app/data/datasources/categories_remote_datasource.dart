@@ -2,7 +2,6 @@ import 'package:get/get.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
-import '../models/category_detail_model.dart';
 import '../models/category_model.dart';
 import '../models/paged_result.dart';
 
@@ -11,7 +10,6 @@ class CategoriesRemoteDataSource {
   final ApiClient _client;
 
   static const String _list = 'categories/list';
-  static const String _detail = 'categories/detail';
 
   Future<PagedResult<CategoryModel>> list({
     required int page,
@@ -49,16 +47,5 @@ class CategoriesRemoteDataSource {
     );
   }
 
-  Future<CategoryDetailModel> detail({required String categoryId}) async {
-    final response = await _client.get(_detail, query: {
-      'category_id': categoryId,
-    });
-
-    final json = _client.parseEnvelope(response);
-
-    final data = json['data'];
-    if (data is! Map) throw ApiException('Unexpected server response.');
-    return CategoryDetailModel.fromJson(Map<String, dynamic>.from(data));
-  }
 }
 

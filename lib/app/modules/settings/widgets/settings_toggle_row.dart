@@ -67,10 +67,7 @@ class SettingsToggleRow extends StatelessWidget {
 }
 
 class SettingsToggleCard extends StatelessWidget {
-  const SettingsToggleCard({
-    super.key,
-    required this.rows,
-  });
+  const SettingsToggleCard({super.key, required this.rows});
 
   final List<Widget> rows;
 

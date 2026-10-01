@@ -1,8 +1,12 @@
 class AppAssets {
   const AppAssets._();
 
+  /// Blurred bar photo behind auth, splash and subscription screens.
+  /// A 2x variant lives in `assets/images/2.0x/`.
   static const String signInBackground = 'assets/images/signin_bg.png';
-  static const String signUpBackground = 'assets/images/signup_bg.png';
+
+  /// Same art as [signInBackground] (the old copy was byte-identical).
+  static const String signUpBackground = signInBackground;
   static const String onboardingBackground = 'assets/images/onboarding_bg.jpeg';
   static const String onboardingBell = 'assets/images/bell.png';
   static const String onboardingStat = 'assets/images/stat.png';

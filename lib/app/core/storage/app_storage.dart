@@ -71,8 +71,9 @@ class AppStorage {
     final fromKey = _parseId(_box.read(_keyUserId));
     if (fromKey != null) return fromKey;
 
-    return _parseId(_mapFrom(_sessionBox.get(_keyUser))?['id'] ??
-        _readMap(_keyUser)?['id']);
+    return _parseId(
+      _mapFrom(_sessionBox.get(_keyUser))?['id'] ?? _readMap(_keyUser)?['id'],
+    );
   }
 
   static Map<String, dynamic>? get user {
@@ -107,8 +108,7 @@ class AppStorage {
   }
 
   /// Compatibility with older GetStorage-only callers.
-  static Future<void> setUser(Map<String, dynamic> value) =>
-      saveSession(value);
+  static Future<void> setUser(Map<String, dynamic> value) => saveSession(value);
 
   static Future<void> repairUserIdFromUser() async {
     if (userId != null) return;
@@ -217,10 +217,9 @@ class AppStorage {
     await _box.write(_keyNotificationPrefs, value);
   }
 
-  static bool get notificationTopicsInitialSyncDone =>
-      _ready
-          ? (_box.read<bool>(_keyNotificationTopicsInitialSyncDone) ?? false)
-          : false;
+  static bool get notificationTopicsInitialSyncDone => _ready
+      ? (_box.read<bool>(_keyNotificationTopicsInitialSyncDone) ?? false)
+      : false;
   static Future<void> setNotificationTopicsInitialSyncDone(bool value) async {
     await ensureReady();
     await _box.write(_keyNotificationTopicsInitialSyncDone, value);

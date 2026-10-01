@@ -1,181 +1,151 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
 import '../../core/analytics/app_analytics_controller.dart';
-import '../../core/constants/app_assets.dart';
-import '../../core/constants/app_constants.dart';
-import '../../core/constants/app_hero_tags.dart';
-import '../../core/network/app_cache_manager.dart';
-import '../../core/storage/app_storage.dart';
-import '../../core/utils/app_haptics.dart';
-import '../../core/widgets/app_empty_state.dart';
-import '../../core/widgets/animated_list_entrance.dart';
-import '../../core/widgets/app_filter_chip.dart';
+import '../../core/animations/state_switcher.dart';
+import '../../core/animations/staggered_entrance.dart';
+import '../../core/platform/app_platform.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
-import '../../core/utils/price_formatter.dart';
-import '../../core/utils/proof_formatter.dart';
+import '../../core/widgets/app_empty_state.dart';
+import '../../core/widgets/app_filter_chip.dart';
 import '../../core/widgets/app_header.dart';
-import '../../data/models/bluebook_model.dart';
-import '../../routes/app_routes.dart';
+import '../../core/widgets/app_search_field.dart';
+import '../../core/widgets/shimmer_box.dart';
 import 'market_controller.dart';
 import 'market_loading_view.dart';
+import 'widgets/market_bottle_row.dart';
 
+const double _kInset = 23;
+
+/// The benchmark list: search (typo tolerant, semantic when enabled),
+/// category chips, and an infinitely scrolling list of bottles.
 class MarketView extends GetView<MarketController> {
   const MarketView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.surfaceDeep, AppColors.surfaceDeep],
-        ),
-      ),
-      child: Stack(
-        children: [
-          const Positioned.fill(
-            child: ColoredBox(color: AppColors.overlayBlack20),
-          ),
-          SafeArea(
-            top: false,
-            child: Obx(() {
-              if (controller.isLoading.value) {
-                return const MarketLoadingView();
-              }
-
-              return RefreshIndicator(
-                color: AppColors.gold1,
-                onRefresh: () async {
-                  if (Get.isRegistered<AppAnalyticsController>()) {
-                    unawaited(
-                      AppAnalyticsController.to.logTap('market_pull_refresh'),
-                    );
-                  }
-                  await controller.forceReload();
-                },
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: (n) {
-                    if (n.metrics.pixels >= n.metrics.maxScrollExtent - 240) {
-                      controller.loadMore();
-                    }
-                    return false;
-                  },
-                  child: ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(
-                      23,
-                      kShellTabBodyContentTopGap,
-                      23,
-                      24,
-                    ),
-                    itemCount: controller.visibleBottles.length + 2,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return _Header(controller: controller);
-                      }
-
-                      // Checked before the trailing loader slot, which would
-                      // otherwise claim index 1 on an empty result.
-                      if (controller.visibleBottles.isEmpty) {
-                        return const _NoBottlesFound();
-                      }
-
-                      if (index == controller.visibleBottles.length + 1) {
-                        return Obx(() {
-                          if (!controller.isLoadingMore.value) {
-                            return const SizedBox(height: 8);
-                          }
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 14),
-                            child: Center(
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.gold1,
-                                ),
-                              ),
-                            ),
-                          );
-                        });
-                      }
-
-                      final b = controller.visibleBottles[index - 1];
-                      return AnimatedListEntrance(
-                        index: index - 1,
-                        child: _BenchmarkCard(bottle: b),
-                      );
-                    },
-                  ),
-                ),
-              );
-            }),
-          ),
-        ],
+    return ColoredBox(
+      color: AppColors.surfaceDeep,
+      child: SafeArea(
+        top: false,
+        child: Obx(() {
+          final loading = controller.isLoading.value;
+          return AppStateSwitcher(
+            stateKey: loading,
+            child: loading ? const MarketLoadingView() : const _MarketList(),
+          );
+        }),
       ),
     );
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.controller});
-  final MarketController controller;
+class _MarketList extends GetView<MarketController> {
+  const _MarketList();
+
+  Future<void> _refresh() async {
+    if (Get.isRegistered<AppAnalyticsController>()) {
+      unawaited(AppAnalyticsController.to.logTap('market_pull_refresh'));
+    }
+    await controller.forceReload(showFullLoader: false);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          onChanged: controller.onSearchChanged,
-          textInputAction: TextInputAction.search,
-          style: AppTextStyles.bodyL(),
-          decoration: InputDecoration(
-            hintText: 'Search 10,000+ bottles',
-            // Muted, so the placeholder never reads as an entered query.
-            hintStyle: AppTextStyles.bodyL().copyWith(
-              color: AppColors.textMuted,
+    return RefreshIndicator.adaptive(
+      onRefresh: _refresh,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (n) {
+          if (n.metrics.pixels >= n.metrics.maxScrollExtent - 320) {
+            controller.loadMore();
+          }
+          return false;
+        },
+        child: CustomScrollView(
+          physics: AppPlatform.scrollPhysics,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                _kInset,
+                kShellTabBodyContentTopGap,
+                _kInset,
+                14,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Obx(
+                      () => AppSearchField(
+                        controller: controller.searchCtrl,
+                        onChanged: controller.onSearchChanged,
+                        hintText: 'Search 250,000+ bottles',
+                        busy: controller.isSearching.value,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const _CategoryRow(),
+                  ],
+                ),
+              ),
             ),
-            prefixIcon: const Icon(
-              Icons.search,
-              color: AppColors.white,
-              size: 20,
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(_kInset, 0, _kInset, 24),
+              sliver: Obx(() {
+                final bottles = controller.visibleBottles;
+                // A fresh query / category gets a fresh stagger.
+                final listKey = ValueKey(
+                  '${controller.keyword.value}|'
+                  '${controller.selectedCategoryId.value}',
+                );
+
+                if (bottles.isEmpty) {
+                  return SliverToBoxAdapter(
+                    child: AppStateSwitcher(
+                      stateKey: listKey,
+                      child: controller.isSearching.value
+                          ? const _SkeletonRows()
+                          : const _NoBottlesFound(),
+                    ),
+                  );
+                }
+
+                return SliverList.separated(
+                  key: listKey,
+                  itemCount: bottles.length + 1,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    if (index == bottles.length) {
+                      return Obx(
+                        () => AnimatedSize(
+                          duration: const Duration(milliseconds: 200),
+                          child: controller.isLoadingMore.value
+                              ? const _SkeletonRows(count: 2)
+                              : const SizedBox(height: 8),
+                        ),
+                      );
+                    }
+                    return StaggeredEntrance(
+                      index: index.clamp(0, 8),
+                      child: MarketBottleRow(bottle: bottles[index]),
+                    );
+                  },
+                );
+              }),
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 10,
-            ),
-            filled: true,
-            fillColor: AppColors.panel,
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(9),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(9),
-              borderSide: const BorderSide(color: AppColors.inputBorderFocused),
-            ),
-          ),
+          ],
         ),
-        const SizedBox(height: 14),
-        _CategoryRow(controller: controller),
-        const SizedBox(height: 14),
-      ],
+      ),
     );
   }
 }
 
-class _CategoryRow extends StatelessWidget {
-  const _CategoryRow({required this.controller});
-  final MarketController controller;
+class _CategoryRow extends GetView<MarketController> {
+  const _CategoryRow();
 
   @override
   Widget build(BuildContext context) {
@@ -184,7 +154,9 @@ class _CategoryRow extends StatelessWidget {
       child: Obx(
         () => ListView.separated(
           scrollDirection: Axis.horizontal,
-          clipBehavior: Clip.hardEdge,
+          // Chips scroll edge to edge; the selected chip's glow is not
+          // clipped into a box.
+          clipBehavior: Clip.none,
           padding: const EdgeInsets.only(right: 4),
           itemCount: controller.categories.length + 1,
           separatorBuilder: (context, index) => const SizedBox(width: 10),
@@ -192,10 +164,9 @@ class _CategoryRow extends StatelessWidget {
             final isAll = index == 0;
             final label = isAll ? 'All' : controller.categories[index - 1].name;
             final id = isAll ? '' : controller.categories[index - 1].id;
-            final selected = controller.selectedCategoryId.value == id;
             return AppFilterChip(
               label: label,
-              selected: selected,
+              selected: controller.selectedCategoryId.value == id,
               onTap: () {
                 if (Get.isRegistered<AppAnalyticsController>()) {
                   unawaited(
@@ -204,7 +175,6 @@ class _CategoryRow extends StatelessWidget {
                     }),
                   );
                 }
-                AppHaptics.selection();
                 controller.selectCategory(id);
               },
             );
@@ -215,247 +185,35 @@ class _CategoryRow extends StatelessWidget {
   }
 }
 
-class _BenchmarkCard extends StatelessWidget {
-  const _BenchmarkCard({required this.bottle});
-  final BluebookModel bottle;
+/// Placeholder rows while the first page of a new query loads, or while the
+/// next page arrives at the bottom.
+class _SkeletonRows extends StatelessWidget {
+  const _SkeletonRows({this.count = 4});
+
+  final int count;
 
   @override
   Widget build(BuildContext context) {
-    final price = PriceFormatter.format(bottle.average);
-    final low = PriceFormatter.format(bottle.low);
-    final high = PriceFormatter.format(bottle.high);
-    final imageUrl = _resolveImageUrl(bottle.image);
-    final proofLabel = ProofFormatter.formatLabelOrFallback(bottle.proof);
-    final ratingLabel = bottle.rating ?? '—';
-    final movementLabel = PriceFormatter.formatPriceMovementLabel(
-      bottle.priceMovement,
-    );
-    final movementColor = PriceFormatter.priceMovementColor(
-      bottle.priceMovement,
-    );
-    return InkWell(
-      borderRadius: BorderRadius.circular(9),
-      onTap: () {
-        if (Get.isRegistered<AppAnalyticsController>()) {
-          unawaited(
-            AppAnalyticsController.to.logTap('market_benchmark_open', {
-              'bottle_id': bottle.id,
-            }),
-          );
-        }
-        AppHaptics.tap();
-        Get.toNamed(
-          AppRoutes.benchmarkDetail,
-          arguments: {
-            'id': bottle.id,
-            'name': bottle.bottleName,
-            'image': bottle.image,
-            'average': bottle.average,
-            'low': bottle.low,
-            'high': bottle.high,
-            'proof': bottle.proof,
-            'description': bottle.description,
-            'rating': bottle.rating,
-            'price_movement': bottle.priceMovement,
-          },
-        );
-      },
-      child: Container(
-        height: 97.247,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(9),
-          gradient: AppColors.cardSurfaceGradient,
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              left: 6.16,
-              top: 13.8,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 62.62,
-                  height: 62.62,
-                  child: _MaybeHero(
-                    tag: AppHeroTags.bottleImage(bottle.id),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: AppColors.bottleRadialGlow,
-                          ),
-                        ),
-                        if (imageUrl != null)
-                          CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            cacheManager: AppCacheManager.images,
-                            fit: BoxFit.contain,
-                            placeholder: (context, _) => _placeholder(),
-                            errorWidget: (context, error, stackTrace) =>
-                                _placeholder(),
-                          )
-                        else
-                          _placeholder(),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+    return ShimmerScope(
+      child: Column(
+        children: [
+          for (var i = 0; i < count; i++)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: ShimmerBox(height: 86, width: double.infinity),
             ),
-            Positioned(
-              left: 72,
-              top: 14,
-              right: 58,
-              child: Text(
-                bottle.bottleName,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.body16().copyWith(
-                  fontSize: 15,
-                  color: AppColors.white,
-                ),
-              ),
-            ),
-            Positioned(
-              left: 72,
-              bottom: 14,
-              child: Row(
-                children: [
-                  Text(
-                    proofLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body16().copyWith(
-                      fontSize: 10,
-                      color: AppColors.textWolf,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  SvgPicture.asset(
-                    AppAssets.star,
-                    width: 8,
-                    height: 8,
-                    colorFilter: const ColorFilter.mode(
-                      AppColors.textWolf,
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    ratingLabel,
-                    style: AppTextStyles.body16().copyWith(
-                      fontSize: 10,
-                      color: AppColors.textWolf,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              right: 12,
-              top: 48,
-              width: 132,
-              bottom: 10,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    price,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body16().copyWith(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textCream,
-                    ),
-                  ),
-                  const Spacer(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      SvgPicture.asset(
-                        AppAssets.marketTrend,
-                        width: 10,
-                        height: 10,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        movementLabel,
-                        style: AppTextStyles.body16().copyWith(
-                          fontSize: 12,
-                          color: movementColor,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          '$low - $high',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
-                          style: AppTextStyles.body16().copyWith(
-                            fontSize: 10,
-                            color: AppColors.textWolf,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              right: 12,
-              top: 14,
-              child: const Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: AppColors.iconNeutralLight,
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
-  }
-
-  Widget _placeholder() {
-    return Image.asset(
-      AppAssets.collectionBottlePlaceholder,
-      fit: BoxFit.contain,
-      gaplessPlayback: true,
-    );
-  }
-
-  String? _resolveImageUrl(String? raw0) {
-    final raw = raw0?.trim();
-    if (raw == null || raw.isEmpty || raw == 'null') return null;
-    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-
-    final uploadUrl = AppStorage.uploadUrl;
-    if (uploadUrl != null && uploadUrl.trim().isNotEmpty) {
-      return '${uploadUrl.trim().replaceAll(RegExp(r'/+$'), '')}/$raw';
-    }
-
-    final api = Uri.parse(AppConstants.apiBaseUrl);
-    return Uri(
-      scheme: api.scheme,
-      host: api.host,
-      port: api.hasPort ? api.port : null,
-      path: raw.startsWith('/') ? raw : '/$raw',
-    ).toString();
   }
 }
 
 /// No results for the current search / category.
-class _NoBottlesFound extends StatelessWidget {
+class _NoBottlesFound extends GetView<MarketController> {
   const _NoBottlesFound();
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<MarketController>();
     final searching = controller.keyword.value.trim().isNotEmpty;
 
     return Padding(
@@ -469,32 +227,8 @@ class _NoBottlesFound extends StatelessWidget {
             : 'We have not benchmarked any bottles here yet. Try another '
                   'category.',
         actionLabel: searching ? 'Clear search' : null,
-        onAction: searching ? () => controller.onSearchChanged('') : null,
+        onAction: searching ? controller.clearSearch : null,
       ),
-    );
-  }
-}
-
-/// Wraps [child] in a [Hero] only when a unique [tag] is available.
-///
-/// Rows without a stable bottle id simply cross-fade with the page instead of
-/// flying, which is better than risking duplicate Hero tags on one screen.
-class _MaybeHero extends StatelessWidget {
-  const _MaybeHero({required this.tag, required this.child});
-
-  final String? tag;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final heroTag = tag;
-    if (heroTag == null) return child;
-    return Hero(
-      tag: heroTag,
-      // Keep the bottle art from being letterboxed mid-flight.
-      flightShuttleBuilder: (context, animation, direction, from, toHero) =>
-          toHero.widget,
-      child: child,
     );
   }
 }

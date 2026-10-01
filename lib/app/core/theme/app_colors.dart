@@ -199,6 +199,11 @@ class AppColors {
   static const Color shimmerBase = Color(0xFF2A1E1A);
   static const Color shimmerHighlight = Color(0xFF3A2A24);
 
+  /// Placeholders drawn on a [cardSurfaceGradient] card, which is nearly the
+  /// same colour as [shimmerBase].
+  static const Color shimmerOnCardBase = Color(0xFF3A2B25);
+  static const Color shimmerOnCardHighlight = Color(0xFF52403A);
+
   // --- Onboarding / OTP accents ---------------------------------------------
 
   /// Primary gold used across get-started and OTP artwork.
@@ -271,4 +276,32 @@ class AppColors {
 
   /// Tooltip surface behind chart readouts.
   static const Color chartTooltipSurface = Color(0xF21F1512);
+
+  // --- Theme / motion surfaces -----------------------------------------------
+
+  /// Material colour-scheme surface (dialogs, pickers, sheets).
+  static const Color schemeSurface = Color(0xFF0C0101);
+
+  /// Small count badge on an icon (active sort filters).
+  static const Color badgeAlert = Color(0xFFD9432F);
+
+  /// Soft gold wash behind the selected bottom-nav item.
+  static const Color navIndicatorWash = Color(0x1FD4AF37);
+
+  /// Gold halo around focused inputs and the active nav pill.
+  static const Color goldGlow = Color(0x40D4AF37);
+
+  /// Sheen band swept across the splash logo.
+  static const Color goldSheen = Color(0x66FFF3C4);
+
+  // --- Price confidence (ai-features-plan.md §2.5) ---------------------------
+
+  /// Market-backed price with plenty of recent observations.
+  static const Color confidenceHigh = trendPositive;
+
+  /// Market-backed, but thinner.
+  static const Color confidenceMedium = goldAccent;
+
+  /// Thin, stale, legacy, or an Oak Spire (admin) price.
+  static const Color confidenceLow = textWolf;
 }

@@ -2,7 +2,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/animations/staggered_entrance.dart';
 import '../../../core/constants/app_assets.dart';
+import '../../../core/widgets/app_backdrop_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/common_primary_button.dart';
@@ -20,11 +22,16 @@ class ForgotPasswordView extends GetView<ForgotPasswordController> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(AppAssets.signInBackground, fit: BoxFit.cover),
+          const AppBackdropImage(AppAssets.signInBackground),
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(35, 185, 35, 24),
-              child: Column(
+              padding: EdgeInsets.fromLTRB(
+                35,
+                MediaQuery.sizeOf(context).height * 0.2,
+                35,
+                24,
+              ),
+              child: StaggeredColumn(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Forgot', style: AppTextStyles.heading32Bold()),

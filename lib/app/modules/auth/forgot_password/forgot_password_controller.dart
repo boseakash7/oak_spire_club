@@ -30,10 +30,7 @@ class ForgotPasswordController extends GetxController {
       await _repo.forgetPassword(email: email);
       unfocusSafely();
       // Replace this route so its TextField is gone before reset/sign-in.
-      Get.offNamed(
-        AppRoutes.resetPassword,
-        arguments: {'email': email},
-      );
+      Get.offNamed(AppRoutes.resetPassword, arguments: {'email': email});
     } on ApiException catch (e) {
       if (!isClosed) isLoading.value = false;
       AppSnackbar.error(e.message);

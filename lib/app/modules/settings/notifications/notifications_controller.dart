@@ -60,28 +60,18 @@ class NotificationsController extends GetxController {
     }
   }
 
-  Future<void> setPushEnabled(bool value) => _updatePreference(
-        NotificationPreferenceKey.pushNotifications,
-        value,
-      );
+  Future<void> setPushEnabled(bool value) =>
+      _updatePreference(NotificationPreferenceKey.pushNotifications, value);
 
-  Future<void> setCollectionAlerts(bool value) => _updatePreference(
-        NotificationPreferenceKey.collectionValue,
-        value,
-      );
+  Future<void> setCollectionAlerts(bool value) =>
+      _updatePreference(NotificationPreferenceKey.collectionValue, value);
 
-  Future<void> setMarketBenchmarkAlerts(bool value) => _updatePreference(
-        NotificationPreferenceKey.marketBenchmarks,
-        value,
-      );
+  Future<void> setMarketBenchmarkAlerts(bool value) =>
+      _updatePreference(NotificationPreferenceKey.marketBenchmarks, value);
 
-  Future<void> setPriceMovementAlerts(bool value) => _updatePreference(
-        NotificationPreferenceKey.priceMovement,
-        value,
-      );
+  Future<void> setPriceMovementAlerts(bool value) =>
+      _updatePreference(NotificationPreferenceKey.priceMovement, value);
 
-  Future<void> setProductUpdates(bool value) => _updatePreference(
-        NotificationPreferenceKey.tipsUpdates,
-        value,
-      );
+  Future<void> setProductUpdates(bool value) =>
+      _updatePreference(NotificationPreferenceKey.tipsUpdates, value);
 }

@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../widgets/settings_scaffold.dart';
+import '../../../core/theme/app_colors.dart';import '../widgets/settings_scaffold.dart';
 
 class LegalWebView extends StatefulWidget {
   const LegalWebView({super.key});
@@ -22,8 +21,9 @@ class _LegalWebViewState extends State<LegalWebView> {
   void initState() {
     super.initState();
     final args = Get.arguments;
-    _pageTitle =
-        args is Map ? args['title']?.toString() ?? 'Document' : 'Document';
+    _pageTitle = args is Map
+        ? args['title']?.toString() ?? 'Document'
+        : 'Document';
     final url = args is Map ? args['url']?.toString() ?? '' : '';
 
     _controller = WebViewController()

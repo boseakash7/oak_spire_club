@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../animations/app_motion.dart';
 import '../theme/app_colors.dart';
-import '../utils/app_haptics.dart';
 import '../theme/app_text_styles.dart';
+import 'app_pressable.dart';
 
 /// Horizontal filter chip (Collection / Market category rows).
 class AppFilterChip extends StatelessWidget {
@@ -20,16 +20,15 @@ class AppFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          AppHaptics.selection();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(42),
+    final duration = AppMotion.of(context, AppMotion.chip);
+    return Semantics(
+      selected: selected,
+      child: AppPressable(
+        onTap: onTap,
+        haptic: PressHaptic.selection,
+        scale: 0.94,
         child: AnimatedContainer(
-          duration: AppMotion.chip,
+          duration: duration,
           curve: AppMotion.standard,
           height: 28,
           constraints: const BoxConstraints(minWidth: 92),
@@ -44,14 +43,14 @@ class AppFilterChip extends StatelessWidget {
                 ? [
                     BoxShadow(
                       color: AppColors.gold1.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      blurRadius: 6,
+                      offset: const Offset(0, 1),
                     ),
                   ]
                 : null,
           ),
           child: AnimatedDefaultTextStyle(
-            duration: AppMotion.chip,
+            duration: duration,
             curve: AppMotion.standard,
             style: AppTextStyles.uiChip().copyWith(
               color: selected ? AppColors.black : AppColors.textCream,

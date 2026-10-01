@@ -30,6 +30,11 @@ flutter analyze                 # lints: package:flutter_lints
 flutter test                    # only test/widget_test.dart exists (route constants)
 flutter run
 
+# Against the local docker backend (oakspireweb) on an Android emulator:
+# run the php container with WEBSITE_URL=10.0.2.2 so the Host header matches,
+# then pass the API base (debug builds allow cleartext HTTP for this).
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2/v2/api/
+
 # Release builds — always obfuscated + split debug info
 ./build_apk.bat                 # or scripts/build_release_apk.ps1 [-SplitPerAbi]
 ./build_bundle.bat
@@ -53,14 +58,25 @@ GetX for everything: state, DI, routing, and the HTTP client. Layering is
 lib/
   main.dart                  Hive + AppStorage + Firebase init, then runApp
   app/
-    app.dart                 GetMaterialApp (dark-only theme, fade/slide transitions)
+    app.dart                 GetMaterialApp (dark-only theme, analytics nav observer)
     app_binding.dart         global DI graph, registered once at startup
-    core/                    cross-cutting: network, cache, storage, theme, firebase,
-                             analytics, animations, shared widgets, utils
-    data/                    models, datasources (HTTP), repositories (cache + shaping)
-    modules/<feature>/       <feature>_binding.dart / _controller.dart / _view.dart
+    core/                    cross-cutting: network, cache, storage, theme, platform,
+                             firebase, analytics, animations, services (update check,
+                             Apple IAP, store links), shared widgets, utils
+    data/                    models, datasources (HTTP), repositories (cache + shaping),
+                             plus chart_index_comparison / collection_value_calculator
+    modules/<feature>/       <feature>_binding.dart / _controller.dart / _view.dart,
+                             plus widgets/ for the view's sections
+    modules/session/         UserSessionController (Rx user), AppConfigController
+    modules/profile/         settings_menu_popup.dart (settings popup + logout)
+    modules/shared/          controller mixins shared by features (PagedBottleSearch)
     routes/                  app_routes.dart, app_pages.dart, *_navigation.dart helpers
 ```
+
+`AppBinding` `Get.put`s three permanent controllers (`AppAnalyticsController`,
+`UserSessionController`, `AppConfigController`, the last after `ConfigRepository` because it
+depends on it), lazy-registers every datasource/repository pair, then calls
+`FcmTokenSyncService.start()`. `AppCache` is put separately in `main.dart`, before `runApp`.
 
 ### Adding a screen
 
@@ -69,6 +85,8 @@ lib/
 3. Create `modules/<feature>/` with a binding (`Get.lazyPut` the controller), a
    `GetxController`, and a `GetView<Controller>` view. Views that need no controller may
    skip the binding (see `settingsHelp`, `settingsAbout`).
+4. Add a case to `AnalyticsScreens.screenKeyForRoute`. Without one, the screen key falls back
+   to the slugged path (`/settings/foo` → `settings_foo`).
 
 ### Adding an API call
 
@@ -77,6 +95,8 @@ lib/
    followed by `_client.parseEnvelope(response)`.
 2. Wrap it in a repository method, which owns caching and any client-side shaping.
 3. Register the datasource + repository pair in `AppBinding` with `Get.lazyPut(..., fenix: true)`.
+   (`NotificationPrefsRemoteDataSource` / `NotificationPrefsRepository` exist but are *not*
+   registered. Register them before anything calls `Get.find` for them.)
 
 ## Screen map
 
@@ -95,8 +115,8 @@ else is a full push.
 | `/reset-password` | `modules/auth/reset_password` | forgot-password (`offNamed`, args `{email}`) |
 | `/shell` | `modules/navigation` | `AuthNavigation.completeSession`, subscription skip/success |
 | `/taste-bottles` | `modules/taste` | home empty state, home chart footer, collection empty state |
-| `/add-to-collection` | `modules/add_collection` | taste list, benchmark detail — both via `AddToCollectionLauncher` |
-| `/benchmark-detail` | `modules/market` | market list tap, collection item detail sheet |
+| `/add-to-collection` | `modules/add_collection` | taste list + benchmark detail via `AddToCollectionLauncher`; taste "add your own" (no args) |
+| `/benchmark-detail` | `modules/market` | market row (`market_bottle_row`), collection quick-view sheet, home "top moved" |
 | `/subscription` | `modules/subscription` | settings menu, `SubscriptionLimitNavigation`, post-auth offer |
 | `/subscription-skip` | `modules/subscription` | subscription screen "skip" |
 | `/subscription/payment-success` | `modules/subscription` | after Razorpay verify / Apple IAP subscribe |
@@ -109,23 +129,34 @@ else is a full push.
 | `/settings/legal-web` | `modules/settings/legal` | about screen, args `{title, url}` (no binding) |
 
 **Shell tabs** are built in [bottom_nav_shell.dart](lib/app/modules/navigation/bottom_nav_shell.dart)
-as a lazy `IndexedStack`: `HomeView` (0), `CollectionView` (1), `MarketView` (2). Settings opens
-as `showSettingsPopup(context)` from the shell header, not as a tab or route.
+as a `LazyTabStack` ([lazy_tab_stack.dart](lib/app/modules/navigation/widgets/lazy_tab_stack.dart)):
+`HomeView` (0), `CollectionView` (1), `MarketView` (2). The fourth nav item (slot 3) is
+Settings, which calls `showSettingsPopup(context)` and sets `settingsMenuOpen`; it is not a tab
+or route. The shell's back handler closes the popup, then returns to Home, then asks to exit.
 
-**Route arguments are untyped maps.** Only the subscription routes have helper accessors
-(`SubscriptionLimitNavigation`, `SubscriptionPaymentSuccessNavigation`). The rest read
-`Get.arguments` directly: `/verify-otp` and `/reset-password` take `{email}`,
+**Route arguments are untyped maps.** Helper accessors exist for the subscription routes
+(`SubscriptionLimitNavigation`, `SubscriptionPaymentSuccessNavigation`, and
+`AuthNavigation.postAuthSubscriptionArg` for `/subscription` and `/subscription-skip`) and for
+`/benchmark-detail` (`BenchmarkDetailRouteArgs.from`, in `benchmark_detail_controller.dart`). The
+rest read `Get.arguments` directly. `/verify-otp` and `/reset-password` take `{email}`.
 `/benchmark-detail` takes a flat bottle map (`id`, `name`, `image`, `average`, `low`, `high`,
-`proof`, `description`, `rating`) built by `CollectionItemDisplay.benchmarkDetailArguments` or
-inline in `market_view`, and `/add-to-collection` takes
+`proof`, `description`, `rating`, `price_movement`), built by
+`CollectionItemDisplay.benchmarkDetailArguments` or inline in `market_bottle_row`.
+`/add-to-collection` takes
 `{prefill, editMode?, originalBottleId?, navigateToCollectionOnSuccess, popBenchmarkDetailOnSuccess}`.
+Home's empty state passes `{autoCloseOnAdded: true}` to `/taste-bottles`, but nothing reads it,
+because taste always pops after an add.
 
-**Add-to-collection returns `true` on success.** `taste_view` and the empty states `await
-Get.toNamed(...)` and call `forceReload()` when the result is `true`; keep that contract when
-adding a new entry point.
+**Add-to-collection pops with `true` on success, and taste-bottles passes that on.** Taste
+switches to the Collection tab, reloads collection and home, then `Get.back(result: true)`. The
+callers that push taste (home chart footer, home and collection empty states) `await
+Get.toNamed(...)` and call `forceReload()` when the result is `true`. Keep that contract when
+adding a new entry point. `AddToCollectionLauncher.open` handles its own follow-up instead:
+it switches tabs, refreshes home and collection, and optionally pops benchmark detail. It also
+merges existing collection rows for the same bottle into an edit-mode prefill.
 
-`modules/category_detail/` is not wired to a route or opened from anywhere — treat it as dead
-code, not as the screen behind the Market category chips (those filter the bluebook list in place).
+The Market category chips filter the bluebook list in place; there is no category detail screen
+(the old unreachable `category_detail` module was removed).
 
 ## API surface
 
@@ -148,12 +179,12 @@ comes from `AppStorage` at the repository layer.
 | `collection/chart-data` | GET | `chartData` | home chart, collection chart (`look_back` days) |
 | `collection/add` | POST multipart | `add` | add-to-collection (image upload), collection quantity/fill edits |
 | `collection/delete-by-user-bottle` | POST | `deleteByUserBottle` | collection remove / edit-replace |
-| `bluebook/get-all-bluebooks` | GET | `getAll` | market search + pagination, taste search |
+| `bluebook/get-all-bluebooks` | GET | `getAll` (no keyword) | market / taste browsing + pagination |
+| `bluebook/search` | GET | `getAll` (with keyword) | market / taste search: hybrid lexical + semantic, same envelope, `category_id` honoured, SQL fallback server-side |
 | `bluebook/create` | POST | `create` | add-to-collection when the bottle is not in the bluebook |
 | `bluebook/get-last-update` | GET | `getLastUpdatedReadable` | market "last updated" label |
 | `bluebook-price-history/chart-data-dashboard` | GET | `getChartDashboard` | benchmark detail chart (`bottleId`, `fromDate`, `endDate`) |
 | `categories/list` | POST + query | `list` | market category chips, taste category chips |
-| `categories/detail` | GET | `detail` | `CategoryDetailController` only — unreachable, see screen map |
 | `package/get-all` | GET | `getAll` | subscription plan list |
 | `package/payment-create` | POST | `createPayment` | subscription checkout (Razorpay) |
 | `package/payment-verify` | POST | `verifyPayment` | Razorpay success/failure handler |
@@ -169,7 +200,7 @@ call; the app only uses `normal` today.
 
 **Cached reads** (24h TTL, cleared on app-version change) are `collection:all:$userId`,
 `collection:chart:$userId:$lookBackDays`, `categories:list:$page:$limit`,
-`categories:detail:$categoryId`, and `bluebook:last-updated`. `bluebook/get-all-bluebooks`,
+and `bluebook:last-updated`. `bluebook/get-all-bluebooks`, `bluebook/search`,
 `config/all`, `user/get-by-id`, and everything under `package/` and `auth/` are uncached.
 
 ## Conventions that matter
@@ -221,8 +252,10 @@ whatever was last persisted, so never assume these are non-null.
 
 **Subscription state** is derived from `UserModel` getters, not stored separately:
 `isFreeUser` (`is_free == 1`, backend-granted premium), `hasActiveSubscription`,
-`needsSubscriptionOffer`, `resolvedPaymentGateway` (`razorpay` | `apple_in_app`).
-`SubscriptionController` picks one of three `SubscriptionScreenMode`s from these.
+`hasUsedTrial`, `needsSubscriptionOffer`, `resolvedPaymentGateway` (`razorpay` | `apple_in_app`).
+`SubscriptionController` picks one of three `SubscriptionScreenMode`s (`checkout`, `freeUser`,
+`activeSubscription`) from these. The live user is `UserSessionController.user` (an `Rxn<UserModel>` loaded
+from `AppStorage`). After a refresh, update it with `setUser` so views rebuild.
 
 **Bottom nav indices are not stable.** The Taste tab is commented out in
 [bottom_nav_shell.dart](lib/app/modules/navigation/bottom_nav_shell.dart), so Benchmark is
@@ -231,9 +264,13 @@ the controller, and `AnalyticsScreens.shellTabScreenName` in sync when tabs chan
 is a popup, not a tab.
 
 **Analytics.** Custom events only: `AppAnalyticsController.to.logScreenView(key)` emits
-`{key}_view`, `logTap(key)` emits `{key}_click`, both through `sanitizeKey`. Always guard
+`{key}_view`, `logTap(key, [extra])` emits `{key}_click`, both through `sanitizeKey`. Always guard
 with `Get.isRegistered<AppAnalyticsController>()` and `unawaited(...)`, matching existing
-call sites.
+call sites. Route screen views are automatic: `AppAnalyticsNavObserver` (in `app.dart`) maps each
+pushed route through `AnalyticsScreens.screenKeyForRoute`. Give each new route a stable key
+there; otherwise it falls back to the slugged path.
+Shell tab switches log through `BottomNavController.setIndex`. Crashlytics and Performance are
+set up in `bootstrapFirebase`.
 
 **FCM topics** are all prefixed `oakspire_` and are documented in
 [fcm_topics_summary.txt](fcm_topics_summary.txt) — registration state, subscription tier,
@@ -242,12 +279,63 @@ the last-applied registration and tier topics are cached in `AppStorage` so swit
 idempotent.
 
 **Theming is dark-only and hand-tuned to Figma.** Colors come from `AppColors`, text from
-`AppTextStyles` (Playfair Display for headings, Roboto/Inter for body, via `google_fonts`).
-Avoid raw `Color(0x...)` or `TextStyle` literals in views — add a named token instead.
-Motion durations live in `AppMotion`.
+`AppTextStyles` (Playfair Display for headings, Roboto/Inter for body, via `google_fonts`),
+spacing / radii / glows from `AppSpacing` / `AppRadii` / `AppShadows`
+([app_spacing.dart](lib/app/core/theme/app_spacing.dart)). `AppTheme` carries component themes
+(inputs, switches, sliders, sheets, date picker). Avoid raw `Color(0x...)` or `TextStyle`
+literals in views — add a named token instead. Older screens still use one-off Figma paddings.
+New and refactored code takes its values from the `AppSpacing` scale (shell gutter is
+`AppSpacing.gutter`, 20).
+
+**Banding.** The dark palette's gradients are only a few color levels apart, so they band on
+8-bit screens. Flutter already dithers gradients drawn in code. Full-screen photo backgrounds go
+through `AppBackdropImage`, which uses high-quality filtering, and ship a 2× variant under
+`assets/images/2.0x/` (`signin_bg.png` does). `signUpBackground` is an alias of
+`signInBackground`. The dark photo backgrounds are de-banded offline with
+[scripts/deband_backgrounds.py](scripts/deband_backgrounds.py), which smooths them in float and
+re-dithers them to 8-bit. Re-run it on the undithered masters (the script says where they are)
+whenever the art changes. Keep `signin_bg` as PNG, because JPEG or WebP brings the bands back.
+Don't add an app-wide grain or noise overlay: a full-screen `ImageShader` pass on every frame
+crashed the SwiftShader (software-GPU) emulator.
+
+**Motion.** Durations and curves live in `AppMotion`; read them through
+`AppMotion.of(context, d)` (or check `AppMotion.reduced(context)`) so the OS "reduce / remove
+animations" setting turns motion off app-wide. The shared primitives, reuse them instead of
+hand-rolling animation:
+- `AppPageTransition` — every route's transition, attached per `GetPage` in `AppPages.pages`
+  (GetX keeps the iOS swipe-back only for a route's own `customTransition`): Cupertino on iOS,
+  Material shared-axis on Android.
+- `AppStateSwitcher` — fade-through between loading / content / empty states.
+- `StaggeredEntrance` / `FadeSlideEntrance` / `StaggeredColumn` — entrances; inside a
+  `StaggerScope`, rows with an `id` animate once and stagger per burst, not per absolute index.
+- `AppPressable` — press scale + haptic for anything tappable (not a bare `GestureDetector`).
+- `ShimmerScope` around a skeleton — one synced sweep for all its `ShimmerBox`es. Placeholders
+  that sit on a `cardSurfaceGradient` card need `AppColors.shimmerOnCardBase/Highlight` (the
+  default base is nearly the card color). `TasteLoadingView` shows how: real-looking card
+  surfaces underneath, with the placeholders in one scope on top.
+- `AnimatedCountText`, `AnimatedFillBar`, `AppSegmentedRange`, `AppSearchField`,
+  `BottleImage` (art + fallback URLs + Hero via `AppHeroTags`), `PricingBadge`.
+- Shell tabs are a `LazyTabStack` (built on first visit, fade-through on switch; hidden tabs get
+  `TickerMode(false)` and `HeroMode(false)`).
+
+**Platform feel** goes through `AppPlatform` (`isCupertino`, `scrollPhysics`, `backIcon`) and
+`showAppDatePicker` (wheel on iOS, calendar on Android); use `RefreshIndicator.adaptive`.
+Payments keep their own `Platform.isIOS` checks.
+
+**Prices say what they rest on.** `BluebookModel.pricing` (`BottlePricing`) is parsed from the
+API's `pricing` object; `PricingBadge` renders it, and a `manual` basis is labelled "Oak Spire
+price", never market value (oakspireweb `ai-features-plan.md` §2.5). The bottle chart is a step
+line on real dates — history is change-only, so a price holds until the next point — and draws
+no BSMI line unless the API sends one (it used to fake one from the current price).
 
 **User messaging** goes through `AppSnackbar.error/success/info` (a custom overlay toast
-with the app icon), not `Get.snackbar` or `ScaffoldMessenger`.
+with the app icon), not `Get.snackbar`, `ScaffoldMessenger` or `Fluttertoast` directly.
+Confirmations use `showAppConfirmDialog`. Other dialogs and sheets use `showAppAnimatedDialog` /
+`showAppAnimatedBottomSheet` ([show_app_dialog.dart](lib/app/core/widgets/show_app_dialog.dart)).
+
+**Images.** A bottle `image` is either a full URL or a bare upload file name.
+`AppImageUrl.resolve` turns it into a URL, using `upload_url` first and then the API host.
+`BottleImage` calls it, so don't concatenate `upload_url` by hand.
 
 **Chart math** is shared, not per-screen: `ChartIndexComparison` rebases each series so the
 first point in the window is 100 (so collection value and BSMI compare on one axis), and
@@ -311,6 +399,14 @@ docker compose up -d        # from the oakspireweb root
 # apache :80, mysql :3306, phpMyAdmin :8080, redis :6379, RedisInsight :8001
 docker compose exec php php cli priceUpdate     # run a cron command by hand
 ```
+
+**Deploying to the server** is `sh scripts/deploy.sh` (in `~/oakspireclub`). It fast-forwards to
+`origin/phase6` only, refuses to run if the server has local commits or edited tracked files, and
+checks `http/public/oak-website/index.html` afterwards. A plain `git pull` used to merge a stray
+server-only commit back in on every pull, which is how the marketing site kept disappearing.
+Server-only values go in the server's `.env` (e.g. `APP_SCHEME=https`, read by
+`Configs/Application.php`) and in `docker-compose.override.yml` (gitignored; see
+`docker-compose.override.example.yml`), never in tracked files.
 
 `http/` is bind-mounted into the apache and php containers, so edits are live — no rebuild.
 `.dockerignore` excludes `http/public/*` from the image on purpose.
@@ -521,14 +617,14 @@ All paths are under `Application/Controllers/`:
 terms/privacy URLs come from. Bottle images uploaded through `collection/add` are moved to
 `Application/Uploads/<rand>_<time>.<ext>` and resolved client-side against `upload_url`.
 
-Chart shaping is split across `Api/V2/Collection::chartData`,
-`Application/Models/Collection` (`getChartData`, `getOverallPriceTrend`, `getIndexDataDashboard`,
-`getCollectionValueByDate`, `getInvestedValue`) and
-`Controllers/Helpers/CollectionHelper` (`fillDailyBothDirections` forward/backward-fills missing
-days, `calculateIndexLevel` rebases a series to 100). The app's `ChartIndexComparison` rebases
-again on top of that — if a chart looks doubly normalized, this is where to look. Several of these
-model methods are called with more arguments than they declare (`getChartData(..., true)`,
-`getInvestedValue($userId, $type)`); PHP ignores the extras, so those trailing arguments do nothing.
+Chart shaping: history is **change-only** (`priceUpdate` writes a row only when a price moves),
+so a bottle's price on a date is its latest row on or before it.
+`Controllers/Helpers/PriceSeriesHelper` is the one place that reads history that way — daily
+weighted sums (collection value, BSMI index), as-of values (`first_price` / `last_price`), and a
+single bottle's change points with a point at each end of the window. `Models/Collection`'s chart
+methods, `bluebook/get-price-history` and dated `chart-data-dashboard` all go through it.
+`Api\V2\Collection::chartData` caches under a versioned key (`CHART_CACHE_VERSION`) for 3 hours.
+The app's `ChartIndexComparison` rebases on top of that.
 
 ## Other surfaces, for orientation
 

@@ -4,4 +4,8 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Debug builds only: lets a build started with the dart-define
+         API_BASE_URL=http://10.0.2.2/v2/api/ reach the local docker backend
+         over plain HTTP. Release builds stay HTTPS-only. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

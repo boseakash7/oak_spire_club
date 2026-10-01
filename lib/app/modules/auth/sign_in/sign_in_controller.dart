@@ -57,10 +57,7 @@ class SignInController extends GetxController {
   @override
   void onClose() {
     unfocusSafely();
-    disposeAfterDetach([
-      emailController,
-      passwordController,
-    ]);
+    disposeAfterDetach([emailController, passwordController]);
     super.onClose();
   }
 }

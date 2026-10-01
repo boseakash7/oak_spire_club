@@ -321,7 +321,10 @@ class HomeController extends GetxController {
     _applyMovedForRange(percent: percent, period: period);
   }
 
-  Future<void> forceReload() => fetchHomeData(forceRefresh: true);
+  /// Pull-to-refresh and "added a bottle": refetch while the current content
+  /// stays on screen (the skeleton only shows when there is nothing yet).
+  Future<void> forceReload() =>
+      fetchHomeData(forceRefresh: true, background: true);
 
   void _applyChartQuickStats(Map<String, dynamic> chart) {
     final rareRaw = chart['rare_bottles_count'];

@@ -14,10 +14,14 @@ class ResetPasswordController extends GetxController {
   static const int otpLength = 4;
   static const int resendCooldown = 60;
 
-  final List<TextEditingController> digitControllers =
-      List.generate(otpLength, (_) => TextEditingController());
-  final List<FocusNode> focusNodes =
-      List.generate(otpLength, (_) => FocusNode());
+  final List<TextEditingController> digitControllers = List.generate(
+    otpLength,
+    (_) => TextEditingController(),
+  );
+  final List<FocusNode> focusNodes = List.generate(
+    otpLength,
+    (_) => FocusNode(),
+  );
 
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
@@ -80,11 +84,7 @@ class ResetPasswordController extends GetxController {
 
     isLoading.value = true;
     try {
-      await _repo.resetPassword(
-        email: email,
-        otp: code,
-        password: password,
-      );
+      await _repo.resetPassword(email: email, otp: code, password: password);
       if (isClosed) return;
 
       AppSnackbar.success('Password updated. Please sign in.');

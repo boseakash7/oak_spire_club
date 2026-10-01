@@ -1,19 +1,19 @@
 import 'dart:io';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../core/constants/app_assets.dart';
-import '../../core/network/app_cache_manager.dart';
+import '../../core/animations/app_motion.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/app_image_url.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/widgets/app_back_button.dart';
 import '../../core/widgets/collection_form_field.dart';
+import '../../core/widgets/bottle_image.dart';
 import '../../core/widgets/common_primary_button.dart';
-import '../../data/models/category_bottle_model.dart';
 import 'add_collection_controller.dart';
 import 'fill_level_bottom_sheet.dart';
 
@@ -182,34 +182,32 @@ class _ImagePreview extends StatelessWidget {
     } else if (previewImageUrl.isEmpty) {
       imageChild = placeholder;
     } else {
-      imageChild = CachedNetworkImage(
-        imageUrl:
-            CategoryBottleModel(
-              id: '',
-              bottleName: '',
-              image: previewImageUrl,
-            ).resolvedImageUrl ??
-            previewImageUrl,
-        cacheManager: AppCacheManager.images,
-        width: 195,
-        height: 195,
-        fit: BoxFit.contain,
-        placeholder: (context, _) => placeholder,
-        errorWidget: (context, error, stackTrace) => placeholder,
+      imageChild = SizedBox.square(
+        dimension: 195,
+        child: BottleImage(url: AppImageUrl.resolve(previewImageUrl)),
       );
     }
 
     return Container(
       height: 235,
       decoration: BoxDecoration(
-        color: AppColors.panel,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: AppColors.border),
+        gradient: AppColors.cardSurfaceGradient,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Center(child: imageChild),
+          // A newly picked photo cross-fades in over the old one.
+          Center(
+            child: AnimatedSwitcher(
+              duration: AppMotion.of(context, AppMotion.medium),
+              child: KeyedSubtree(
+                key: ValueKey(localImageFile?.path ?? previewImageUrl),
+                child: imageChild,
+              ),
+            ),
+          ),
           if (showChangeImage)
             Positioned(
               right: 27,

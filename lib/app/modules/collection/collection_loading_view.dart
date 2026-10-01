@@ -7,8 +7,11 @@ import '../../core/widgets/shimmer_box.dart';
 class CollectionLoadingView extends StatelessWidget {
   const CollectionLoadingView({super.key});
 
+  /// One shimmer sweep across the whole skeleton (see [ShimmerScope]).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ShimmerScope(child: _skeleton(context));
+
+  Widget _skeleton(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -63,12 +66,13 @@ class CollectionLoadingView extends StatelessWidget {
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 14,
-                      childAspectRatio: 166 / 211,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 14,
+                          childAspectRatio: 166 / 211,
+                        ),
                     itemCount: 4,
                     itemBuilder: (context, index) => LayoutBuilder(
                       builder: (context, c) => ShimmerBox(

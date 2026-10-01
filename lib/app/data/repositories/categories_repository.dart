@@ -2,7 +2,6 @@ import 'package:get/get.dart';
 
 import '../../core/cache/app_cache.dart';
 import '../datasources/categories_remote_datasource.dart';
-import '../models/category_detail_model.dart';
 import '../models/category_model.dart';
 import '../models/paged_result.dart';
 
@@ -61,23 +60,5 @@ class CategoriesRepository {
     );
   }
 
-  Future<CategoryDetailModel> detail({
-    required String categoryId,
-    bool forceRefresh = false,
-  }) async {
-    final cache = Get.find<AppCache>();
-    return cache.getOrFetch<CategoryDetailModel>(
-      cacheKey: 'categories:detail:$categoryId',
-      ttl: _ttl,
-      forceRefresh: forceRefresh,
-      fetch: () => _remote.detail(categoryId: categoryId),
-      encode: (v) => v.toJson(),
-      decode: (json) => CategoryDetailModel.fromJson(
-        json is Map<String, dynamic>
-            ? json
-            : Map<String, dynamic>.from(json as Map),
-      ),
-    );
-  }
 }
 

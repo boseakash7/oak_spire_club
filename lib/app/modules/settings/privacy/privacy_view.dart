@@ -19,8 +19,9 @@ class PrivacyView extends GetView<PrivacyController> {
         () => CommonPrimaryButton(
           label: 'Update password',
           isLoading: controller.isSaving.value,
-          onPressed:
-              controller.isSaving.value ? null : controller.updatePassword,
+          onPressed: controller.isSaving.value
+              ? null
+              : controller.updatePassword,
         ),
       ),
       child: Column(

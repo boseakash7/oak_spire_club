@@ -7,8 +7,11 @@ import '../../core/widgets/shimmer_box.dart';
 class SubscriptionLoadingView extends StatelessWidget {
   const SubscriptionLoadingView({super.key});
 
+  /// One shimmer sweep across the whole skeleton (see [ShimmerScope]).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ShimmerScope(child: _skeleton(context));
+
+  Widget _skeleton(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

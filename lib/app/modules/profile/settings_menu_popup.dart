@@ -16,7 +16,7 @@ import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_snackbar.dart';
-import '../../core/widgets/animated_list_entrance.dart';
+import '../../core/animations/staggered_entrance.dart';
 import '../../core/widgets/app_confirm_dialog.dart';
 import '../../modules/navigation/bottom_nav_controller.dart';
 import '../../modules/session/user_session_controller.dart';
@@ -228,7 +228,7 @@ class _SettingsMenuDialogState extends State<_SettingsMenuDialog> {
                                 const _SectionLabel('Account'),
                                 const SizedBox(height: 8),
                                 ..._accountRows.asMap().entries.map(
-                                  (e) => AnimatedListEntrance(
+                                  (e) => StaggeredEntrance(
                                     index: e.key,
                                     child: _SettingsMenuRow(
                                       data: e.value,
@@ -242,7 +242,7 @@ class _SettingsMenuDialogState extends State<_SettingsMenuDialog> {
                                 const _SectionLabel('Support & legal'),
                                 const SizedBox(height: 8),
                                 ..._supportRows.asMap().entries.map(
-                                  (e) => AnimatedListEntrance(
+                                  (e) => StaggeredEntrance(
                                     index: e.key + _accountRows.length,
                                     child: _SettingsMenuRow(
                                       data: e.value,
@@ -253,7 +253,7 @@ class _SettingsMenuDialogState extends State<_SettingsMenuDialog> {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                AnimatedListEntrance(
+                                StaggeredEntrance(
                                   index:
                                       _accountRows.length + _supportRows.length,
                                   child: _SettingsMenuRow(
@@ -274,7 +274,7 @@ class _SettingsMenuDialogState extends State<_SettingsMenuDialog> {
                                         : () => _onLogoutTap(context),
                                   ),
                                 ),
-                                AnimatedListEntrance(
+                                StaggeredEntrance(
                                   index:
                                       _accountRows.length +
                                       _supportRows.length +

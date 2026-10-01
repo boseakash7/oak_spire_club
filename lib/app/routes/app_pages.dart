@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
 
+import '../core/animations/app_motion.dart';
+import '../core/animations/app_page_transition.dart';
 import '../modules/get_started/get_started_view.dart';
 import '../modules/auth/forgot_password/forgot_password_binding.dart';
 import '../modules/auth/forgot_password/forgot_password_view.dart';
@@ -41,7 +43,21 @@ import 'app_routes.dart';
 class AppPages {
   const AppPages._();
 
-  static final pages = <GetPage<dynamic>>[
+  /// Every route gets the platform-adaptive [AppPageTransition]. It is set
+  /// per page (not on GetMaterialApp) because only a route's own transition
+  /// keeps GetX's iOS swipe-back gesture.
+  static final pages = _routes
+      .map(
+        (page) => page.copy(
+          customTransition: page.customTransition ?? _transition,
+          transitionDuration: page.transitionDuration ?? AppMotion.page,
+        ),
+      )
+      .toList(growable: false);
+
+  static final _transition = AppPageTransition();
+
+  static final _routes = <GetPage<dynamic>>[
     GetPage(
       name: AppRoutes.splash,
       page: () => const SplashView(),

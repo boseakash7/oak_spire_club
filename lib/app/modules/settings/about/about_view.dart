@@ -95,10 +95,8 @@ class _AboutViewState extends State<AboutView> {
           _AboutLinkRow(
             icon: Icons.description_outlined,
             title: 'Terms of Use',
-            onTap: () => _openLegal(
-              title: 'Terms of Use',
-              url: AppConstants.termsUrl,
-            ),
+            onTap: () =>
+                _openLegal(title: 'Terms of Use', url: AppConstants.termsUrl),
           ),
           const SizedBox(height: 10),
           _AboutLinkRow(

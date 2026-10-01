@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../../core/animations/app_motion.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/shimmer_box.dart';
 import '../../../core/utils/price_formatter.dart';
 import '../home_controller.dart';
 
@@ -33,16 +34,22 @@ class HomeChartLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _legendSwatch(
-          color: AppColors.chartLineMarketValue,
-          label: 'Market Value',
-        ),
-        const SizedBox(width: 22),
-        _legendSwatch(color: AppColors.chartLineBsmi, label: 'BSMI'),
-      ],
+    final home = Get.find<HomeController>();
+    // BSMI only when the chart actually has an index line to show.
+    return Obx(
+      () => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _legendSwatch(
+            color: AppColors.chartLineMarketValue,
+            label: 'Market Value',
+          ),
+          if (home.chartBsmiSeriesK.isNotEmpty) ...[
+            const SizedBox(width: 22),
+            _legendSwatch(color: AppColors.chartLineBsmi, label: 'BSMI'),
+          ],
+        ],
+      ),
     );
   }
 
@@ -103,7 +110,11 @@ class _HomeValueChartState extends State<HomeValueChart>
       _pendingDrawRevision = null;
       if (!mounted) return;
       _lastAnimatedRevision = revision;
-      _drawController.forward(from: 0);
+      if (AppMotion.reduced(context)) {
+        _drawController.value = 1;
+      } else {
+        _drawController.forward(from: 0);
+      }
     });
   }
 
@@ -143,14 +154,32 @@ class _HomeValueChartState extends State<HomeValueChart>
               if (mounted) _drawController.reset();
             });
           }
+          if (loading) {
+            return const ShimmerBox(
+              height: double.infinity,
+              width: double.infinity,
+              radius: 0,
+            );
+          }
           return ColoredBox(
             color: AppColors.chartPlotBackground,
             child: Center(
-              child: Text(
-                loading ? 'Loading chart' : 'No chart data',
-                style: AppTextStyles.caption().copyWith(
-                  color: AppColors.textWolf,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.show_chart_rounded,
+                    size: 28,
+                    color: AppColors.textWolf,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No price history for this range yet',
+                    style: AppTextStyles.caption().copyWith(
+                      color: AppColors.textWolf,
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -364,7 +393,7 @@ class _HomeValueChartState extends State<HomeValueChart>
         // rather than covering the plot with a spinner.
         return AnimatedOpacity(
           opacity: loading ? 0.4 : 1,
-          duration: AppMotion.fast,
+          duration: AppMotion.of(context, AppMotion.fast),
           curve: AppMotion.standard,
           child: chart,
         );
@@ -431,6 +460,8 @@ Widget _dateAxisLabel(
   return SideTitleWidget(
     meta: meta,
     space: 4,
+    // Keep the first / last date inside the plot instead of clipped.
+    fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
     child: Text(
       DateFormat('MMM d').format(parsed),
       style: AppTextStyles.micro(),

@@ -12,6 +12,7 @@ import '../../core/utils/app_snackbar.dart';
 import '../../core/utils/dispose_after_detach.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/utils/validators.dart';
+import '../../core/widgets/app_date_picker.dart';
 import '../../data/models/bluebook_model.dart';
 import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/collection_repository.dart';
@@ -182,8 +183,8 @@ class AddCollectionController extends GetxController {
 
   Future<void> pickDate(BuildContext context) async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await showAppDatePicker(
+      context,
       firstDate: DateTime(1990),
       lastDate: DateTime(now.year + 2),
       initialDate: dateAcquired ?? now,

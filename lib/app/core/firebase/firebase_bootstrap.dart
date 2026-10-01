@@ -40,5 +40,5 @@ Future<void> bootstrapFirebase() async {
 
 /// Custom route observer; screen events use `{screen}_view` via [AppAnalyticsController].
 List<NavigatorObserver> firebaseAnalyticsNavObservers() => [
-      AppAnalyticsNavObserver(),
-    ];
+  AppAnalyticsNavObserver(),
+];

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../animations/app_motion.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -55,7 +56,27 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
-                    child: _TitleText(title: title),
+                    // Tab changes swap the title with a short fade-rise.
+                    child: AnimatedSwitcher(
+                      duration: AppMotion.of(context, AppMotion.medium),
+                      switchInCurve: AppMotion.emphasizedDecelerate,
+                      switchOutCurve: AppMotion.exit,
+                      layoutBuilder: (current, previous) => Stack(
+                        alignment: Alignment.centerLeft,
+                        children: [...previous, ?current],
+                      ),
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween(
+                            begin: const Offset(0, 0.35),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      ),
+                      child: _TitleText(key: ValueKey(title), title: title),
+                    ),
                   ),
                 ),
               ),
@@ -104,7 +125,7 @@ class _GreetingText extends StatelessWidget {
 }
 
 class _TitleText extends StatelessWidget {
-  const _TitleText({required this.title});
+  const _TitleText({super.key, required this.title});
 
   final String title;
 

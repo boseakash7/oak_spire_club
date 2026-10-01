@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../platform/app_platform.dart';
 import '../theme/app_colors.dart';
 
-/// iOS-style chevron back control for app bars and custom headers.
+/// Back control for app bars and custom headers: a chevron on iOS, an arrow
+/// on Android.
 class AppBackButton extends StatelessWidget {
   const AppBackButton({
     super.key,
@@ -32,11 +34,7 @@ class AppBackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       onPressed: onPressed ?? () => _defaultPop(context),
-      icon: Icon(
-        Icons.arrow_back_ios_new_rounded,
-        color: color,
-        size: iconSize,
-      ),
+      icon: Icon(AppPlatform.backIcon, color: color, size: iconSize),
       padding: EdgeInsets.zero,
       constraints: constraints,
       tooltip: MaterialLocalizations.of(context).backButtonTooltip,
@@ -44,7 +42,7 @@ class AppBackButton extends StatelessWidget {
   }
 }
 
-/// Standard dark app bar with an iOS-style back button when the route can pop.
+/// Standard dark app bar with a platform back button when the route can pop.
 class AppScreenAppBar extends StatelessWidget implements PreferredSizeWidget {
   const AppScreenAppBar({
     super.key,
@@ -71,9 +69,7 @@ class AppScreenAppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       centerTitle: centerTitle,
       automaticallyImplyLeading: false,
-      leading: showBack && canPop
-          ? AppBackButton(onPressed: onBack)
-          : null,
+      leading: showBack && canPop ? AppBackButton(onPressed: onBack) : null,
       title: title,
     );
   }

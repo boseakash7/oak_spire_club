@@ -50,7 +50,9 @@ class AppCache {
   void invalidate(String cacheKey) => _box.delete(cacheKey);
 
   Future<void> invalidateByPrefix(String prefix) async {
-    final keys = _box.keys.whereType<String>().where((k) => k.startsWith(prefix));
+    final keys = _box.keys.whereType<String>().where(
+      (k) => k.startsWith(prefix),
+    );
     for (final k in keys.toList(growable: false)) {
       await _box.delete(k);
     }
@@ -99,4 +101,3 @@ class _CachedEntry {
     return decode(obj);
   }
 }
-

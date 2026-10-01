@@ -43,7 +43,7 @@ class CollectionFormField extends StatelessWidget {
 
   static const Color fillColor = AppColors.panel;
   static const Color borderEnabled = AppColors.border;
-  static const Color borderFocused = AppColors.inputBorderFocused;
+  static const Color borderFocused = AppColors.gold2;
   static const Color borderError = AppColors.destructive;
 
   @override

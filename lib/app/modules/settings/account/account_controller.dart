@@ -55,11 +55,7 @@ class AccountController extends GetxController {
 
     isSaving.value = true;
     try {
-      await _auth.updateProfile(
-        userId: user.id,
-        name: name,
-        gender: gender,
-      );
+      await _auth.updateProfile(userId: user.id, name: name, gender: gender);
       await AppStorage.setUserGender(gender);
       await _users.refreshUserById(user.id);
       await AppSnackbar.success('Profile updated.');
@@ -74,10 +70,7 @@ class AccountController extends GetxController {
   @override
   void onClose() {
     unfocusSafely();
-    disposeAfterDetach([
-      nameController,
-      emailController,
-    ]);
+    disposeAfterDetach([nameController, emailController]);
     super.onClose();
   }
 }

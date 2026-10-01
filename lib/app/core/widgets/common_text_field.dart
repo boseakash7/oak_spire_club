@@ -21,6 +21,7 @@ class CommonTextField extends StatefulWidget {
   final TextInputType? keyboardType;
   final bool obscureText;
   final bool readOnly;
+
   /// When true (usually with [obscureText]), shows an eye icon to show/hide the value.
   final bool showVisibilityToggle;
   final TextInputAction? textInputAction;
@@ -33,8 +34,7 @@ class CommonTextField extends StatefulWidget {
 class _CommonTextFieldState extends State<CommonTextField> {
   late bool _obscure;
 
-  bool get _passwordLike =>
-      widget.showVisibilityToggle || widget.obscureText;
+  bool get _passwordLike => widget.showVisibilityToggle || widget.obscureText;
 
   @override
   void initState() {
@@ -53,8 +53,9 @@ class _CommonTextFieldState extends State<CommonTextField> {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveObscure =
-        widget.showVisibilityToggle ? _obscure : widget.obscureText;
+    final effectiveObscure = widget.showVisibilityToggle
+        ? _obscure
+        : widget.obscureText;
 
     return SizedBox(
       height: 45,
@@ -68,16 +69,12 @@ class _CommonTextFieldState extends State<CommonTextField> {
         textInputAction: widget.textInputAction,
         onSubmitted: widget.onSubmitted,
         style: AppTextStyles.body16().copyWith(
-          color: widget.readOnly
-              ? AppColors.textMuted
-              : AppColors.white,
+          color: widget.readOnly ? AppColors.textMuted : AppColors.white,
         ),
         decoration: InputDecoration(
           isDense: true,
           filled: true,
-          fillColor: widget.readOnly
-              ? AppColors.surfaceChip
-              : AppColors.panel,
+          fillColor: widget.readOnly ? AppColors.surfaceChip : AppColors.panel,
           hintText: widget.hintText,
           hintStyle: AppTextStyles.body16().copyWith(
             color: AppColors.white.withValues(alpha: 0.9),
@@ -108,9 +105,10 @@ class _CommonTextFieldState extends State<CommonTextField> {
             borderRadius: BorderRadius.circular(9),
             borderSide: const BorderSide(color: AppColors.border),
           ),
+          // Gold on focus, so the active field is obvious.
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(9),
-            borderSide: const BorderSide(color: AppColors.border, width: 1.2),
+            borderSide: const BorderSide(color: AppColors.gold2, width: 1.2),
           ),
         ),
       ),

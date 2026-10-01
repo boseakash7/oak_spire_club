@@ -63,32 +63,3 @@ Widget appSheetSlideTransition(
     child: child,
   );
 }
-
-/// Subtle fade + upward slide for full-screen routes.
-Widget appPageFadeSlideTransition(
-  BuildContext context,
-  Animation<double> animation,
-  Animation<double> secondaryAnimation,
-  Widget child,
-) {
-  final curved = CurvedAnimation(
-    parent: animation,
-    curve: AppMotion.enter,
-    reverseCurve: AppMotion.exit,
-  );
-  return FadeTransition(
-    opacity: curved,
-    child: SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0, 0.03),
-        end: Offset.zero,
-      ).animate(curved),
-      child: child,
-    ),
-  );
-}
-
-/// Backdrop that fades with the route animation.
-Color appDialogBarrierColor(double animationValue) {
-  return Colors.black.withValues(alpha: 0.72 * animationValue.clamp(0.0, 1.0));
-}

@@ -11,7 +11,10 @@ class Validators {
 
   static bool isValidPassword(String value) => value.trim().length >= 8;
 
-  static String? requiredText(String? value, {String message = 'This field is required.'}) {
+  static String? requiredText(
+    String? value, {
+    String message = 'This field is required.',
+  }) {
     if (value == null || value.trim().isEmpty) return message;
     return null;
   }
@@ -60,4 +63,3 @@ class Validators {
     return null;
   }
 }
-

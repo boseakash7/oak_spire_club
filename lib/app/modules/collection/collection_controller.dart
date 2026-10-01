@@ -21,12 +21,20 @@ class CollectionController extends GetxController {
   final isLoading = true.obs;
 
   final valueText = r'$ —'.obs;
+
+  /// Raw collection value, for the count-up animation.
+  final valueAmount = 0.0.obs;
   final trendShort = '—'.obs;
 
   final sort = CollectionSort.name.obs;
   final sortAscending = true.obs;
 
   final _repo = Get.find<CollectionRepository>();
+
+  /// The skeleton shows only until the first load lands; later refreshes
+  /// (pull-to-refresh, quantity edits, returning from add) keep the grid on
+  /// screen and swap the data in place.
+  bool _loadedOnce = false;
 
   @override
   void onInit() {
@@ -35,7 +43,7 @@ class CollectionController extends GetxController {
   }
 
   Future<void> load({bool forceRefresh = false}) async {
-    isLoading.value = true;
+    if (!_loadedOnce) isLoading.value = true;
     try {
       final list = await _repo.fetchMyCollection(forceRefresh: forceRefresh);
       items.assignAll(list);
@@ -46,6 +54,7 @@ class CollectionController extends GetxController {
         decimalDigits: 0,
       );
       final localTotal = CollectionValueCalculator.totalInvestedFromItems(list);
+      valueAmount.value = localTotal;
 
       final chart = await _repo.fetchChartData(
         lookBackDays: 90,
@@ -80,13 +89,20 @@ class CollectionController extends GetxController {
         NumberFormat.currency(locale: 'en_US', symbol: r'$', decimalDigits: 0),
       );
     } finally {
+      _loadedOnce = true;
       isLoading.value = false;
     }
   }
 
+  /// Keeps Home's figures in step without flashing its skeleton.
   void _syncHomeAfterCollectionLoad() {
     if (!Get.isRegistered<HomeController>()) return;
-    unawaited(Get.find<HomeController>().fetchHomeData(forceRefresh: false));
+    unawaited(
+      Get.find<HomeController>().fetchHomeData(
+        forceRefresh: false,
+        background: true,
+      ),
+    );
   }
 
   void _applyFallbackValue(
@@ -94,6 +110,7 @@ class CollectionController extends GetxController {
     NumberFormat formatter,
   ) {
     final total = CollectionValueCalculator.totalInvestedFromItems(list);
+    valueAmount.value = total;
     valueText.value = total > 0 ? formatter.format(total) : r'$ —';
     trendShort.value = '—';
   }

@@ -14,7 +14,10 @@ class BottomNavBinding extends Bindings {
     // when leaving a tab and Get.find fails on return (CollectionView Obx).
     Get.lazyPut<BottomNavController>(() => BottomNavController(), fenix: true);
     Get.lazyPut<HomeController>(() => HomeController(), fenix: true);
-    Get.lazyPut<CollectionController>(() => CollectionController(), fenix: true);
+    Get.lazyPut<CollectionController>(
+      () => CollectionController(),
+      fenix: true,
+    );
     Get.lazyPut<MarketController>(
       () => MarketController(
         bluebookRepo: Get.find<BluebookRepository>(),
@@ -24,4 +27,3 @@ class BottomNavBinding extends Bindings {
     );
   }
 }
-

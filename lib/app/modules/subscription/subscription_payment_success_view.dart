@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/widgets/app_backdrop_image.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_subscription_theme.dart';
@@ -10,6 +11,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/common_primary_button.dart';
 import '../../core/widgets/gradient_text.dart';
 import '../../data/models/subscription_payment_receipt.dart';
+import 'widgets/payment_result_badge.dart';
 import '../../routes/subscription_payment_success_navigation.dart';
 
 /// Shown after `package/payment-verify` (paid or failed).
@@ -29,11 +31,9 @@ class SubscriptionPaymentSuccessView extends StatelessWidget {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
+            const AppBackdropImage(
               AppAssets.subscriptionBackground,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  Image.asset(AppAssets.signUpBackground, fit: BoxFit.cover),
+              fallbackAsset: AppAssets.signUpBackground,
             ),
             ColoredBox(color: Colors.black.withValues(alpha: 0.35)),
             SafeArea(
@@ -44,30 +44,7 @@ class SubscriptionPaymentSuccessView extends StatelessWidget {
                 child: Column(
                   children: [
                     const SizedBox(height: 24),
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: succeeded ? AppColors.goldGradient : null,
-                        color: succeeded ? null : AppColors.destructiveSurface,
-                        border: succeeded
-                            ? null
-                            : Border.all(
-                                color: AppColors.errorLight.withValues(
-                                  alpha: 0.7,
-                                ),
-                                width: 1.5,
-                              ),
-                      ),
-                      child: Icon(
-                        succeeded ? Icons.check_rounded : Icons.close_rounded,
-                        size: 36,
-                        color: succeeded
-                            ? AppColors.black
-                            : AppColors.errorLight,
-                      ),
-                    ),
+                    PaymentResultBadge(succeeded: succeeded),
                     const SizedBox(height: 20),
                     if (succeeded) ...[
                       Text(

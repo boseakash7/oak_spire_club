@@ -49,9 +49,9 @@ class _AppUpdateDialogBody extends StatelessWidget {
     final title = isForced ? 'Update required' : 'Update available';
     final message = isForced
         ? 'A new version of ${AppConstants.appName} is required to continue. '
-            'Please update from the store to keep using the app.'
+              'Please update from the store to keep using the app.'
         : 'A new version of ${AppConstants.appName} is available with '
-            'improvements and fixes.';
+              'improvements and fixes.';
 
     return Dialog(
       backgroundColor: Colors.transparent,

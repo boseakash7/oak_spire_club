@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/animations/staggered_entrance.dart';
+import '../../../core/platform/app_platform.dart';
+import '../../../core/widgets/app_pressable.dart';
 import '../../../core/constants/app_assets.dart';
+import '../../../core/widgets/app_backdrop_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/common_primary_button.dart';
@@ -19,19 +23,19 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(AppAssets.signInBackground, fit: BoxFit.cover),
+          const AppBackdropImage(AppAssets.signInBackground),
           SafeArea(
             child: Obx(
               () => IgnorePointer(
                 ignoring: controller.isLoading.value,
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(35, 24, 35, 24),
-                  child: Column(
+                  child: StaggeredColumn(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: GestureDetector(
+                        child: AppPressable(
                           onTap: () => Get.back(),
                           child: Container(
                             width: 40,
@@ -43,8 +47,8 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
                                 color: Colors.white.withValues(alpha: 0.25),
                               ),
                             ),
-                            child: const Icon(
-                              Icons.arrow_back_ios_new_rounded,
+                            child: Icon(
+                              AppPlatform.backIcon,
                               color: AppColors.white,
                               size: 18,
                             ),
@@ -128,7 +132,7 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
                               ),
                             );
                           }
-                          return GestureDetector(
+                          return AppPressable(
                             onTap: controller.onResend,
                             child: Text(
                               'Resend Code',

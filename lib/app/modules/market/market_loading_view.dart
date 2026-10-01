@@ -7,15 +7,22 @@ import '../../core/widgets/shimmer_box.dart';
 class MarketLoadingView extends StatelessWidget {
   const MarketLoadingView({super.key});
 
+  /// One shimmer sweep across the whole skeleton (see [ShimmerScope]).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ShimmerScope(child: _skeleton(context));
+
+  Widget _skeleton(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [AppColors.surfaceDeep, AppColors.surfaceDeep]),
+        gradient: LinearGradient(
+          colors: [AppColors.surfaceDeep, AppColors.surfaceDeep],
+        ),
       ),
       child: Stack(
         children: [
-          const Positioned.fill(child: ColoredBox(color: AppColors.overlayBlack20)),
+          const Positioned.fill(
+            child: ColoredBox(color: AppColors.overlayBlack20),
+          ),
           SafeArea(
             top: false,
             child: SingleChildScrollView(

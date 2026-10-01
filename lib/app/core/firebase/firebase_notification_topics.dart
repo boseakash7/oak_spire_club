@@ -33,11 +33,7 @@ abstract final class FirebaseNotificationTopics {
   static const paidUser = '${_prefix}paid_user';
   static const trialUser = '${_prefix}trial_user';
 
-  static const allTierTopics = [
-    freeUser,
-    paidUser,
-    trialUser,
-  ];
+  static const allTierTopics = [freeUser, paidUser, trialUser];
 
   static const alertPreferenceKeys = [
     NotificationPreferenceKey.collectionValue,
@@ -49,12 +45,12 @@ abstract final class FirebaseNotificationTopics {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   static String? topicForPreferenceKey(String key) => switch (key) {
-        NotificationPreferenceKey.collectionValue => collection,
-        NotificationPreferenceKey.marketBenchmarks => market,
-        NotificationPreferenceKey.priceMovement => priceMovement,
-        NotificationPreferenceKey.tipsUpdates => tips,
-        _ => null,
-      };
+    NotificationPreferenceKey.collectionValue => collection,
+    NotificationPreferenceKey.marketBenchmarks => market,
+    NotificationPreferenceKey.priceMovement => priceMovement,
+    NotificationPreferenceKey.tipsUpdates => tips,
+    _ => null,
+  };
 
   /// First app launch only: subscribe default alert topics in the background.
   /// Later launches and user toggles are handled elsewhere.
@@ -184,7 +180,9 @@ abstract final class FirebaseNotificationTopics {
       await _messaging.subscribeToTopic(unregisteredUsers);
       await AppStorage.setCurrentRegistrationTopic(unregisteredUsers);
       if (kDebugMode) {
-        debugPrint('[FCM] Subscribed to unregistered topic: $unregisteredUsers');
+        debugPrint(
+          '[FCM] Subscribed to unregistered topic: $unregisteredUsers',
+        );
       }
     } catch (e, st) {
       if (kDebugMode) {
@@ -244,10 +242,9 @@ abstract final class FirebaseNotificationTopics {
       }
 
       // Run all unsubscriptions in parallel with a 2.5s safety timeout
-      await Future.wait(unsubs).timeout(
-        const Duration(milliseconds: 2500),
-        onTimeout: () => [],
-      );
+      await Future.wait(
+        unsubs,
+      ).timeout(const Duration(milliseconds: 2500), onTimeout: () => []);
 
       // 4. Clear stored topic states
       await AppStorage.setCurrentRegistrationTopic(null);

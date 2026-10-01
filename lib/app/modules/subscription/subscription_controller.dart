@@ -123,8 +123,9 @@ class SubscriptionController extends GetxController {
       } else if (selectedPackageId.value == null ||
           !list.any((p) => p.id == selectedPackageId.value)) {
         final monthly = list.where((p) => !p.isYearly).toList();
-        selectedPackageId.value =
-            monthly.isNotEmpty ? monthly.first.id : list.first.id;
+        selectedPackageId.value = monthly.isNotEmpty
+            ? monthly.first.id
+            : list.first.id;
       }
     } on LimitExceededException {
       packages.clear();
@@ -172,14 +173,12 @@ class SubscriptionController extends GetxController {
   String? get razorpaySubscriptionIdForCancel =>
       transactionHistory.resolveRazorpaySubscriptionIdForCancel();
 
-  bool get isRazorpayGateway =>
-      paymentGatewayForCancel.value == 'razorpay';
+  bool get isRazorpayGateway => paymentGatewayForCancel.value == 'razorpay';
 
   bool get isAppleInAppGateway =>
       paymentGatewayForCancel.value == 'apple_in_app';
 
-  bool get canShowCancelSubscription =>
-      paymentGatewayForCancel.value != null;
+  bool get canShowCancelSubscription => paymentGatewayForCancel.value != null;
 
   bool get canCancelSubscription {
     if (isLoadingHistory.value) return false;
