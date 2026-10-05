@@ -114,9 +114,6 @@ class SignUpView extends GetView<SignUpController> {
                           () => CommonPrimaryButton(
                             label: 'Register For FREE',
                             onPressed: controller.onRegister,
-                            textStyle: AppTextStyles.button20Bold().copyWith(
-                              fontSize: 18,
-                            ),
                             isLoading: controller.isLoading.value,
                           ),
                         ),

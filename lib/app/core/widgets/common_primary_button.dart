@@ -4,6 +4,7 @@ import '../animations/app_motion.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_haptics.dart';
 import '../theme/app_text_styles.dart';
+import '../theme/app_spacing.dart';
 
 class CommonPrimaryButton extends StatefulWidget {
   const CommonPrimaryButton({
@@ -26,6 +27,10 @@ class CommonPrimaryButton extends StatefulWidget {
 class _CommonPrimaryButtonState extends State<CommonPrimaryButton> {
   bool _pressed = false;
 
+  TextStyle get _style =>
+      widget.textStyle ??
+      AppTextStyles.button20Bold().copyWith(fontSize: AppButtonSize.labelSize);
+
   @override
   Widget build(BuildContext context) {
     final enabled = !widget.isLoading && widget.onPressed != null;
@@ -34,18 +39,18 @@ class _CommonPrimaryButtonState extends State<CommonPrimaryButton> {
       duration: AppMotion.press,
       curve: AppMotion.pressCurve,
       child: SizedBox(
-        height: 56,
+        height: AppButtonSize.regular,
         width: double.infinity,
         child: DecoratedBox(
           decoration: BoxDecoration(
             gradient: AppColors.goldGradient,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppButtonSize.radius),
           ),
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppButtonSize.radius),
             child: InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppButtonSize.radius),
               onTap: enabled
                   ? () {
                       AppHaptics.tap();
@@ -66,14 +71,12 @@ class _CommonPrimaryButtonState extends State<CommonPrimaryButton> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.2,
-                          color:
-                              (widget.textStyle ?? AppTextStyles.button20Bold())
-                                  .color,
+                          color: _style.color,
                         ),
                       )
                     : Text(
                         widget.label,
-                        style: widget.textStyle ?? AppTextStyles.button20Bold(),
+                        style: _style,
                       ),
               ),
             ),

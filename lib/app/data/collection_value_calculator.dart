@@ -59,4 +59,76 @@ class CollectionValueCalculator {
     }
     return priced ? sum : null;
   }
+
+  /// Every figure the Home and Collection headers show, computed once.
+  ///
+  /// The headline is what the collection is worth today: each row at its
+  /// bluebook average, or at what was paid when the bottle has no market
+  /// price, so a bottle is never dropped from the total. Gain compares market
+  /// against paid only on rows that have both, so a bottle valued at cost
+  /// cannot pull the percentage toward 0.
+  static CollectionValueSummary summarize(Iterable<CollectionItemModel> items) {
+    var invested = 0.0;
+    var value = 0.0;
+    var gainMarket = 0.0;
+    var gainPaid = 0.0;
+    var priced = 0;
+    var atCost = 0;
+
+    for (final item in items) {
+      final paid = item.paidTotalValue;
+      final market = item.marketTotalValue;
+      invested += paid;
+      if (market == null) {
+        value += paid;
+        atCost++;
+        continue;
+      }
+      value += market;
+      priced++;
+      if (paid > 0) {
+        gainMarket += market;
+        gainPaid += paid;
+      }
+    }
+
+    final hasGain = gainPaid > 0;
+    return CollectionValueSummary(
+      invested: invested,
+      value: value,
+      showingInvestedAsValue: priced == 0,
+      valuedAtCostCount: priced == 0 ? 0 : atCost,
+      gain: hasGain ? gainMarket - gainPaid : null,
+      gainPercent: hasGain ? (gainMarket - gainPaid) / gainPaid * 100 : null,
+    );
+  }
+}
+
+/// See [CollectionValueCalculator.summarize].
+class CollectionValueSummary {
+  const CollectionValueSummary({
+    required this.invested,
+    required this.value,
+    required this.showingInvestedAsValue,
+    required this.valuedAtCostCount,
+    required this.gain,
+    required this.gainPercent,
+  });
+
+  /// What the user paid in total.
+  final double invested;
+
+  /// Today's value: market price where known, price paid elsewhere.
+  final double value;
+
+  /// No bottle has a market price, so [value] is just [invested] and must be
+  /// labelled as such rather than called "value".
+  final bool showingInvestedAsValue;
+
+  /// Bottles without a market price, counted in [value] at what was paid.
+  final int valuedAtCostCount;
+
+  /// Market minus paid over the bottles that have both; null when none do.
+  final double? gain;
+  final double? gainPercent;
 }

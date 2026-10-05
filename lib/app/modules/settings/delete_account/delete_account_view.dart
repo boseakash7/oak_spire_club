@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../widgets/settings_scaffold.dart';
 import 'delete_account_controller.dart';
+import '../../../core/theme/app_spacing.dart';
 
 class DeleteAccountView extends GetView<DeleteAccountController> {
   const DeleteAccountView({super.key});
@@ -19,7 +20,7 @@ class DeleteAccountView extends GetView<DeleteAccountController> {
         children: [
           Obx(
             () => SizedBox(
-              height: 56,
+              height: AppButtonSize.regular,
               width: double.infinity,
               child: Material(
                 color: AppColors.destructive,

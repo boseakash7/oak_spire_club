@@ -5,6 +5,7 @@ import '../constants/app_constants.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'show_app_dialog.dart';
+import '../theme/app_spacing.dart';
 
 /// Shows an app-update dialog styled like other Oak Spire popups.
 ///
@@ -117,7 +118,7 @@ class _AppUpdateDialogBody extends StatelessWidget {
                   if (onLater != null) ...[
                     SizedBox(
                       width: double.infinity,
-                      height: 50,
+                      height: AppButtonSize.regular,
                       child: OutlinedButton(
                         onPressed: onLater,
                         style: OutlinedButton.styleFrom(
@@ -140,7 +141,7 @@ class _AppUpdateDialogBody extends StatelessWidget {
                   ],
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: AppButtonSize.regular,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: AppColors.goldGradient,
@@ -159,7 +160,7 @@ class _AppUpdateDialogBody extends StatelessWidget {
                         child: Text(
                           'Update now',
                           style: AppTextStyles.button20Bold().copyWith(
-                            fontSize: 17,
+                            fontSize: AppButtonSize.labelSize,
                             color: AppColors.black,
                           ),
                         ),

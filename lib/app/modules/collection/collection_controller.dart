@@ -6,12 +6,20 @@ import 'package:intl/intl.dart';
 import '../../data/collection_value_calculator.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
+import '../../data/models/price_sparkline.dart';
+import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/collection_repository.dart';
 import '../home/home_controller.dart';
 
 enum CollectionFilter { all, opened, notOpened, rareFind }
 
-enum CollectionSort { name, price, fillRate, addedTime }
+enum CollectionSort { name, price, gain, fillRate, addedTime }
+
+final _wholeDollars = NumberFormat.currency(
+  locale: 'en_US',
+  symbol: r'$',
+  decimalDigits: 0,
+);
 
 class CollectionController extends GetxController {
   CollectionController();
@@ -20,19 +28,35 @@ class CollectionController extends GetxController {
   final filter = CollectionFilter.all.obs;
   final isLoading = true.obs;
 
-  final valueText = r'$ —'.obs;
-
-  /// Raw collection value, for the count-up animation.
+  /// What the collection is worth today (see
+  /// [CollectionValueCalculator.summarize]), for the count-up animation.
   final valueAmount = 0.0.obs;
+
+  /// True when no bottle has a market price, so [valueAmount] is what was
+  /// paid and the heading must say so.
+  final showingInvestedAsValue = false.obs;
+
+  /// "Invested $X · +$Y · 2 at cost" under the value; empty when unknown.
+  final valueCaption = ''.obs;
+
+  /// Gain against what was paid, over the bottles that have a market price.
+  final gainPercent = Rxn<double>();
+
+  /// [gainPercent] as a badge label, e.g. `+27.7%`.
   final trendShort = '—'.obs;
 
   final sort = CollectionSort.name.obs;
   final sortAscending = true.obs;
 
+  /// 90-day sparklines keyed by bluebook id; rows without one draw a
+  /// placeholder until it lands (or for good, if the bottle has no price).
+  final sparklines = <String, PriceSparkline>{}.obs;
+
   final _repo = Get.find<CollectionRepository>();
+  final _bluebookRepo = Get.find<BluebookRepository>();
 
   /// The skeleton shows only until the first load lands; later refreshes
-  /// (pull-to-refresh, quantity edits, returning from add) keep the grid on
+  /// (pull-to-refresh, quantity edits, returning from add) keep the list on
   /// screen and swap the data in place.
   bool _loadedOnce = false;
 
@@ -47,51 +71,54 @@ class CollectionController extends GetxController {
     try {
       final list = await _repo.fetchMyCollection(forceRefresh: forceRefresh);
       items.assignAll(list);
-
-      final fmt = NumberFormat.currency(
-        locale: 'en_US',
-        symbol: r'$',
-        decimalDigits: 0,
-      );
-      final localTotal = CollectionValueCalculator.totalInvestedFromItems(list);
-      valueAmount.value = localTotal;
-
-      final chart = await _repo.fetchChartData(
-        lookBackDays: 90,
-        forceRefresh: forceRefresh,
-      );
-      if (chart != null) {
-        final first = double.tryParse(chart['first_price']?.toString() ?? '');
-        final last = double.tryParse(chart['last_price']?.toString() ?? '');
-        if (localTotal > 0) {
-          valueText.value = fmt.format(localTotal);
-        } else {
-          valueText.value = r'$ —';
-        }
-        if (list.isEmpty) {
-          trendShort.value = '—';
-        } else if (first != null && last != null && last != 0) {
-          final pct = CollectionValueCalculator.movedPercentFromFirstLast(
-            first: first,
-            last: last,
-          )!;
-          trendShort.value = '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%';
-        } else {
-          trendShort.value = '—';
-        }
-      } else {
-        _applyFallbackValue(list, fmt);
-      }
+      _applyValueFigures(list);
+      unawaited(_loadSparklines(list, forceRefresh: forceRefresh));
       _syncHomeAfterCollectionLoad();
     } catch (_) {
-      _applyFallbackValue(
-        items,
-        NumberFormat.currency(locale: 'en_US', symbol: r'$', decimalDigits: 0),
-      );
+      _applyValueFigures(items);
     } finally {
       _loadedOnce = true;
       isLoading.value = false;
     }
+  }
+
+  /// One request for every bottle in the collection (cached per bottle).
+  Future<void> _loadSparklines(
+    List<CollectionItemModel> list, {
+    bool forceRefresh = false,
+  }) async {
+    final ids = [
+      for (final item in list)
+        if (item.bluebookBottleId != null && item.marketAverageValue != null)
+          item.bluebookBottleId!,
+    ];
+    if (ids.isEmpty) return;
+    final fetched = await _bluebookRepo.sparklines(
+      ids,
+      forceRefresh: forceRefresh,
+    );
+    sparklines.addAll(fetched);
+  }
+
+  void _applyValueFigures(Iterable<CollectionItemModel> list) {
+    final summary = CollectionValueCalculator.summarize(list);
+    valueAmount.value = summary.value;
+    showingInvestedAsValue.value = summary.showingInvestedAsValue;
+
+    final pct = summary.gainPercent;
+    gainPercent.value = pct;
+    trendShort.value = pct == null
+        ? '—'
+        : '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%';
+
+    final gain = summary.gain;
+    valueCaption.value = [
+      if (!summary.showingInvestedAsValue && summary.invested > 0)
+        'Invested ${_wholeDollars.format(summary.invested)}',
+      if (gain != null)
+        '${gain >= 0 ? '+' : '-'}${_wholeDollars.format(gain.abs())}',
+      if (summary.valuedAtCostCount > 0) '${summary.valuedAtCostCount} at cost',
+    ].join(' · ');
   }
 
   /// Keeps Home's figures in step without flashing its skeleton.
@@ -103,16 +130,6 @@ class CollectionController extends GetxController {
         background: true,
       ),
     );
-  }
-
-  void _applyFallbackValue(
-    Iterable<CollectionItemModel> list,
-    NumberFormat formatter,
-  ) {
-    final total = CollectionValueCalculator.totalInvestedFromItems(list);
-    valueAmount.value = total;
-    valueText.value = total > 0 ? formatter.format(total) : r'$ —';
-    trendShort.value = '—';
   }
 
   Future<void> forceReload() => load(forceRefresh: true);
@@ -154,9 +171,14 @@ class CollectionController extends GetxController {
         res = a.lineTitle.toLowerCase().compareTo(b.lineTitle.toLowerCase());
         break;
       case CollectionSort.price:
-        final pa = double.tryParse(a.pricePaid ?? '') ?? 0;
-        final pb = double.tryParse(b.pricePaid ?? '') ?? 0;
+        // Today's value per bottle, or what was paid when there is none.
+        final pa = a.marketAverageValue ?? double.tryParse(a.pricePaid ?? '') ?? 0;
+        final pb = b.marketAverageValue ?? double.tryParse(b.pricePaid ?? '') ?? 0;
         res = pa.compareTo(pb);
+        break;
+      case CollectionSort.gain:
+        // Bottles without a gain figure sort as if flat.
+        res = (a.gainPercent ?? 0).compareTo(b.gainPercent ?? 0);
         break;
       case CollectionSort.fillRate:
         res = a.fillRatio.compareTo(b.fillRatio);

@@ -113,27 +113,37 @@ class _MarketList extends GetView<MarketController> {
                   );
                 }
 
-                return SliverList.separated(
+                // Rows that scroll in after the first screenful show at rest.
+                return StaggerScope(
                   key: listKey,
-                  itemCount: bottles.length + 1,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    if (index == bottles.length) {
-                      return Obx(
-                        () => AnimatedSize(
-                          duration: const Duration(milliseconds: 200),
-                          child: controller.isLoadingMore.value
-                              ? const _SkeletonRows(count: 2)
-                              : const SizedBox(height: 8),
+                  entranceWindow: const Duration(milliseconds: 600),
+                  child: SliverList.separated(
+                    itemCount: bottles.length + 1,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      if (index == bottles.length) {
+                        return Obx(
+                          () => AnimatedSize(
+                            duration: const Duration(milliseconds: 200),
+                            child: controller.isLoadingMore.value
+                                ? const _SkeletonRows(count: 2)
+                                : const SizedBox(height: 8),
+                          ),
+                        );
+                      }
+                      final bottle = bottles[index];
+                      return StaggeredEntrance(
+                        id: bottle.id,
+                        child: Obx(
+                          () => MarketBottleRow(
+                            bottle: bottle,
+                            sparkline: controller.sparklines[bottle.id],
+                          ),
                         ),
                       );
-                    }
-                    return StaggeredEntrance(
-                      index: index.clamp(0, 8),
-                      child: MarketBottleRow(bottle: bottles[index]),
-                    );
-                  },
+                    },
+                  ),
                 );
               }),
             ),
@@ -149,37 +159,24 @@ class _CategoryRow extends GetView<MarketController> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      child: Obx(
-        () => ListView.separated(
-          scrollDirection: Axis.horizontal,
-          // Chips scroll edge to edge; the selected chip's glow is not
-          // clipped into a box.
-          clipBehavior: Clip.none,
-          padding: const EdgeInsets.only(right: 4),
-          itemCount: controller.categories.length + 1,
-          separatorBuilder: (context, index) => const SizedBox(width: 10),
-          itemBuilder: (context, index) {
-            final isAll = index == 0;
-            final label = isAll ? 'All' : controller.categories[index - 1].name;
-            final id = isAll ? '' : controller.categories[index - 1].id;
-            return AppFilterChip(
-              label: label,
-              selected: controller.selectedCategoryId.value == id,
-              onTap: () {
-                if (Get.isRegistered<AppAnalyticsController>()) {
-                  unawaited(
-                    AppAnalyticsController.to.logTap('market_category_select', {
-                      'category_id': id,
-                    }),
-                  );
-                }
-                controller.selectCategory(id);
-              },
+    return Obx(
+      () => AppFilterChipBar<String>(
+        items: [
+          const AppFilterChipItem('', 'All'),
+          for (final c in controller.categories)
+            AppFilterChipItem(c.id, c.name),
+        ],
+        selected: controller.selectedCategoryId.value,
+        onSelected: (id) {
+          if (Get.isRegistered<AppAnalyticsController>()) {
+            unawaited(
+              AppAnalyticsController.to.logTap('market_category_select', {
+                'category_id': id,
+              }),
             );
-          },
-        ),
+          }
+          controller.selectCategory(id);
+        },
       ),
     );
   }

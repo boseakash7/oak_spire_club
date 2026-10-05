@@ -187,47 +187,17 @@ class _CollectionFilterRowState extends State<CollectionFilterRow>
           const SizedBox(width: 12),
           Expanded(
             child: Obx(
-              () => ListView(
-                scrollDirection: Axis.horizontal,
-                // Prevent chips from painting over the fixed filter icon area.
-                clipBehavior: Clip.hardEdge,
-                padding: const EdgeInsets.only(right: 4),
-                children: [
-                  AppFilterChip(
-                    label: 'All',
-                    selected:
-                        widget.controller.filter.value == CollectionFilter.all,
-                    onTap: () =>
-                        widget.controller.setFilter(CollectionFilter.all),
-                  ),
-                  const SizedBox(width: 10),
-                  AppFilterChip(
-                    label: 'Opened',
-                    selected:
-                        widget.controller.filter.value ==
-                        CollectionFilter.opened,
-                    onTap: () =>
-                        widget.controller.setFilter(CollectionFilter.opened),
-                  ),
-                  const SizedBox(width: 10),
-                  AppFilterChip(
-                    label: 'Not opened',
-                    selected:
-                        widget.controller.filter.value ==
-                        CollectionFilter.notOpened,
-                    onTap: () =>
-                        widget.controller.setFilter(CollectionFilter.notOpened),
-                  ),
-                  const SizedBox(width: 10),
-                  AppFilterChip(
-                    label: 'Rare Find',
-                    selected:
-                        widget.controller.filter.value ==
-                        CollectionFilter.rareFind,
-                    onTap: () =>
-                        widget.controller.setFilter(CollectionFilter.rareFind),
-                  ),
+              () => AppFilterChipBar<CollectionFilter>(
+                items: const [
+                  AppFilterChipItem(CollectionFilter.all, 'All'),
+                  AppFilterChipItem(CollectionFilter.opened, 'Opened'),
+                  AppFilterChipItem(CollectionFilter.notOpened, 'Not opened'),
+                  AppFilterChipItem(CollectionFilter.rareFind, 'Rare Find'),
                 ],
+                selected: widget.controller.filter.value,
+                onSelected: widget.controller.setFilter,
+                // Keep chips from sliding under the fixed sort icon.
+                clipToBounds: true,
               ),
             ),
           ),
@@ -249,7 +219,7 @@ class _SortMenu extends StatelessWidget {
       color: Colors.transparent,
       child: Container(
         width: 156,
-        height: 148,
+        height: 182,
         margin: const EdgeInsets.only(top: 2),
         decoration: BoxDecoration(
           color: AppColors.menuSurface,
@@ -287,6 +257,18 @@ class _SortMenu extends StatelessWidget {
                 ascending: controller.sortAscending.value,
                 onTap: () {
                   controller.toggleSort(CollectionSort.price);
+                  onClose();
+                },
+              ),
+              const SizedBox(height: 5),
+              _SortMenuRow(
+                label: 'Gain',
+                selected:
+                    showSelected &&
+                    controller.sort.value == CollectionSort.gain,
+                ascending: controller.sortAscending.value,
+                onTap: () {
+                  controller.toggleSort(CollectionSort.gain);
                   onClose();
                 },
               ),

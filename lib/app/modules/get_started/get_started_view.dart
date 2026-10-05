@@ -12,6 +12,7 @@ import '../../core/widgets/app_backdrop_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../routes/app_routes.dart';
+import '../../core/theme/app_spacing.dart';
 
 class GetStartedView extends StatelessWidget {
   const GetStartedView({super.key});
@@ -19,7 +20,7 @@ class GetStartedView extends StatelessWidget {
   static const double _horizontalPadding = 20;
   static const double _logoSize = 114;
   static const double _topOffset = 28;
-  static const double _buttonRadius = 12;
+  static const double _buttonRadius = AppButtonSize.radius;
 
   // Design-matched onboarding palette.
   static const Color _goldAccent = AppColors.goldMid;
@@ -462,7 +463,7 @@ class _GoldPillButtonState extends State<_GoldPillButton> {
       scale: _pressed ? 0.98 : 1,
       duration: const Duration(milliseconds: 120),
       child: SizedBox(
-        height: 52,
+        height: AppButtonSize.regular,
         width: double.infinity,
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -489,7 +490,7 @@ class _GoldPillButtonState extends State<_GoldPillButton> {
                 child: Text(
                   widget.label,
                   style: AppTextStyles.button20Bold().copyWith(
-                    fontSize: 18,
+                    fontSize: AppButtonSize.labelSize,
                     fontWeight: FontWeight.w600,
                     color: widget.filled
                         ? AppColors.goldEmber

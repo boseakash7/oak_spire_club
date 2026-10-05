@@ -7,12 +7,15 @@ import '../../core/utils/app_image_url.dart';
 import '../../core/utils/greeting_formatter.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/utils/proof_formatter.dart';
+import '../../core/utils/rating_formatter.dart';
 import '../session/user_session_controller.dart';
 import '../../data/models/bluebook_price_history_chart_model.dart';
+import '../../data/models/bottle_details.dart';
 import '../../data/models/bottle_pricing.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import '../../data/repositories/bluebook_price_history_repository.dart';
+import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/collection_repository.dart';
 import '../add_collection/add_to_collection_launcher.dart';
 
@@ -103,11 +106,14 @@ class BenchmarkDetailController extends GetxController {
   BenchmarkDetailController({
     required CollectionRepository collectionRepo,
     required BluebookPriceHistoryRepository priceHistoryRepo,
+    required BluebookRepository bluebookRepo,
   }) : _collectionRepo = collectionRepo,
-       _priceHistoryRepo = priceHistoryRepo;
+       _priceHistoryRepo = priceHistoryRepo,
+       _bluebookRepo = bluebookRepo;
 
   final CollectionRepository _collectionRepo;
   final BluebookPriceHistoryRepository _priceHistoryRepo;
+  final BluebookRepository _bluebookRepo;
   late final String? bottleId;
   late final String productName;
   late final String? rawAverage;
@@ -117,8 +123,17 @@ class BenchmarkDetailController extends GetxController {
   late final String? imageUrl;
   late final String? imagePathOrUrl;
   late final String? proofText;
-  late final String? descriptionText;
   late final String? ratingDisplay;
+
+  /// From the route arguments, then topped up by [fetchDetails].
+  final description = RxnString();
+
+  /// Distillery, age, ABV and the rest of the catalog facts. Null until the
+  /// by-id request answers; a failed request leaves it null, and the page
+  /// simply has no facts section.
+  final details = Rxn<BottleDetails>();
+  final detailsLoading = false.obs;
+  final isRare = false.obs;
   late final String? priceMovementRaw;
 
   final selectedChartRange = BenchmarkDetailChartRange.y1.obs;
@@ -171,21 +186,47 @@ class BenchmarkDetailController extends GetxController {
     imagePathOrUrl = args.imagePathOrUrl;
     imageUrl = AppImageUrl.resolve(args.imagePathOrUrl);
     proofText = ProofFormatter.formatLabel(_nullableRouteString(args.proof));
-    descriptionText = _nullableRouteString(args.description);
-    ratingDisplay = _nullableRouteString(args.rating);
+    description.value = _nullableRouteString(args.description);
+    // Stored out of 100; shown out of 10 like everywhere else.
+    ratingDisplay = RatingFormatter.outOfTen(args.rating) == null
+        ? null
+        : RatingFormatter.labelOutOfTen(args.rating);
     priceMovementRaw = _nullableRouteString(args.priceMovement);
     if (_canLoadPriceChart) {
       unawaited(fetchPriceChart());
+      unawaited(fetchDetails());
     }
     unawaited(_loadCollectionOwnership());
   }
 
-  /// Pull-to-refresh: re-pull the price chart and this user's ownership rows.
+  /// Pull-to-refresh: re-pull the price chart, the catalog facts and this
+  /// user's ownership rows.
   Future<void> reload() async {
     await Future.wait([
       if (_canLoadPriceChart) fetchPriceChart(),
+      if (_canLoadPriceChart) fetchDetails(),
       _loadCollectionOwnership(),
     ]);
+  }
+
+  /// The route arguments carry only what the list row had. The by-id request
+  /// brings the rest, whichever screen opened this one (market, collection,
+  /// home).
+  Future<void> fetchDetails() async {
+    if (!_canLoadPriceChart) return;
+    detailsLoading.value = true;
+    try {
+      final bottle = await _bluebookRepo.getById(bottleId!);
+      details.value = bottle.details;
+      isRare.value = bottle.isRare == true;
+      final text = _nullableRouteString(bottle.description);
+      if (text != null) description.value = text;
+      pricing.value ??= bottle.pricing;
+    } catch (_) {
+      // Optional section: the page is complete without it.
+    } finally {
+      detailsLoading.value = false;
+    }
   }
 
   Future<void> _loadCollectionOwnership() async {

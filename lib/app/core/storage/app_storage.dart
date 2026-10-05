@@ -21,6 +21,8 @@ class AppStorage {
       'current_registration_topic';
   static const String _keyCurrentTierTopic = 'current_tier_topic';
   static const String _keyTrialCountdownEndsAt = 'trial_countdown_ends_at';
+  static const String _keyRecentBottleSearches = 'recent_bottle_searches';
+  static const int _maxRecentBottleSearches = 6;
   static const String _keySubscriptionOfferDismissedForUserId =
       'subscription_offer_dismissed_for_user_id';
 
@@ -259,6 +261,30 @@ class AppStorage {
   static Future<void> setTrialCountdownEndsAtMillis(int value) async {
     await ensureReady();
     await _box.write(_keyTrialCountdownEndsAt, value);
+  }
+
+  /// Latest "Add a bottle" queries, newest first.
+  static List<String> get recentBottleSearches {
+    if (!_ready) return const [];
+    final raw = _box.read(_keyRecentBottleSearches);
+    if (raw is! List) return const [];
+    return raw.map((e) => e.toString()).toList(growable: false);
+  }
+
+  static Future<void> addRecentBottleSearch(String query) async {
+    final q = query.trim();
+    if (q.length < 2) return;
+    await ensureReady();
+    final next = [
+      q,
+      ...recentBottleSearches.where((e) => e.toLowerCase() != q.toLowerCase()),
+    ].take(_maxRecentBottleSearches).toList();
+    await _box.write(_keyRecentBottleSearches, next);
+  }
+
+  static Future<void> clearRecentBottleSearches() async {
+    await ensureReady();
+    await _box.remove(_keyRecentBottleSearches);
   }
 
   /// Whether this user chose limited access instead of the post-auth subscription offer.

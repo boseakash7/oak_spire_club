@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../data/repositories/bluebook_price_history_repository.dart';
+import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/collection_repository.dart';
 import 'benchmark_detail_controller.dart';
 
@@ -11,6 +12,7 @@ class BenchmarkDetailBinding extends Bindings {
       () => BenchmarkDetailController(
         collectionRepo: Get.find<CollectionRepository>(),
         priceHistoryRepo: Get.find<BluebookPriceHistoryRepository>(),
+        bluebookRepo: Get.find<BluebookRepository>(),
       ),
     );
   }

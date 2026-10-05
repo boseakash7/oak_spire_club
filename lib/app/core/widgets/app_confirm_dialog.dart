@@ -4,6 +4,7 @@ import '../animations/app_motion.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'show_app_dialog.dart';
+import '../theme/app_spacing.dart';
 
 /// Styled confirmation dialog using app colors — use anywhere via [showAppConfirmDialog].
 Future<bool?> showAppConfirmDialog(
@@ -105,7 +106,7 @@ class _AppConfirmDialogBody extends StatelessWidget {
                   const SizedBox(height: 26),
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: AppButtonSize.regular,
                     child: OutlinedButton(
                       onPressed: () => Navigator.of(context).pop(false),
                       style: OutlinedButton.styleFrom(
@@ -127,7 +128,7 @@ class _AppConfirmDialogBody extends StatelessWidget {
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: AppButtonSize.regular,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: confirmIsDestructive
@@ -151,7 +152,7 @@ class _AppConfirmDialogBody extends StatelessWidget {
                         child: Text(
                           confirmLabel,
                           style: AppTextStyles.button20Bold().copyWith(
-                            fontSize: 17,
+                            fontSize: AppButtonSize.labelSize,
                             color: confirmIsDestructive
                                 ? Colors.white
                                 : AppColors.black,

@@ -47,6 +47,21 @@ class AppCache {
     return value;
   }
 
+  /// The cached value for [cacheKey], or null when it is missing or older
+  /// than [ttl]. With [put], for callers that batch many keys into one
+  /// request, which [getOrFetch] cannot do.
+  T? peek<T>({
+    required String cacheKey,
+    required Duration ttl,
+    required T Function(Object json) decode,
+  }) {
+    final cached = _read(cacheKey);
+    if (cached == null || cached.isExpired(ttl)) return null;
+    return cached(decode);
+  }
+
+  Future<void> put(String cacheKey, Object json) => _write(cacheKey, json);
+
   void invalidate(String cacheKey) => _box.delete(cacheKey);
 
   Future<void> invalidateByPrefix(String prefix) async {

@@ -40,8 +40,10 @@ class CollectionRepository {
 
       final base = entries.first;
       int totalQty = 0;
-      double totalPrice = 0;
-      int priceCount = 0;
+      // Unit price weighted by quantity: 1 at $100 plus 3 at $200 is $175 a
+      // bottle, not the $150 a plain average of the rows gives.
+      double totalPaid = 0;
+      int pricedQty = 0;
       double totalFill = 0;
       int fillCount = 0;
       String? createdAt = base.createdAt;
@@ -52,12 +54,13 @@ class CollectionRepository {
 
       for (final e in entries) {
         final q = int.tryParse(e.quantity ?? '');
-        totalQty += (q == null || q <= 0) ? 1 : q;
+        final qty = (q == null || q <= 0) ? 1 : q;
+        totalQty += qty;
 
         final p = double.tryParse(e.pricePaid ?? '');
         if (p != null) {
-          totalPrice += p;
-          priceCount += 1;
+          totalPaid += p * qty;
+          pricedQty += qty;
         }
 
         final f = double.tryParse(e.fill ?? '');
@@ -100,12 +103,13 @@ class CollectionRepository {
               : (totalFill / fillCount).round().toString(),
           image: image,
           proof: proof,
-          pricePaid: priceCount == 0
+          pricePaid: pricedQty == 0
               ? base.pricePaid
-              : (totalPrice / priceCount).toStringAsFixed(2),
+              : (totalPaid / pricedQty).toStringAsFixed(2),
           notes: notes,
           dateAcquired: dateAcquired,
           bluebook: base.bluebook,
+          priceMovement: base.priceMovement,
         ),
       );
     }

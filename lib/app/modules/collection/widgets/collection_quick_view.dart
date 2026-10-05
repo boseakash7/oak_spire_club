@@ -10,14 +10,18 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/animated_fill_bar.dart';
 import '../../../core/widgets/app_pressable.dart';
+import '../../../core/utils/price_formatter.dart';
 import '../../../core/widgets/bottle_image.dart';
 import '../../../data/models/collection_item_display.dart';
 import '../../../data/models/collection_item_model.dart';
 import '../../../routes/app_routes.dart';
 import '../collection_controller.dart';
-import 'collection_bottle_card.dart';
 
 const Color _kBackdrop = Color.fromRGBO(49, 49, 49, 0.67);
+
+/// Quick-view card geometry, from the Figma collection card.
+const double kCollectionCardRadius = 20;
+const double kCollectionBottleImage = 100;
 
 /// Opens the quick view for [item], flying it out of the card at
 /// [cardContext], and reloads the collection if the quantity changed.
@@ -64,7 +68,8 @@ class _QuickView extends StatefulWidget {
 
 class _QuickViewState extends State<_QuickView> {
   static const double _cardWidth = 196;
-  static const double _cardHeight = 226;
+  // Taller than the Figma 226 to fit the "Paid" line under the value.
+  static const double _cardHeight = 240;
 
   int _qty = 1;
   bool _busy = false;
@@ -216,16 +221,10 @@ class _QuickViewState extends State<_QuickView> {
                                         child: child,
                                       ),
                                     ),
-                                child: Text(
-                                  '${item.priceLabel} ($_qty)',
+                                child: _QuickViewValue(
                                   key: ValueKey(_qty),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTextStyles.bodyL().copyWith(
-                                    fontSize: 12,
-                                    color: AppColors.textCream,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  item: item,
+                                  quantity: _qty,
                                 ),
                               ),
                             ),
@@ -390,6 +389,96 @@ class _ActionButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Name, optional subtitle and proof.
+class CollectionCardDetails extends StatelessWidget {
+  const CollectionCardDetails({super.key, required this.item});
+
+  final CollectionItemModel item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          item.lineTitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.uiCardTitle(),
+        ),
+        if (item.lineSubtitle.isNotEmpty)
+          Text(
+            item.lineSubtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.uiCardTitle(),
+          ),
+        SizedBox(height: item.lineSubtitle.isEmpty ? 6 : 4),
+        Text(item.proofLabel, style: AppTextStyles.uiCardMeta()),
+      ],
+    );
+  }
+}
+
+/// Today's value for [quantity] bottles with the gain against paid, or what
+/// was paid when the bottle has no market price.
+class _QuickViewValue extends StatelessWidget {
+  const _QuickViewValue({super.key, required this.item, required this.quantity});
+
+  final CollectionItemModel item;
+  final int quantity;
+
+  @override
+  Widget build(BuildContext context) {
+    final unitPaid = double.tryParse(item.pricePaid ?? '') ?? 0;
+    final unitMarket = item.marketAverageValue;
+    final paid = unitPaid * quantity;
+    final market = unitMarket == null || unitMarket <= 0
+        ? null
+        : unitMarket * quantity;
+    final pct = market == null || paid <= 0 ? null : (market - paid) / paid * 100;
+    final valueStyle = AppTextStyles.bodyL().copyWith(
+      fontSize: 12,
+      color: AppColors.textCream,
+      fontWeight: FontWeight.w500,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '${PriceFormatter.format((market ?? paid).toStringAsFixed(2))} ($quantity)',
+              ),
+              if (pct != null)
+                TextSpan(
+                  text: '  ${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    color: pct >= 0
+                        ? AppColors.trendPositive
+                        : AppColors.marketTrendDown,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+            ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: valueStyle,
+        ),
+        if (market != null && paid > 0)
+          Text(
+            'Paid ${PriceFormatter.format(paid.toStringAsFixed(2))}',
+            style: AppTextStyles.uiCardMeta(),
+          ),
+      ],
     );
   }
 }

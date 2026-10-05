@@ -11,9 +11,15 @@ import 'app_motion.dart';
 /// item that already played (scrolled away and back, or rebuilt after a
 /// refresh) shows at rest instead of animating again.
 class StaggerScope extends StatefulWidget {
-  const StaggerScope({super.key, required this.child});
+  const StaggerScope({super.key, required this.child, this.entranceWindow});
 
   final Widget child;
+
+  /// When set, only items that appear within this long of the scope being
+  /// created animate (the first screenful of a list). Rows that scroll into
+  /// view or arrive with a later page show at rest, so scrolling never
+  /// reveals blank rows popping in. Key the scope by query to restart it.
+  final Duration? entranceWindow;
 
   /// Forget every played item, e.g. when a new search replaces the list.
   static void reset(BuildContext context) =>
@@ -28,10 +34,16 @@ class _StaggerScopeState extends State<StaggerScope> {
   static const Duration _burstGap = Duration(milliseconds: 140);
 
   final Set<Object> _played = <Object>{};
+  final DateTime _createdAt = DateTime.now();
   DateTime _lastStart = DateTime.fromMillisecondsSinceEpoch(0);
   int _burst = 0;
 
   bool hasPlayed(Object id) => _played.contains(id);
+
+  bool get entranceOpen {
+    final window = widget.entranceWindow;
+    return window == null || DateTime.now().difference(_createdAt) <= window;
+  }
 
   void markPlayed(Object id) => _played.add(id);
 
@@ -114,7 +126,9 @@ class _StaggeredEntranceState extends State<StaggeredEntrance>
 
     if (!widget.enabled ||
         AppMotion.reduced(context) ||
-        (scope != null && id != null && scope.hasPlayed(id))) {
+        (scope != null &&
+            id != null &&
+            (scope.hasPlayed(id) || !scope.entranceOpen))) {
       _controller.value = 1;
       return;
     }

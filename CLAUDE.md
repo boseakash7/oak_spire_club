@@ -27,7 +27,7 @@ The API this app talks to lives in the sibling repo `../oakspireweb` (PHP). It i
 ```sh
 flutter pub get
 flutter analyze                 # lints: package:flutter_lints
-flutter test                    # only test/widget_test.dart exists (route constants)
+flutter test                    # route constants + value/rating/sparkline parsing
 flutter run
 
 # Against the local docker backend (oakspireweb) on an Android emulator:
@@ -134,6 +134,35 @@ as a `LazyTabStack` ([lazy_tab_stack.dart](lib/app/modules/navigation/widgets/la
 Settings, which calls `showSettingsPopup(context)` and sets `settingsMenuOpen`; it is not a tab
 or route. The shell's back handler closes the popup, then returns to Home, then asks to exit.
 
+**Shell header** ([app_header.dart](lib/app/core/widgets/app_header.dart)) is the only `AppHeader`
+use. The right side has two lines:
+- Line 1 is the greeting plus a `BottleMetaChip` pill: `PREMIUM` (gold) when
+  `user.hasActiveSubscription || user.isFreeUser`, else `FREE`. It reads
+  `UserSessionController.user` reactively, so call `setUser` after a refresh and the pill flips.
+- Line 2 is `HomeController.headerMoveText`, computed in `_applyHeaderMove` from the chart's
+  daily value series: `▲ $124 today`. When today was flat it shows the 7-day change
+  (`… this week`), and when that is flat too it shows `Steady this week`. It is empty with no
+  collection or no chart data.
+- The header reads `HomeController` only when `Get.isRegistered`, since the shell binding
+  lazy-puts it.
+
+**Collection tab** is a `SliverList` of `CollectionBottleRow`
+([collection_bottle_row.dart](lib/app/modules/collection/widgets/collection_bottle_row.dart)).
+The old two-column grid and `CollectionBottleCard` are gone.
+- Left side of a row: art, name, maker · region, and type / age / ABV / Rare / rating chips
+  (from `CollectionItemDisplay.details`, i.e. `BottleDetails.fromBottleJson(bluebook)`).
+  Below them: fill bar + %, `×qty`, and "Paid $X".
+- Right side: today's value (`marketTotalValue`), gain $ and % against paid, the 90-day
+  sparkline, and `Last ±N%` (`price_movement`). A bottle with no market price shows its paid
+  value marked "Valued at cost".
+- Each row's `Obx` always reads `controller.sparklines[bottleId ?? '']`, because an `Obx` that
+  reads no observable throws.
+- Tapping a row still opens `showCollectionQuickView`. That file now owns
+  `kCollectionCardRadius`, `kCollectionBottleImage` and `CollectionCardDetails`. Its card is
+  240 tall (Figma 226) to fit today's value + gain % and a "Paid" line.
+- The sort menu is Name / Price / Gain / Fill Rate / Added Time. Price sorts by current unit
+  value (falling back to paid). Gain sorts by `gainPercent`.
+
 **Route arguments are untyped maps.** Helper accessors exist for the subscription routes
 (`SubscriptionLimitNavigation`, `SubscriptionPaymentSuccessNavigation`, and
 `AuthNavigation.postAuthSubscriptionArg` for `/subscription` and `/subscription-skip`) and for
@@ -181,8 +210,10 @@ comes from `AppStorage` at the repository layer.
 | `collection/delete-by-user-bottle` | POST | `deleteByUserBottle` | collection remove / edit-replace |
 | `bluebook/get-all-bluebooks` | GET | `getAll` (no keyword) | market / taste browsing + pagination |
 | `bluebook/search` | GET | `getAll` (with keyword) | market / taste search: hybrid lexical + semantic, same envelope, `category_id` honoured, SQL fallback server-side |
+| `bluebook/get-by-id` | GET | `getById` | benchmark detail: the catalog facts (`details`: distillery, type, age, ABV, cask…) the list rows don't carry, whichever screen opened it |
 | `bluebook/create` | POST | `create` | add-to-collection when the bottle is not in the bluebook |
 | `bluebook/get-last-update` | GET | `getLastUpdatedReadable` | market "last updated" label |
+| `bluebook/sparklines` | GET | `sparklines` (`ids` ≤ 60, `days`) | collection rows (all bottles, one call) and Benchmark rows (one call per page): 24 as-of samples per bottle; repository never throws, a missing endpoint only costs the sparklines |
 | `bluebook-price-history/chart-data-dashboard` | GET | `getChartDashboard` | benchmark detail chart (`bottleId`, `fromDate`, `endDate`) |
 | `categories/list` | POST + query | `list` | market category chips, taste category chips |
 | `package/get-all` | GET | `getAll` | subscription plan list |
@@ -200,7 +231,8 @@ call; the app only uses `normal` today.
 
 **Cached reads** (24h TTL, cleared on app-version change) are `collection:all:$userId`,
 `collection:chart:$userId:$lookBackDays`, `categories:list:$page:$limit`,
-and `bluebook:last-updated`. `bluebook/get-all-bluebooks`, `bluebook/search`,
+and `bluebook:last-updated`; plus `bluebook:spark:$id:$days` (6h, one entry per bottle, read
+and written through `AppCache.peek` / `put` so a batch only requests the misses). `bluebook/get-all-bluebooks`, `bluebook/search`,
 `config/all`, `user/get-by-id`, and everything under `package/` and `auth/` are uncached.
 
 ## Conventions that matter
@@ -227,7 +259,14 @@ of `{v: appVersion, t: epochMs, d: jsonString}`. Entries expire on TTL *and* on 
 change. Repositories call `cache.getOrFetch(cacheKey:, ttl:, fetch:, encode:, decode:)` with
 user-scoped keys like `collection:all:$userId`. **Any mutation must invalidate the affected
 prefixes** — see `CollectionRepository.addToCollection`, which clears both
-`collection:all:$userId` and `collection:chart:$userId:`.
+`collection:all:$userId` and `collection:chart:$userId:`. For a batch of many keys in one request
+(sparklines), use `cache.peek(cacheKey:, ttl:, decode:)` to find the misses and `cache.put(key, json)`
+to store each result; `getOrFetch` is single-key.
+
+**Grouping `collection/all`.** `CollectionRepository._groupCollectionItems` merges rows of the same
+bluebook bottle into one: quantities add up, `pricePaid` is the **quantity-weighted** unit price
+(Σ unit × qty / Σ qty), and `priceMovement` is kept from the first row. Every value and gain figure
+depends on this, so don't go back to a plain average of the rows.
 
 **Two persistence stores, deliberately.** `AppStorage` writes the login session to *both*
 Hive (`oakspire_session_v1`, durable on iOS) and GetStorage (legacy), with a one-way
@@ -287,6 +326,16 @@ literals in views — add a named token instead. Older screens still use one-off
 New and refactored code takes its values from the `AppSpacing` scale (shell gutter is
 `AppSpacing.gutter`, 20).
 
+**Buttons.** Sizes come from `AppButtonSize` ([app_spacing.dart](lib/app/core/theme/app_spacing.dart)):
+`regular` (44) for full-width CTAs, dialogs and sheets, `compact` (40) for inline actions such as the
+empty state's "Browse bottles". Don't hardcode a button `height`. `CommonPrimaryButton` is the
+standard primary action.
+
+**Bottle facts.** Bottle payloads carry a `details` object next to `pricing` (built by
+`BlueBookHelper::details` in oakspireweb; numbers are typed, blanks are null). `BluebookModel.details`
+is a `BottleDetails`: `chips` for list rows (age, ABV), `facts` for the detail page. A server without
+`details` still sends the raw columns, and `BottleDetails.fromBottleJson` falls back to them.
+
 **Banding.** The dark palette's gradients are only a few color levels apart, so they band on
 8-bit screens. Flutter already dithers gradients drawn in code. Full-screen photo backgrounds go
 through `AppBackdropImage`, which uses high-quality filtering, and ship a 2× variant under
@@ -308,6 +357,14 @@ hand-rolling animation:
 - `AppStateSwitcher` — fade-through between loading / content / empty states.
 - `StaggeredEntrance` / `FadeSlideEntrance` / `StaggeredColumn` — entrances; inside a
   `StaggerScope`, rows with an `id` animate once and stagger per burst, not per absolute index.
+  Long scrolling lists (Benchmark, Add a bottle) key the scope by query and pass
+  `entranceWindow`, so only the first screenful animates. Never use
+  `StaggeredEntrance(index: i)` in a lazily built list: rows scrolled into view would wait for
+  their slot and then pop in.
+- `AppFilterChipBar` ([app_filter_chip.dart](lib/app/core/widgets/app_filter_chip.dart)) — every
+  filter-chip row (Collection, Benchmark, Add a bottle). Picking a chip moves the gold
+  highlight toward the middle of the bar. Once it is there it stays put, and the row scrolls
+  the chip into it. Pass `clipToBounds` when the bar sits beside fixed content.
 - `AppPressable` — press scale + haptic for anything tappable (not a bare `GestureDetector`).
 - `ShimmerScope` around a skeleton — one synced sweep for all its `ShimmerBox`es. Placeholders
   that sit on a `cardSurfaceGradient` card need `AppColors.shimmerOnCardBase/Highlight` (the
@@ -315,6 +372,12 @@ hand-rolling animation:
   surfaces underneath, with the placeholders in one scope on top.
 - `AnimatedCountText`, `AnimatedFillBar`, `AppSegmentedRange`, `AppSearchField`,
   `BottleImage` (art + fallback URLs + Hero via `AppHeroTags`), `PricingBadge`.
+- `PriceSparklineView` ([price_sparkline.dart](lib/app/core/widgets/price_sparkline.dart)): the
+  list-row price line (Collection 64×22, Benchmark 60×20).
+  - It is a `CustomPainter` in a `RepaintBoundary`. Don't use fl_chart in rows.
+  - It draws a step line, green / red / muted by the window's change.
+  - While its data is null it shows a dashed baseline, so the row doesn't shift, and it fades
+    in when the data arrives.
 - Shell tabs are a `LazyTabStack` (built on first visit, fade-through on switch; hidden tabs get
   `TickerMode(false)` and `HeroMode(false)`).
 
@@ -340,12 +403,37 @@ Confirmations use `showAppConfirmDialog`. Other dialogs and sheets use `showAppA
 **Chart math** is shared, not per-screen: `ChartIndexComparison` rebases each series so the
 first point in the window is 100 (so collection value and BSMI compare on one axis), and
 `CollectionValueCalculator` is the single source of truth for invested value and the
-"Moved +N%" figure.
+"Moved +N%" figure. `CollectionValueCalculator.summarize` gives Home and Collection the same
+headline: today's value (bluebook average × qty, or price paid for a bottle with no market
+price), invested, and gain / gain % over only the rows that have both prices. Collection's
+badge is that gain against paid, not the chart's 90-day move. `CollectionItemDisplay` has the
+per-row versions: `marketTotalValue`, `paidTotalValue`, `gainValue`, `gainPercent`, plus `pricing`
+and `ratingRaw`.
+
+**Sparklines** come from `BluebookRepository.sparklines(ids, {days = 90, forceRefresh})`
+(model `PriceSparkline`: `prices`, `changePct`).
+- It is cached per bottle and requests only the misses, in chunks of
+  `BluebookRemoteDataSource.sparklinesMaxIds` (60).
+- A bottle the server leaves out is cached as empty, so it isn't requested again.
+- **It never throws**: on an old server the rows just keep the placeholder.
+- `CollectionController._loadSparklines` asks for every priced bottle in one go after each load.
+- The Benchmark tab fetches per page: `PagedBottleSearch` calls the hook
+  `onBottlesLoaded(page, reset:)` after each page, and `MarketController` overrides it, for
+  priced bottles only.
+- Taste doesn't override the hook, so "Add a bottle" makes no sparkline calls. Pull-to-refresh
+  on Benchmark bypasses the cache for the first page it reloads.
+- The points are evenly spaced samples, so the painter spaces them evenly. Keep the server
+  sampling dates evenly too, or the timing of moves will look wrong.
+
+**Ratings** are stored out of 100 (`bluebook.rating`, 0 = not rated; the collection average
+`collection_rating_percentage` is on the same scale). Show them out of 10 through
+`RatingFormatter` (`label` → `9.2`, `labelOutOfTen` → `9.2/10`), never the raw number.
 
 ## Testing
 
-There is effectively no test suite — `test/widget_test.dart` only asserts route constants.
-Do not assume tests cover a change; verify behavior by running the app.
+There is effectively no test suite: `test/widget_test.dart` asserts route constants and
+`test/collection_value_test.dart` covers `CollectionValueCalculator.summarize`, `RatingFormatter`
+and `PriceSparkline` parsing. Do not assume tests cover a change; verify behavior by running the app.
 
 ---
 
@@ -605,7 +693,7 @@ All paths are under `Application/Controllers/`:
 | `config/all` | `Api/Config.php` — reads `Configs/Website.php` plus the `app_config` version row written by `/app/updater` |
 | `collection/all`, `collection/delete-by-user-bottle` | `Api/Collection.php` |
 | `collection/chart-data`, `collection/add` | `Api/V2/Collection.php` (**v2 override**) |
-| `bluebook/*` | `Api/BlueBook.php` (`getAdminBottles` is the paginated, category-filtered market list) |
+| `bluebook/*` | `Api/BlueBook.php` (`getAdminBottles` is the paginated, category-filtered market list; `sparklines` serves `bluebook/sparklines`) |
 | `bluebook-price-history/chart-data-dashboard` | `Api/BluebookPriceHistory.php` |
 | `categories/list`, `categories/detail` | `Api/Category.php` |
 | `package/*` | `Api/Package.php` |
@@ -625,6 +713,18 @@ single bottle's change points with a point at each end of the window. `Models/Co
 methods, `bluebook/get-price-history` and dated `chart-data-dashboard` all go through it.
 `Api\V2\Collection::chartData` caches under a versioned key (`CHART_CACHE_VERSION`) for 3 hours.
 The app's `ChartIndexComparison` rebases on top of that.
+
+`PriceSeriesHelper::sparklines($ids, $minDate, $maxDate, $samples = 24)` backs `bluebook/sparklines`.
+- For each bottle it returns the as-of price on `$samples` evenly spaced dates (the end is capped
+  at today). Bottles with no price are left out.
+- It needs only the seed query (`_seed`) and `rowsBetweenForBottles`, so the query count stays
+  fixed however many bottles are asked for. Don't add a per-bottle query loop.
+- `Api\BlueBook::sparklines` (v1 route, inherited by `/v2`) reads `ids`, comma separated, capped
+  by `SPARKLINE_MAX_IDS` = 60. It reads `days` from 30 / 90 / 180 / 365 (default 90).
+- It caches the result in Redis for `SPARKLINE_CACHE_TTL` (3 hours), keyed
+  `sparklines#v1#<days>#<date>#md5(sorted ids)`.
+- It returns `{id: {points: [{d, p}], first, last, change_pct}}`. The map is cast to an object,
+  so an empty result is `{}`, not `[]`.
 
 ## Other surfaces, for orientation
 

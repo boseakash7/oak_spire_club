@@ -5,7 +5,9 @@ import '../animations/app_motion.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../../modules/home/home_controller.dart';
 import '../../modules/session/user_session_controller.dart';
+import 'bottle_meta_chip.dart';
 
 /// Toolbar row height for [AppHeader] / shell [PreferredSize].
 const double kShellAppBarHeight = kToolbarHeight;
@@ -92,7 +94,12 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                 ),
               )
             else
-              _GreetingText(session: session),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: _GreetingText(session: session),
+                ),
+              ),
           ],
         ),
       ),
@@ -100,6 +107,8 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
+/// "Good morning, Akash" with the member pill, and under it the
+/// collection's move today (from Home's chart data, so no extra request).
 class _GreetingText extends StatelessWidget {
   const _GreetingText({required this.session});
 
@@ -107,20 +116,81 @@ class _GreetingText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(
-      () => Text(
-        session.greetingText,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.right,
-        style: AppTextStyles.body16().copyWith(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          height: 1.0,
-          color: AppColors.textGreeting,
-        ),
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Obx(() {
+          final user = session.user.value;
+          // Free premium (is_free) counts: the backend treats it as subscribed.
+          final premium =
+              user != null && (user.hasActiveSubscription || user.isFreeUser);
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  session.greetingText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.body16().copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    height: 1.0,
+                    color: AppColors.textGreeting,
+                  ),
+                ),
+              ),
+              if (user != null) ...[
+                const SizedBox(width: 6),
+                BottleMetaChip(label: premium ? 'PREMIUM' : 'FREE', gold: premium),
+              ],
+            ],
+          );
+        }),
+        if (Get.isRegistered<HomeController>())
+          _MoveLine(home: Get.find<HomeController>()),
+      ],
     );
+  }
+}
+
+class _MoveLine extends StatelessWidget {
+  const _MoveLine({required this.home});
+
+  final HomeController home;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final text = home.headerMoveText.value;
+      final up = home.headerMoveUp.value;
+      final color = up == null
+          ? AppColors.textMuted
+          : up
+          ? AppColors.trendPositive
+          : AppColors.marketTrendDown;
+      return AnimatedSwitcher(
+        duration: AppMotion.of(context, AppMotion.medium),
+        child: text.isEmpty
+            ? const SizedBox.shrink()
+            : Padding(
+                key: ValueKey(text),
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.micro().copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+      );
+    });
   }
 }
 

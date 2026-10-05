@@ -17,6 +17,15 @@ abstract final class AppSpacing {
   static const double gutter = 20;
 }
 
+/// Button metrics, so a primary action is the same size on every screen.
+/// [compact] is the inline size (the empty state's "Browse bottles").
+abstract final class AppButtonSize {
+  static const double regular = 44;
+  static const double compact = 40;
+  static const double radius = 10;
+  static const double labelSize = 16;
+}
+
 /// Corner radii.
 abstract final class AppRadii {
   static const double chip = 999;

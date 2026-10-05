@@ -19,7 +19,7 @@ import '../../data/models/collection_item_model.dart';
 import '../../routes/app_routes.dart';
 import 'collection_controller.dart';
 import 'collection_loading_view.dart';
-import 'widgets/collection_bottle_card.dart';
+import 'widgets/collection_bottle_row.dart';
 import 'widgets/collection_filter_row.dart';
 import 'widgets/collection_quick_view.dart';
 import 'widgets/collection_value_header.dart';
@@ -133,7 +133,7 @@ class _CollectionBody extends StatelessWidget {
                       ),
                     );
                   }
-                  return _Grid(list: list, controller: controller);
+                  return _List(list: list, controller: controller);
                 }),
               ],
             ),
@@ -144,15 +144,15 @@ class _CollectionBody extends StatelessWidget {
   }
 }
 
-class _Grid extends StatelessWidget {
-  const _Grid({required this.list, required this.controller});
+class _List extends StatelessWidget {
+  const _List({required this.list, required this.controller});
 
   final List<CollectionItemModel> list;
   final CollectionController controller;
 
   @override
   Widget build(BuildContext context) {
-    // Hero tags must be unique on screen; only the first card of a bottle
+    // Hero tags must be unique on screen; only the first row of a bottle
     // carries one.
     final seen = <String>{};
     final heroIds = [
@@ -165,30 +165,32 @@ class _Grid extends StatelessWidget {
 
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(_kInset, 0, _kInset, 120),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: AppSpacing.md,
-          crossAxisSpacing: 14,
-          childAspectRatio: kCollectionCardWidth / kCollectionCardHeight,
-        ),
-        delegate: SliverChildBuilderDelegate((context, index) {
+      sliver: SliverList.separated(
+        itemCount: list.length,
+        separatorBuilder: (context, index) =>
+            const SizedBox(height: AppSpacing.sm),
+        itemBuilder: (context, index) {
           final item = list[index];
+          final bottleId = item.bluebookBottleId;
           return StaggeredEntrance(
             id: 'collection-${item.id}',
             child: Builder(
-              builder: (cardContext) => CollectionBottleCard(
-                item: item,
-                heroBottleId: heroIds[index],
-                onTap: () => showCollectionQuickView(
-                  cardContext,
+              builder: (rowContext) => Obx(
+                () => CollectionBottleRow(
                   item: item,
-                  controller: controller,
+                  heroBottleId: heroIds[index],
+                  // Always read the map: an Obx that reads nothing throws.
+                  sparkline: controller.sparklines[bottleId ?? ''],
+                  onTap: () => showCollectionQuickView(
+                    rowContext,
+                    item: item,
+                    controller: controller,
+                  ),
                 ),
               ),
             ),
           );
-        }, childCount: list.length),
+        },
       ),
     );
   }

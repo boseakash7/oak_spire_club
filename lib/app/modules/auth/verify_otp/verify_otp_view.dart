@@ -122,9 +122,6 @@ class VerifyOtpView extends GetView<VerifyOtpController> {
                         () => CommonPrimaryButton(
                           label: 'Verify',
                           onPressed: controller.onVerify,
-                          textStyle: AppTextStyles.button20Bold().copyWith(
-                            fontSize: 18,
-                          ),
                           isLoading: controller.isLoading.value,
                         ),
                       ),

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/price_formatter.dart';
 import '../../../core/widgets/pricing_badge.dart';
@@ -73,7 +74,55 @@ class BenchmarkTopSummary extends GetView<BenchmarkDetailController> {
               ),
           ],
         ),
+        Obx(() {
+          final d = controller.details.value;
+          final tags = <String>[
+            if (controller.isRare.value) 'Rare',
+            if (d?.isAllocated == true) 'Allocated',
+            if (d?.spiritType != null) d!.spiritType!,
+            ?d?.ageLabel,
+          ];
+          if (tags.isEmpty) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                for (final t in tags)
+                  _Tag(label: t, gold: t == 'Rare' || t == 'Allocated'),
+              ],
+            ),
+          );
+        }),
       ],
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag({required this.label, required this.gold});
+
+  final String label;
+  final bool gold;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: gold ? AppColors.goldAccentGlow : AppColors.surfaceChip,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(
+          color: gold ? AppColors.tagGoldBorder : AppColors.tagInactiveBorder,
+        ),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.bodyS().copyWith(
+          color: gold ? AppColors.goldRich : AppColors.textMuted,
+        ),
+      ),
     );
   }
 }

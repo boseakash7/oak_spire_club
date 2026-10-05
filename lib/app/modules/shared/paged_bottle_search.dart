@@ -21,7 +21,9 @@ mixin PagedBottleSearch on GetxController {
   BluebookRepository get bluebookRepo;
   CategoriesRepository get categoriesRepo;
 
-  static const int pageSize = 10;
+  /// Bottles per request; a screen may ask for more.
+  int get pageSize => 10;
+
   static const int _allCategoriesLimit = 200;
   static const Duration _debounceDelay = Duration(milliseconds: 400);
 
@@ -35,6 +37,10 @@ mixin PagedBottleSearch on GetxController {
   final isSearching = false.obs;
 
   final isLoadingMore = false.obs;
+
+  /// The last first-page request failed, so an empty list means "couldn't
+  /// load", not "nothing matched".
+  final loadFailed = false.obs;
   final hasMore = true.obs;
   final keyword = ''.obs;
   final selectedCategoryId = ''.obs;
@@ -82,14 +88,20 @@ mixin PagedBottleSearch on GetxController {
       );
       if (generation != _generation) return;
       if (reset) {
+        loadFailed.value = false;
         bottles.assignAll(res);
       } else {
         bottles.addAll(res);
       }
       hasMore.value = res.length >= pageSize;
+      onBottlesLoaded(res, reset: reset);
     } catch (e) {
       if (generation != _generation) return;
-      if (!reset) _page -= 1;
+      if (reset) {
+        loadFailed.value = true;
+      } else {
+        _page -= 1;
+      }
       await AppSnackbar.error(e.toString());
     } finally {
       if (generation == _generation) {
@@ -99,6 +111,11 @@ mixin PagedBottleSearch on GetxController {
       }
     }
   }
+
+  /// Called with each page as it lands; [reset] is true for a first page.
+  /// A screen that decorates rows (the Benchmark tab's sparklines) fetches
+  /// for them here.
+  void onBottlesLoaded(List<BluebookModel> page, {required bool reset}) {}
 
   Future<void> loadMore() => load(reset: false);
 
@@ -124,6 +141,16 @@ mixin PagedBottleSearch on GetxController {
     if (keyword.value.trim() == value.trim()) return;
     keyword.value = value;
     await load(reset: true, showFullLoader: false);
+  }
+
+  /// Runs [value] now, skipping the debounce (a tapped recent search).
+  void searchNow(String value) {
+    _debounce?.cancel();
+    searchCtrl.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+    unawaited(_applySearch(value));
   }
 
   /// Empty state's "Clear search".

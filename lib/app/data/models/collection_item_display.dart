@@ -2,6 +2,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/utils/proof_formatter.dart';
+import 'bottle_details.dart';
+import 'bottle_pricing.dart';
 import 'collection_item_model.dart';
 
 /// CMS static files usually live under `/v2/…`, not under `/v2/api/…`.
@@ -130,6 +132,42 @@ extension CollectionItemDisplay on CollectionItemModel {
     if (raw == null || raw == 'null') return null;
     return double.tryParse(raw.replaceAll(RegExp(r'[^0-9.\-]'), ''));
   }
+
+  /// What this row is worth today: market average × quantity, or null when
+  /// the bluebook has no price.
+  double? get marketTotalValue {
+    final unit = marketAverageValue;
+    if (unit == null || unit <= 0) return null;
+    return unit * displayQuantity;
+  }
+
+  /// What was paid for this row: unit `price_paid` × quantity.
+  double get paidTotalValue =>
+      (double.tryParse(pricePaid ?? '') ?? 0) * displayQuantity;
+
+  /// Market minus paid; null when either side is unknown.
+  double? get gainValue {
+    final market = marketTotalValue;
+    final paid = paidTotalValue;
+    if (market == null || paid <= 0) return null;
+    return market - paid;
+  }
+
+  /// [gainValue] as a percentage of what was paid.
+  double? get gainPercent {
+    final gain = gainValue;
+    if (gain == null) return null;
+    return gain / paidTotalValue * 100;
+  }
+
+  /// Catalog facts (distillery, type, age, ABV…) from the nested bluebook.
+  BottleDetails get details => BottleDetails.fromBottleJson(bluebook ?? const {});
+
+  /// What the bottle's market price rests on, when the API sends it.
+  BottlePricing? get pricing => BottlePricing.fromJson(bluebook?['pricing']);
+
+  /// Bluebook `rating` (out of 100); see [RatingFormatter].
+  String? get ratingRaw => _pickBluebook(const ['rating']);
 
   /// Primary line (brand / expression name).
   String get lineTitle =>

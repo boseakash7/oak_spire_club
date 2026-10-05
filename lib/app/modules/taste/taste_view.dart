@@ -18,7 +18,9 @@ import '../../core/widgets/app_filter_chip.dart';
 import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/app_search_field.dart';
 import '../../core/widgets/bottle_image.dart';
+import '../../core/widgets/bottle_meta_chip.dart';
 import '../../core/widgets/pricing_badge.dart';
+import '../../core/widgets/show_app_dialog.dart';
 import '../../data/models/bluebook_model.dart';
 import '../../routes/app_routes.dart';
 import '../collection/collection_controller.dart';
@@ -29,8 +31,14 @@ import 'taste_loading_view.dart';
 
 const double _kInset = 23;
 
+/// Fixed thumbnail slot: every bottle gets the same box and crop.
+const double _kThumb = 48;
+
 /// Height of [_AddOwnBottleRow] including its top margin.
 const double _kAddOwnRowExtent = 72;
+
+/// Rows built this soon after a list appears play their entrance.
+const Duration _kEntranceWindow = Duration(milliseconds: 600);
 
 /// "Add a bottle": search the catalog, tap a bottle to add it, or add one
 /// that is not listed.
@@ -81,7 +89,14 @@ Future<void> _handleAddedSuccess() async {
 class _TasteList extends GetView<TasteController> {
   const _TasteList();
 
-  Future<void> _add(BluebookModel bottle) async {
+  /// Row tap: confirm first, then the usual add flow.
+  Future<void> _open(BuildContext context, BluebookModel bottle) async {
+    final confirmed = await _showConfirmSheet(
+      context,
+      bottle: bottle,
+      owned: controller.isOwned(bottle),
+    );
+    if (confirmed != true) return;
     final res = await controller.addBottleToCollection(bottle);
     if (res == true) await _handleAddedSuccess();
   }
@@ -116,10 +131,11 @@ class _TasteList extends GetView<TasteController> {
                       () => AppSearchField(
                         controller: controller.searchCtrl,
                         onChanged: controller.onSearchChanged,
-                        hintText: 'Search bottles by name or distillery',
+                        hintText: 'Search name, distillery, or age',
                         busy: controller.isSearching.value,
                       ),
                     ),
+                    const _RecentSearches(),
                     const SizedBox(height: 12),
                     const _CategoryRow(),
                   ],
@@ -131,40 +147,33 @@ class _TasteList extends GetView<TasteController> {
               sliver: Obx(() {
                 final bottles = controller.visibleBottles;
                 if (bottles.isEmpty) {
-                  return SliverToBoxAdapter(
-                    child: controller.isSearching.value
-                        ? const TasteBottleSkeletonList()
-                        : Padding(
-                            padding: const EdgeInsets.only(top: 24),
-                            child: AppEmptyState(
-                              icon: Icons.search_off_rounded,
-                              title: 'No bottles found',
-                              message:
-                                  'Try another spelling, or add it yourself '
-                                  'below.',
-                              actionLabel:
-                                  controller.keyword.value.trim().isEmpty
-                                  ? null
-                                  : 'Clear search',
-                              onAction: controller.clearSearch,
-                            ),
-                          ),
-                  );
+                  return SliverToBoxAdapter(child: _emptyBody());
                 }
-                return SliverList.separated(
+                // A fresh query / category gets a fresh entrance; rows that
+                // scroll in later show at rest.
+                return StaggerScope(
                   key: ValueKey(
                     '${controller.keyword.value}|'
                     '${controller.selectedCategoryId.value}',
                   ),
-                  itemCount: bottles.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 10),
-                  itemBuilder: (context, index) => StaggeredEntrance(
-                    index: index.clamp(0, 8),
-                    child: _BottleRow(
-                      bottle: bottles[index],
-                      onAdd: () => _add(bottles[index]),
-                    ),
+                  entranceWindow: _kEntranceWindow,
+                  child: SliverList.separated(
+                    itemCount: bottles.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final bottle = bottles[index];
+                      return StaggeredEntrance(
+                        id: bottle.id,
+                        child: Obx(
+                          () => _BottleRow(
+                            bottle: bottle,
+                            owned: controller.isOwned(bottle),
+                            onTap: () => _open(context, bottle),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 );
               }),
@@ -210,6 +219,141 @@ class _TasteList extends GetView<TasteController> {
       ),
     );
   }
+
+  /// Nothing to list: still loading, failed, or nothing matched.
+  Widget _emptyBody() {
+    if (controller.isSearching.value) return const TasteBottleSkeletonList();
+    if (controller.loadFailed.value) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 24),
+        child: AppEmptyState(
+          icon: Icons.cloud_off_rounded,
+          title: 'Couldn’t load bottles',
+          message: 'Check your connection and try again.',
+          actionLabel: 'Try again',
+          onAction: () => controller.forceReload(showFullLoader: false),
+        ),
+      );
+    }
+    final query = controller.keyword.value.trim();
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: AppEmptyState(
+        icon: Icons.search_off_rounded,
+        title: query.isEmpty ? 'No bottles found' : 'No match for “$query”',
+        message: 'Try the distillery name or add it manually.',
+        actionLabel: query.isEmpty ? null : 'Clear search',
+        onAction: controller.clearSearch,
+      ),
+    );
+  }
+}
+
+/// Recent queries under an empty search field.
+class _RecentSearches extends GetView<TasteController> {
+  const _RecentSearches();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller.searchCtrl,
+      builder: (context, value, _) {
+        return Obx(() {
+          final recents = controller.recentSearches.toList(growable: false);
+          final show = value.text.isEmpty && recents.isNotEmpty;
+          return AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            alignment: Alignment.topCenter,
+            child: !show
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 32,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: recents.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(width: AppSpacing.xs),
+                              itemBuilder: (context, index) => _RecentChip(
+                                label: recents[index],
+                                onTap: () =>
+                                    controller.searchNow(recents[index]),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        AppPressable(
+                          onTap: controller.clearRecentSearches,
+                          semanticLabel: 'Clear recent searches',
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.xxs),
+                            child: Text(
+                              'Clear',
+                              style: AppTextStyles.bodyS().copyWith(
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+          );
+        });
+      },
+    );
+  }
+}
+
+class _RecentChip extends StatelessWidget {
+  const _RecentChip({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPressable(
+      onTap: onTap,
+      semanticLabel: 'Search $label',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceChip,
+          borderRadius: BorderRadius.circular(AppRadii.chip),
+          border: Border.all(color: AppColors.tagInactiveBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.history_rounded,
+              size: 14,
+              color: AppColors.textMuted,
+            ),
+            const SizedBox(width: AppSpacing.xxs),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 140),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.bodyS().copyWith(
+                  color: AppColors.textCream,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _CategoryRow extends GetView<TasteController> {
@@ -217,64 +361,50 @@ class _CategoryRow extends GetView<TasteController> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      child: Obx(
-        () => ListView.separated(
-          scrollDirection: Axis.horizontal,
-          // Chips scroll edge to edge; the selected chip's glow is not
-          // clipped into a box.
-          clipBehavior: Clip.none,
-          padding: const EdgeInsets.only(right: 4),
-          itemCount: controller.categories.length + 1,
-          separatorBuilder: (context, index) => const SizedBox(width: 10),
-          itemBuilder: (context, index) {
-            final isAll = index == 0;
-            final label = isAll ? 'All' : controller.categories[index - 1].name;
-            final id = isAll ? '' : controller.categories[index - 1].id;
-            return AppFilterChip(
-              label: label,
-              selected: controller.selectedCategoryId.value == id,
-              onTap: () => controller.selectCategory(id),
-            );
-          },
-        ),
+    return Obx(
+      () => AppFilterChipBar<String>(
+        items: [
+          const AppFilterChipItem('', 'All'),
+          for (final c in controller.categories) AppFilterChipItem(c.id, c.name),
+        ],
+        selected: controller.selectedCategoryId.value,
+        onSelected: controller.selectCategory,
       ),
     );
   }
 }
 
+/// One bottle: name (2 lines), a meta line of chips, a price or nothing, and
+/// an "Add" label. The whole row is the tap target.
 class _BottleRow extends StatelessWidget {
-  const _BottleRow({required this.bottle, required this.onAdd});
+  const _BottleRow({
+    required this.bottle,
+    required this.owned,
+    required this.onTap,
+  });
 
   final BluebookModel bottle;
-  final VoidCallback onAdd;
+  final bool owned;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final hasPrice = (double.tryParse(bottle.average ?? '') ?? 0) > 0;
     return AppPressable(
-      onTap: onAdd,
+      onTap: onTap,
       haptic: PressHaptic.tap,
-      semanticLabel: 'Add ${bottle.bottleName}',
+      semanticLabel: owned
+          ? '${bottle.bottleName}, in your collection'
+          : 'Add ${bottle.bottleName}',
       child: Container(
-        padding: const EdgeInsets.fromLTRB(6, 8, 10, 8),
+        padding: const EdgeInsets.fromLTRB(8, 10, 12, 10),
         decoration: BoxDecoration(
           gradient: AppColors.cardSurfaceGradient,
           borderRadius: BorderRadius.circular(AppRadii.md),
         ),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox.square(
-                dimension: 56,
-                child: BottleImage(
-                  url: AppImageUrl.resolve(bottle.image),
-                  cacheWidthPx: 170,
-                  padding: const EdgeInsets.all(3),
-                ),
-              ),
-            ),
+            _BottleThumb(image: bottle.image),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
@@ -289,30 +419,16 @@ class _BottleRow extends StatelessWidget {
                       color: AppColors.white,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    ProofFormatter.formatLabelOrFallback(bottle.proof),
-                    style: AppTextStyles.bodyS().copyWith(
-                      fontSize: 10,
-                      color: AppColors.textWolf,
-                    ),
-                  ),
+                  _MetaChips(bottle: bottle),
                 ],
               ),
             ),
             const SizedBox(width: AppSpacing.xs),
             Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if ((double.tryParse(bottle.average ?? '') ?? 0) <= 0)
-                  Text(
-                    'No price yet',
-                    style: AppTextStyles.bodyS().copyWith(
-                      fontSize: 10,
-                      color: AppColors.textWolf,
-                    ),
-                  )
-                else
+                if (hasPrice) ...[
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -327,23 +443,255 @@ class _BottleRow extends StatelessWidget {
                       ),
                     ],
                   ),
-                const SizedBox(height: 8),
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: AppColors.goldGradient,
-                  ),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    size: 18,
-                    color: AppColors.black,
-                  ),
-                ),
+                  const SizedBox(height: 6),
+                ],
+                _RowAction(owned: owned),
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Same box and crop for every bottle; the bottle placeholder shows until
+/// (or instead of) the photo.
+class _BottleThumb extends StatelessWidget {
+  const _BottleThumb({required this.image, this.size = _kThumb});
+
+  final String? image;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox.square(
+        dimension: size,
+        child: BottleImage(
+          url: AppImageUrl.resolve(image),
+          cacheWidthPx: (size * 3).round(),
+          padding: const EdgeInsets.all(3),
+        ),
+      ),
+    );
+  }
+}
+
+/// Age and ABV (proof when the catalog has no ABV) and a Rare tag, as labelled
+/// chips: `12 yr · 45%`. Nothing at all when the bottle has none of them,
+/// rather than a dash.
+class _MetaChips extends StatelessWidget {
+  const _MetaChips({required this.bottle});
+
+  final BluebookModel bottle;
+
+  @override
+  Widget build(BuildContext context) {
+    final details = bottle.details;
+    final labels = [
+      ?details.ageLabel,
+      ?(details.abvLabel ?? ProofFormatter.formatLabel(bottle.proof)),
+    ];
+    final rare = bottle.isRare == true;
+    if (labels.isEmpty && !rare) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: [
+          for (final label in labels) BottleMetaChip(label: label),
+          if (rare) const BottleMetaChip(label: 'Rare', gold: true),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Add" as a labelled text button, or the owned marker. Not a gesture of
+/// its own: the row beneath handles the tap.
+class _RowAction extends StatelessWidget {
+  const _RowAction({required this.owned});
+
+  final bool owned;
+
+  @override
+  Widget build(BuildContext context) {
+    if (owned) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            size: 14,
+            color: AppColors.successLight,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'In your collection',
+            style: AppTextStyles.bodyS().copyWith(
+              fontSize: 11,
+              color: AppColors.successLight,
+            ),
+          ),
+        ],
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.add_rounded, size: 16, color: AppColors.goldRich),
+        const SizedBox(width: 2),
+        Text(
+          'Add',
+          style: AppTextStyles.bodyM().copyWith(
+            fontWeight: FontWeight.w700,
+            color: AppColors.goldRich,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The confirm step: a summary of the bottle, then on to the add form.
+/// Resolves true when the user chose to continue.
+Future<bool?> _showConfirmSheet(
+  BuildContext context, {
+  required BluebookModel bottle,
+  required bool owned,
+}) {
+  final hasPrice = (double.tryParse(bottle.average ?? '') ?? 0) > 0;
+  return showAppAnimatedBottomSheet<bool>(
+    context: context,
+    builder: (ctx) {
+      final bottomInset = MediaQuery.paddingOf(ctx).bottom;
+      return DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: AppColors.cardSurfaceGradient,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(_kInset, 22, _kInset, 20 + bottomInset),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  _BottleThumb(image: bottle.image, size: 72),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          bottle.bottleName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.titleS().copyWith(
+                            color: AppColors.white,
+                          ),
+                        ),
+                        _MetaChips(bottle: bottle),
+                        if (hasPrice) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              PricingBadge(
+                                pricing: bottle.pricing,
+                                compact: true,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                PriceFormatter.format(bottle.average),
+                                style: AppTextStyles.bodyM().copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textCream,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (owned) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'This bottle is already in your collection. Continuing '
+                  'lets you edit it.',
+                  style: AppTextStyles.bodyS().copyWith(
+                    color: AppColors.textMuted,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SheetButton(
+                      label: 'Cancel',
+                      outlined: true,
+                      onTap: () => Navigator.of(ctx).pop(false),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    flex: 2,
+                    child: _SheetButton(
+                      label: owned ? 'Edit in collection' : 'Add to collection',
+                      onTap: () => Navigator.of(ctx).pop(true),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _SheetButton extends StatelessWidget {
+  const _SheetButton({
+    required this.label,
+    required this.onTap,
+    this.outlined = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPressable(
+      onTap: onTap,
+      haptic: PressHaptic.tap,
+      child: Container(
+        height: AppButtonSize.regular,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          gradient: outlined ? null : AppColors.goldGradient,
+          color: outlined ? AppColors.surfaceChip : null,
+          border: outlined
+              ? Border.all(color: AppColors.tagInactiveBorder)
+              : null,
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.bodyL().copyWith(
+            fontWeight: FontWeight.w700,
+            color: outlined ? AppColors.textCream : AppColors.black,
+          ),
         ),
       ),
     );

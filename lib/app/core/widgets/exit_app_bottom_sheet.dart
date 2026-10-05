@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'show_app_dialog.dart';
+import '../theme/app_spacing.dart';
 
 /// Confirms exit before closing the app (used on home tab back press).
 Future<bool> showExitAppBottomSheet(BuildContext context) async {
@@ -85,7 +86,7 @@ class _SheetButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Ink(
-          height: 48,
+          height: AppButtonSize.regular,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             gradient: outlined ? null : AppColors.goldGradient,

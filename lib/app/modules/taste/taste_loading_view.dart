@@ -6,8 +6,8 @@ import '../../core/widgets/shimmer_box.dart';
 
 const double _kInset = 23;
 
-/// Height of a real bottle row: 56 image + 8 + 8 vertical padding.
-const double _kRowHeight = 72;
+/// Height of a real bottle row with a one-line name and a meta chip.
+const double _kRowHeight = 76;
 const double _kRowGap = 10;
 
 /// Search field + chips block above the list (matches `_TasteList`).
@@ -181,10 +181,10 @@ class _RowPlaceholders extends StatelessWidget {
     return SizedBox(
       height: _kRowHeight,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(6, 8, 10, 8),
+        padding: const EdgeInsets.fromLTRB(8, 10, 12, 10),
         child: Row(
           children: [
-            const ShimmerBox(height: 56, width: 56, radius: 8),
+            const ShimmerBox(height: 48, width: 48, radius: 8),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(

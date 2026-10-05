@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/firebase/firebase_notification_topics.dart';
+import '../../core/utils/rating_formatter.dart';
 import '../../data/chart_index_comparison.dart';
 import '../../data/collection_value_calculator.dart';
 import '../../data/models/collection_item_display.dart';
@@ -98,6 +99,14 @@ class HomeController extends GetxController {
   /// Bumps when chart series reload so [LineChart] rebuilds on filter change.
   final chartRevision = 0.obs;
 
+  /// The header's second line: the collection's move today, or this week
+  /// when today was flat, e.g. `▲ $124 today`. Empty when there is nothing
+  /// to say (no collection, no chart data).
+  final headerMoveText = ''.obs;
+
+  /// Sign of [headerMoveText] for its color; null when flat or empty.
+  final headerMoveUp = RxnBool();
+
   final isLoading = false.obs;
 
   final _repo = Get.find<CollectionRepository>();
@@ -184,7 +193,8 @@ class HomeController extends GetxController {
     return out;
   }
 
-  /// Sets the hero value, the invested line and the unrealised gain.
+  /// Sets the hero value, the invested line and the unrealised gain from
+  /// [CollectionValueCalculator.summarize], the same figures Collection shows.
   ///
   /// Market value leads because that is what the app is for; invested value is
   /// the supporting figure. When no row has a bluebook price there is no market
@@ -193,27 +203,23 @@ class HomeController extends GetxController {
     Iterable<CollectionItemModel> items,
     NumberFormat formatter,
   ) {
-    final invested = CollectionValueCalculator.totalInvestedFromItems(items);
-    final market = CollectionValueCalculator.totalMarketValueFromItems(items);
+    final summary = CollectionValueCalculator.summarize(items);
 
-    investedValueText.value = invested > 0
-        ? formatter.format(invested)
+    investedValueText.value = summary.invested > 0
+        ? formatter.format(summary.invested)
         : r'$ —';
 
-    final hero = market ?? invested;
-    showingInvestedAsValue.value = market == null;
-    collectionValue.value = hero;
-    collectionValueText.value = hero > 0 ? formatter.format(hero) : r'$ —';
+    showingInvestedAsValue.value = summary.showingInvestedAsValue;
+    collectionValue.value = summary.value;
+    collectionValueText.value = summary.value > 0
+        ? formatter.format(summary.value)
+        : r'$ —';
 
-    if (market != null && invested > 0) {
-      final gain = market - invested;
-      unrealisedGain.value = gain;
-      unrealisedGainText.value =
-          '${gain >= 0 ? '+' : '-'}${formatter.format(gain.abs())}';
-    } else {
-      unrealisedGain.value = null;
-      unrealisedGainText.value = '';
-    }
+    final gain = summary.gain;
+    unrealisedGain.value = gain;
+    unrealisedGainText.value = gain == null
+        ? ''
+        : '${gain >= 0 ? '+' : '-'}${formatter.format(gain.abs())}';
   }
 
   void _applyFallbackValue(
@@ -234,6 +240,8 @@ class HomeController extends GetxController {
   static const double emptyChartMaxYk = 110;
 
   void _clearChartSeries() {
+    headerMoveText.value = '';
+    headerMoveUp.value = null;
     chartSeriesK.clear();
     chartBsmiSeriesK.clear();
     chartPointDates.clear();
@@ -290,6 +298,7 @@ class HomeController extends GetxController {
     _applyChartQuickStats(chart);
 
     final marketPoints = ChartIndexComparison.parsePriceSeries(chart['data']);
+    _applyHeaderMove(marketPoints, formatter);
     if (marketPoints.isNotEmpty) {
       final indexPoints = ChartIndexComparison.parsePriceSeries(
         chart['index_data'],
@@ -321,6 +330,44 @@ class HomeController extends GetxController {
     _applyMovedForRange(percent: percent, period: period);
   }
 
+  /// Today's change from the daily value series, falling back to the last
+  /// seven days when today was flat. Every chart range covers both.
+  void _applyHeaderMove(
+    List<Map<String, dynamic>> points,
+    NumberFormat formatter,
+  ) {
+    final prices = [
+      for (final p
+          in [...points]..sort(
+            (a, b) => (a['date']?.toString() ?? '').compareTo(
+              b['date']?.toString() ?? '',
+            ),
+          ))
+        double.parse(p['price'].toString()),
+    ];
+    if (!hasCollection.value || prices.length < 2) {
+      headerMoveText.value = '';
+      headerMoveUp.value = null;
+      return;
+    }
+
+    final last = prices.last;
+    var change = last - prices[prices.length - 2];
+    var period = 'today';
+    if (change.abs() < 0.5) {
+      change = last - prices[prices.length > 7 ? prices.length - 8 : 0];
+      period = 'this week';
+    }
+    if (change.abs() < 0.5) {
+      headerMoveText.value = 'Steady this week';
+      headerMoveUp.value = null;
+      return;
+    }
+    headerMoveUp.value = change > 0;
+    headerMoveText.value =
+        '${change > 0 ? '▲' : '▼'} ${formatter.format(change.abs())} $period';
+  }
+
   /// Pull-to-refresh and "added a bottle": refetch while the current content
   /// stays on screen (the skeleton only shows when there is nothing yet).
   Future<void> forceReload() =>
@@ -338,21 +385,8 @@ class HomeController extends GetxController {
     );
   }
 
-  /// `collection_rating_percentage` is 0–100; Quick Stats shows a 0–5 value with star.
-  static String _formatCollectionRating(dynamic raw) {
-    final v = double.tryParse(raw?.toString() ?? '');
-    if (v == null) return '—';
-
-    final double onFiveScale;
-    if (v <= 5) {
-      onFiveScale = v;
-    } else {
-      onFiveScale = (v / 100) * 5;
-    }
-
-    if (onFiveScale == onFiveScale.roundToDouble()) {
-      return onFiveScale.toInt().toString();
-    }
-    return onFiveScale.toStringAsFixed(1);
-  }
+  /// `collection_rating_percentage` is the average bottle rating, out of 100
+  /// like `bluebook.rating`; Quick Stats shows it out of 10.
+  static String _formatCollectionRating(dynamic raw) =>
+      RatingFormatter.label(raw);
 }

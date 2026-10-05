@@ -16,7 +16,8 @@ final _wholeDollars = NumberFormat.currency(
   decimalDigits: 0,
 );
 
-/// "Collection Value" with the total counting up and the 90-day move.
+/// "Collection Value": today's worth counting up, what was paid and the gain
+/// beneath it, and the gain against paid as a percentage.
 class CollectionValueHeader extends StatelessWidget {
   const CollectionValueHeader({super.key, required this.controller});
 
@@ -25,16 +26,23 @@ class CollectionValueHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Collection Value',
-                style: AppTextStyles.titleL().copyWith(
-                  color: AppColors.textCream,
+              // The heading has to match the number: with no market price
+              // anywhere in the collection, the number is what was paid.
+              Obx(
+                () => Text(
+                  controller.showingInvestedAsValue.value
+                      ? 'Total Invested'
+                      : 'Collection Value',
+                  style: AppTextStyles.titleL().copyWith(
+                    color: AppColors.textCream,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -53,51 +61,102 @@ class CollectionValueHeader extends StatelessWidget {
                   ),
                 ),
               ),
+              Obx(() {
+                final caption = controller.valueCaption.value;
+                if (caption.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.caption(),
+                  ),
+                );
+              }),
             ],
           ),
         ),
         const SizedBox(width: 10),
         Obx(() {
-          final trend = controller.trendShort.value;
+          final pct = controller.gainPercent.value;
           return AnimatedSwitcher(
             duration: AppMotion.of(context, AppMotion.medium),
             transitionBuilder: (child, animation) => FadeTransition(
               opacity: animation,
               child: ScaleTransition(scale: animation, child: child),
             ),
-            child: Container(
-              key: ValueKey(trend),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.goldAccentGlow,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.tagGoldBorder),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SvgPicture.asset(
-                    AppAssets.collectionTrendChart,
-                    width: 22,
-                    height: 11,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    trend,
-                    style: AppTextStyles.bodyL().copyWith(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.goldBright,
-                      height: 1.0,
-                    ),
-                  ),
-                ],
-              ),
+            child: _GainBadge(
+              key: ValueKey(controller.trendShort.value),
+              percent: pct,
+              label: controller.trendShort.value,
             ),
           );
         }),
       ],
+    );
+  }
+}
+
+/// Gain against what was paid, green when up and red when down. Gold with
+/// the chart glyph while there is no figure yet.
+class _GainBadge extends StatelessWidget {
+  const _GainBadge({super.key, required this.percent, required this.label});
+
+  final double? percent;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = percent;
+    final tint = pct == null
+        ? AppColors.goldBright
+        : pct >= 0
+        ? AppColors.trendPositive
+        : AppColors.trendNegative;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: pct == null
+            ? AppColors.goldAccentGlow
+            : tint.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: pct == null
+              ? AppColors.tagGoldBorder
+              : tint.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (pct == null)
+            SvgPicture.asset(
+              AppAssets.collectionTrendChart,
+              width: 22,
+              height: 11,
+              fit: BoxFit.contain,
+            )
+          else
+            SvgPicture.asset(
+              pct >= 0 ? AppAssets.iconArrowUp : AppAssets.iconArrowDown,
+              width: 11,
+              height: 11,
+              colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
+            ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppTextStyles.bodyL().copyWith(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: tint,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

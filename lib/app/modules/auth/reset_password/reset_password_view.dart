@@ -104,9 +104,6 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
                         () => CommonPrimaryButton(
                           label: 'Reset Password',
                           onPressed: controller.onReset,
-                          textStyle: AppTextStyles.button20Bold().copyWith(
-                            fontSize: 18,
-                          ),
                           isLoading: controller.isLoading.value,
                         ),
                       ),

@@ -13,6 +13,7 @@ import '../../core/widgets/app_back_button.dart';
 import '../../core/widgets/app_segmented_range.dart';
 import '../../core/widgets/bottle_image.dart';
 import 'benchmark_detail_controller.dart';
+import 'widgets/benchmark_facts.dart';
 import 'widgets/benchmark_ownership_card.dart';
 import 'widgets/benchmark_price_chart.dart';
 import 'widgets/benchmark_top_summary.dart';
@@ -121,7 +122,7 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      _Details(text: controller.descriptionText),
+                      const BenchmarkFacts(),
                       const BenchmarkOwnershipCard(),
                     ],
                   ),
@@ -254,36 +255,6 @@ class _GlassCircle extends StatelessWidget {
         border: Border.all(color: AppColors.white.withValues(alpha: 0.08)),
       ),
       child: Center(child: child),
-    );
-  }
-}
-
-class _Details extends StatelessWidget {
-  const _Details({required this.text});
-
-  final String? text;
-
-  @override
-  Widget build(BuildContext context) {
-    final body = text?.trim() ?? '';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Details',
-          style: AppTextStyles.titleS().copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          body.isNotEmpty ? body : 'No description available.',
-          style: AppTextStyles.bodyM().copyWith(
-            height: 1.35,
-            color: body.isNotEmpty
-                ? AppColors.textNeutralSoft
-                : AppColors.textWolf,
-          ),
-        ),
-      ],
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/shimmer_box.dart';
 
@@ -63,25 +64,16 @@ class CollectionLoadingView extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 22),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 14,
-                          childAspectRatio: 166 / 211,
-                        ),
-                    itemCount: 4,
-                    itemBuilder: (context, index) => LayoutBuilder(
+                  for (var i = 0; i < 5; i++) ...[
+                    if (i > 0) const SizedBox(height: AppSpacing.sm),
+                    LayoutBuilder(
                       builder: (context, c) => ShimmerBox(
-                        height: c.maxHeight,
+                        height: 104,
                         width: c.maxWidth,
-                        radius: 20,
+                        radius: AppRadii.md,
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

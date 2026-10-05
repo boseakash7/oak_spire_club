@@ -120,8 +120,17 @@ class _StatTile extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(stat.ratingText!, style: valueStyle),
+                      if (stat.ratingText != '—')
+                        Text(
+                          '/10',
+                          style: AppTextStyles.caption().copyWith(
+                            color: AppColors.textStatLabel,
+                          ),
+                        ),
                       const SizedBox(width: 6),
                       const Icon(
                         Icons.star_rounded,
