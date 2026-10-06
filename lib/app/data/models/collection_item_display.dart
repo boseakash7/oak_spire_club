@@ -250,6 +250,17 @@ extension CollectionItemDisplay on CollectionItemModel {
     return v < 100;
   }
 
+  /// Bottles in this row that have been opened: all of a row whose fill is
+  /// under 100%, or the sum a merged row carries.
+  int get openedBottleCount =>
+      (openedQuantity ?? (isDrunk ? displayQuantity : 0)).clamp(
+        0,
+        displayQuantity,
+      );
+
+  /// Bottles in this row still sealed.
+  int get sealedBottleCount => displayQuantity - openedBottleCount;
+
   bool get isOpenedHeuristic {
     final t = type?.toLowerCase() ?? '';
     if (t.contains('opened') && !t.contains('unopened')) return true;

@@ -8,6 +8,7 @@ import 'data/datasources/bluebook_remote_datasource.dart';
 import 'data/datasources/categories_remote_datasource.dart';
 import 'data/datasources/collection_remote_datasource.dart';
 import 'data/datasources/config_remote_datasource.dart';
+import 'data/datasources/market_remote_datasource.dart';
 import 'data/datasources/package_remote_datasource.dart';
 import 'core/firebase/fcm_token_sync_service.dart';
 import 'data/datasources/user_remote_datasource.dart';
@@ -18,6 +19,7 @@ import 'data/repositories/bluebook_repository.dart';
 import 'data/repositories/categories_repository.dart';
 import 'data/repositories/collection_repository.dart';
 import 'data/repositories/config_repository.dart';
+import 'data/repositories/market_repository.dart';
 import 'data/repositories/package_repository.dart';
 import 'data/repositories/user_repository.dart';
 import 'data/repositories/user_token_repository.dart';
@@ -54,6 +56,15 @@ class AppBinding extends Bindings {
     );
     Get.lazyPut<BluebookRepository>(
       () => BluebookRepository(Get.find<BluebookRemoteDataSource>()),
+      fenix: true,
+    );
+
+    Get.lazyPut<MarketRemoteDataSource>(
+      () => MarketRemoteDataSource(Get.find<ApiClient>()),
+      fenix: true,
+    );
+    Get.lazyPut<MarketRepository>(
+      () => MarketRepository(Get.find<MarketRemoteDataSource>()),
       fenix: true,
     );
 

@@ -24,6 +24,10 @@ mixin PagedBottleSearch on GetxController {
   /// Bottles per request; a screen may ask for more.
   int get pageSize => 10;
 
+  /// Browse order sent to the server (`bluebook/get-all-bluebooks` `sort`);
+  /// null keeps the server default (by name). A keyword search ignores it.
+  String? get sortParam => null;
+
   static const int _allCategoriesLimit = 200;
   static const Duration _debounceDelay = Duration(milliseconds: 400);
 
@@ -85,6 +89,7 @@ mixin PagedBottleSearch on GetxController {
         limit: pageSize,
         keyword: query.isEmpty ? null : query,
         categoryId: category.isEmpty ? null : category,
+        sort: sortParam,
       );
       if (generation != _generation) return;
       if (reset) {

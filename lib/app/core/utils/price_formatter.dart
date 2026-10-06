@@ -82,4 +82,20 @@ class PriceFormatter {
     if (n == null || n == 0) return 'flat';
     return n > 0 ? 'up' : 'down';
   }
+
+  /// A signed percent with one decimal, e.g. `+2.5%`, `-0.8%`, `0.0%`.
+  static String percentLabel(double value) {
+    final rounded = double.parse(value.toStringAsFixed(1));
+    final sign = rounded > 0 ? '+' : '';
+    return '$sign${rounded.toStringAsFixed(1)}%';
+  }
+
+  /// Green up, red down, muted flat or unknown — for a numeric percent.
+  static Color percentColor(double? value) {
+    if (value == null) return AppColors.textWolf;
+    final rounded = double.parse(value.toStringAsFixed(1));
+    if (rounded > 0) return AppColors.trendPositive;
+    if (rounded < 0) return AppColors.marketTrendDown;
+    return AppColors.textWolf;
+  }
 }

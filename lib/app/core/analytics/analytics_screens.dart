@@ -8,9 +8,8 @@ abstract final class AnalyticsScreens {
   static String shellTabScreenName(int index) {
     return switch (index) {
       0 => 'main_home',
-      1 => 'main_collection',
-      // 2 => 'main_taste',
-      2 => 'main_market',
+      1 => 'main_market',
+      2 => 'main_collection',
       3 => 'main_profile',
       _ => 'main_home',
     };
@@ -37,6 +36,8 @@ abstract final class AnalyticsScreens {
         return 'taste_bottles';
       case AppRoutes.benchmarkDetail:
         return 'benchmark_detail';
+      case AppRoutes.marketIndex:
+        return 'market_index';
       case AppRoutes.subscription:
         return 'subscription';
       case AppRoutes.subscriptionSkip:

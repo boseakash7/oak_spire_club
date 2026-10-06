@@ -102,7 +102,9 @@ class AddToCollectionLauncher {
     if (result == true) {
       if (navigateToCollectionOnSuccess &&
           Get.isRegistered<BottomNavController>()) {
-        Get.find<BottomNavController>().setIndex(1);
+        Get.find<BottomNavController>().setIndex(
+          BottomNavController.collectionTab,
+        );
       }
       if (Get.isRegistered<HomeController>()) {
         unawaited(

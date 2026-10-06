@@ -92,6 +92,22 @@ class BottleDetails {
     return '${_trim(a)}%';
   }
 
+  /// Market price as a multiple of the release price (MSRP): 3.2 means the
+  /// bottle trades at 3.2× what it retailed for. Null without both prices.
+  double? retailMultiple(double? average) {
+    final m = msrp;
+    if (m == null || average == null || average <= 0) return null;
+    return average / m;
+  }
+
+  /// "3.2× retail" (one decimal under 10×, whole above), or null.
+  String? retailMultipleLabel(double? average) {
+    final x = retailMultiple(average);
+    if (x == null) return null;
+    final shown = x >= 10 ? x.round().toString() : x.toStringAsFixed(1);
+    return '$shown× retail';
+  }
+
   /// Short labelled chips for a list row: age, then ABV.
   List<String> get chips => [?ageLabel, ?abvLabel];
 

@@ -9,6 +9,8 @@ import '../../core/utils/price_formatter.dart';
 import '../../core/utils/proof_formatter.dart';
 import '../../core/utils/rating_formatter.dart';
 import '../session/user_session_controller.dart';
+import '../../data/deal_check.dart';
+import '../../data/models/bluebook_model.dart';
 import '../../data/models/bluebook_price_history_chart_model.dart';
 import '../../data/models/bottle_details.dart';
 import '../../data/models/bottle_pricing.dart';
@@ -54,6 +56,21 @@ class BenchmarkDetailRouteArgs {
       priceMovement: map['price_movement']?.toString(),
     );
   }
+
+  /// The route arguments for a catalog bottle, as every market list sends
+  /// them (rows, movers, Home strips).
+  static Map<String, dynamic> mapFromBluebook(BluebookModel bottle) => {
+    'id': bottle.id,
+    'name': bottle.bottleName,
+    'image': bottle.image,
+    'average': bottle.average,
+    'low': bottle.low,
+    'high': bottle.high,
+    'proof': bottle.proof,
+    'description': bottle.description,
+    'rating': bottle.rating,
+    'price_movement': bottle.priceMovement,
+  };
 
   static const _kDefaultName = 'Batons single Barrel 10 Years multicusting';
 
@@ -125,6 +142,23 @@ class BenchmarkDetailController extends GetxController {
   late final String? proofText;
   late final String? ratingDisplay;
 
+  /// Numeric average / low / high from the route, for the deal check.
+  late final double? averageValue;
+  late final double? lowValue;
+  late final double? highValue;
+
+  /// What the user typed into the deal check; null when empty.
+  final askingPrice = Rxn<double>();
+
+  /// The asking price against the market; null until one is typed, or when
+  /// the bottle has no average.
+  DealCheck? get dealCheck => DealCheck.evaluate(
+    asking: askingPrice.value,
+    average: averageValue,
+    low: lowValue,
+    high: highValue,
+  );
+
   /// From the route arguments, then topped up by [fetchDetails].
   final description = RxnString();
 
@@ -183,6 +217,9 @@ class BenchmarkDetailController extends GetxController {
     avgFormatted = PriceFormatter.format(args.averageRaw);
     lowFormatted = PriceFormatter.format(args.lowRaw);
     highFormatted = PriceFormatter.format(args.highRaw);
+    averageValue = _money(args.averageRaw);
+    lowValue = _money(args.lowRaw);
+    highValue = _money(args.highRaw);
     imagePathOrUrl = args.imagePathOrUrl;
     imageUrl = AppImageUrl.resolve(args.imagePathOrUrl);
     proofText = ProofFormatter.formatLabel(_nullableRouteString(args.proof));
@@ -347,12 +384,30 @@ class BenchmarkDetailController extends GetxController {
     }
   }
 
+  /// Change over the loaded chart window, first point to last, in percent.
+  /// Null until at least two priced points are loaded. Unlike
+  /// [priceMovementRaw] ("last change", which can be months old), this is
+  /// the move over the range the user picked.
+  double? get rangeChangePercent {
+    final pts = chartPoints;
+    if (pts.length < 2) return null;
+    final first = pts.first.price;
+    final last = pts.last.price;
+    if (first <= 0 || last <= 0) return null;
+    return (last - first) / first * 100;
+  }
+
   void _syncBsmiSeries(List<BluebookPriceChartPoint> pts) {
     if (pts.isNotEmpty && pts.every((p) => p.bsmi != null)) {
       chartBsmiValues.assignAll(pts.map((p) => p.bsmi!));
     } else {
       chartBsmiValues.clear();
     }
+  }
+
+  static double? _money(String? raw) {
+    final n = double.tryParse((raw ?? '').replaceAll(RegExp(r'[^\d.]'), ''));
+    return n != null && n > 0 ? n : null;
   }
 
   static String? _nullableRouteString(String? value) {

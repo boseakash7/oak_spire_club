@@ -22,6 +22,7 @@ import '../../../core/widgets/pricing_badge.dart';
 import '../../../data/models/bluebook_model.dart';
 import '../../../data/models/price_sparkline.dart';
 import '../../../routes/app_routes.dart';
+import '../benchmark_detail_controller.dart';
 
 /// One bottle in the benchmark list: art, name, distillery and region, type /
 /// age / ABV chips and rating on the left; price, what it rests on, a 90-day
@@ -45,18 +46,7 @@ class MarketBottleRow extends StatelessWidget {
     }
     Get.toNamed(
       AppRoutes.benchmarkDetail,
-      arguments: {
-        'id': bottle.id,
-        'name': bottle.bottleName,
-        'image': bottle.image,
-        'average': bottle.average,
-        'low': bottle.low,
-        'high': bottle.high,
-        'proof': bottle.proof,
-        'description': bottle.description,
-        'rating': bottle.rating,
-        'price_movement': bottle.priceMovement,
-      },
+      arguments: BenchmarkDetailRouteArgs.mapFromBluebook(bottle),
     );
   }
 
@@ -66,9 +56,15 @@ class MarketBottleRow extends StatelessWidget {
       fontSize: 11,
       color: AppColors.textWolf,
     );
-    final movementColor = PriceFormatter.priceMovementColor(
-      bottle.priceMovement,
-    );
+    // The 30-day change when the nightly stats have one; otherwise the
+    // bottle's last price change, which can be months old.
+    final change30d = bottle.market?.change30d;
+    final movementLabel = change30d != null
+        ? '${PriceFormatter.percentLabel(change30d)} 30d'
+        : PriceFormatter.formatPriceMovementLabel(bottle.priceMovement);
+    final movementColor = change30d != null
+        ? PriceFormatter.percentColor(change30d)
+        : PriceFormatter.priceMovementColor(bottle.priceMovement);
     final details = bottle.details;
     // Who made it and where, then type / age / ABV (proof when the catalog has
     // no ABV) as chips. Whatever the catalog doesn't know is left out.
@@ -82,7 +78,10 @@ class MarketBottleRow extends StatelessWidget {
       ?(details.abvLabel ?? ProofFormatter.formatLabel(bottle.proof)),
     ];
     // Most of the catalog has no price yet; say so instead of "$0".
-    final priced = (double.tryParse(bottle.average ?? '') ?? 0) > 0;
+    final average = double.tryParse(bottle.average ?? '') ?? 0;
+    final priced = average > 0;
+    // Secondary premium: what it trades at against its release price.
+    final retail = priced ? details.retailMultipleLabel(average) : null;
 
     return AppPressable(
       onTap: _open,
@@ -143,6 +142,7 @@ class MarketBottleRow extends StatelessWidget {
                         const BottleMetaChip(label: 'Rare', gold: true),
                       if (details.isAllocated)
                         const BottleMetaChip(label: 'Allocated', gold: true),
+                      if (retail != null) BottleMetaChip(label: retail),
                       if (RatingFormatter.outOfTen(bottle.rating) != null)
                         Row(
                           mainAxisSize: MainAxisSize.min,
@@ -194,9 +194,7 @@ class MarketBottleRow extends StatelessWidget {
                   PriceSparklineView(data: sparkline, width: 60, height: 20),
                   const SizedBox(height: 4),
                   Text(
-                    PriceFormatter.formatPriceMovementLabel(
-                      bottle.priceMovement,
-                    ),
+                    movementLabel,
                     style: AppTextStyles.bodyS().copyWith(
                       color: movementColor,
                       fontWeight: FontWeight.w600,

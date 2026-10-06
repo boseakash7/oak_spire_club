@@ -21,6 +21,7 @@ import 'collection_controller.dart';
 import 'collection_loading_view.dart';
 import 'widgets/collection_bottle_row.dart';
 import 'widgets/collection_filter_row.dart';
+import 'widgets/collection_insights.dart';
 import 'widgets/collection_quick_view.dart';
 import 'widgets/collection_value_header.dart';
 
@@ -99,15 +100,29 @@ class _CollectionBody extends StatelessWidget {
                     0,
                   ),
                   sliver: SliverToBoxAdapter(
+                    child: FadeSlideEntrance(
+                      child: CollectionValueHeader(controller: controller),
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 18)),
+                // Chart, top movers and quick stats need a bottle to say
+                // anything; the empty state below covers an empty collection.
+                Obx(
+                  () => SliverToBoxAdapter(
+                    child: controller.items.isEmpty
+                        ? const SizedBox.shrink()
+                        : const CollectionInsights(inset: _kInset),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: _kInset),
+                  sliver: SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         FadeSlideEntrance(
-                          child: CollectionValueHeader(controller: controller),
-                        ),
-                        const SizedBox(height: 18),
-                        FadeSlideEntrance(
-                          index: 1,
+                          index: 3,
                           child: CollectionFilterRow(controller: controller),
                         ),
                         const SizedBox(height: 18),

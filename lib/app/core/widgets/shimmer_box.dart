@@ -82,3 +82,77 @@ class ShimmerBox extends StatelessWidget {
     );
   }
 }
+
+/// A skeleton on real surfaces. [builder] lays the skeleton out twice: with
+/// `placeholders: false` it draws the surfaces (cards, fields), and with
+/// `placeholders: true` the [ShimmerBox]es that sit on them, inside one
+/// [ShimmerScope] in the on-card colours. So a single sweep runs over the
+/// details while the cards keep the colour of the real rows. Wrap anything
+/// that only one layer draws in a [ShimmerSlot].
+class ShimmerCardLayers extends StatelessWidget {
+  const ShimmerCardLayers({super.key, required this.builder});
+
+  final Widget Function(bool placeholders) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        builder(false),
+        Positioned.fill(
+          child: ShimmerScope(
+            baseColor: AppColors.shimmerOnCardBase,
+            highlightColor: AppColors.shimmerOnCardHighlight,
+            child: builder(true),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Inside a [ShimmerCardLayers] builder: shows [child] in the placeholder
+/// layer and keeps it as empty space of the same size in the surface layer.
+class ShimmerSlot extends StatelessWidget {
+  const ShimmerSlot({
+    super.key,
+    required this.placeholders,
+    required this.child,
+  });
+
+  final bool placeholders;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (placeholders) return child;
+    return Visibility(
+      visible: false,
+      maintainSize: true,
+      maintainAnimation: true,
+      maintainState: true,
+      child: child,
+    );
+  }
+}
+
+/// A placeholder text line [widthFactor] of the available width.
+class ShimmerLine extends StatelessWidget {
+  const ShimmerLine({
+    super.key,
+    required this.widthFactor,
+    required this.height,
+  });
+
+  final double widthFactor;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      alignment: Alignment.centerLeft,
+      widthFactor: widthFactor,
+      child: ShimmerBox(height: height, width: double.infinity, radius: 4),
+    );
+  }
+}

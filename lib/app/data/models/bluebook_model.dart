@@ -1,4 +1,5 @@
 import 'bottle_details.dart';
+import 'bottle_market_stats.dart';
 import 'bottle_pricing.dart';
 import 'proof_json.dart';
 
@@ -18,6 +19,7 @@ class BluebookModel {
     this.isRare,
     this.pricing,
     this.details = BottleDetails.empty,
+    this.market,
   });
 
   final String id;
@@ -41,6 +43,10 @@ class BluebookModel {
   /// Distillery, age, ABV and the other catalog facts; empty when unknown.
   final BottleDetails details;
 
+  /// 30/90/365-day change and 365-day range from the nightly stats; null
+  /// from endpoints (or servers) that do not send `market`.
+  final BottleMarketStats? market;
+
   factory BluebookModel.fromJson(Map<String, dynamic> json) {
     return BluebookModel(
       id: json['id'].toString(),
@@ -57,6 +63,7 @@ class BluebookModel {
       isRare: _nullableBool01(json['is_rare']),
       pricing: BottlePricing.fromJson(json['pricing']),
       details: BottleDetails.fromBottleJson(json),
+      market: BottleMarketStats.fromJson(json['market']),
     );
   }
 

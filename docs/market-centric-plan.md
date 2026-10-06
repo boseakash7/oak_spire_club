@@ -47,7 +47,11 @@ Guardrails apply to everything above:
 ## Decisions (confirmed)
 - **This build: Phase 1 + Phase 2.** Watchlist and alerts are follow-ups.
 - **No guest mode.** Sign-up stays first, and the auth flow is untouched.
-- **Home is folded into Collection.**
+- **Home is folded into Collection.** *(2026-10-05: superseded. Home is back as the landing tab:
+  a market + collection dashboard with the headline index, breadth, your collection vs the
+  index, movers, and community lists (hot with collectors, newly priced, most collected, top
+  rated) from the new `market/highlights`. Collection keeps the full insights. Nav is
+  Home · Market · Collection · Settings popup.)*
 
 ## Target navigation
 

@@ -49,7 +49,21 @@ class BenchmarkTopSummary extends GetView<BenchmarkDetailController> {
               ),
             ),
             const SizedBox(width: 10),
-            _MovementChip(raw: movementRaw),
+            // The move over the chart range the user picked; until the chart
+            // loads, the bottle's last price change.
+            Obx(() {
+              final change = controller.rangeChangePercent;
+              if (change != null) {
+                return _MovementChip(
+                  percent: change,
+                  suffix: controller.selectedChartRange.value.label,
+                );
+              }
+              return _MovementChip(
+                percent: PriceFormatter.parsePriceMovementValue(movementRaw),
+                suffix: 'last move',
+              );
+            }),
             const Spacer(),
             Obx(() => PricingBadge(pricing: controller.pricing.value)),
           ],
@@ -81,6 +95,7 @@ class BenchmarkTopSummary extends GetView<BenchmarkDetailController> {
             if (d?.isAllocated == true) 'Allocated',
             if (d?.spiritType != null) d!.spiritType!,
             ?d?.ageLabel,
+            ?d?.retailMultipleLabel(controller.averageValue),
           ];
           if (tags.isEmpty) return const SizedBox.shrink();
           return Padding(
@@ -128,17 +143,27 @@ class _Tag extends StatelessWidget {
 }
 
 class _MovementChip extends StatelessWidget {
-  const _MovementChip({required this.raw});
+  const _MovementChip({required this.percent, this.suffix});
 
-  final String? raw;
+  /// Signed percent change; null hides the chip.
+  final double? percent;
+
+  /// What the change covers, e.g. "1Y" or "last move".
+  final String? suffix;
 
   @override
   Widget build(BuildContext context) {
-    final label = PriceFormatter.formatPriceMovementLabel(raw);
-    if (label == '—') return const SizedBox.shrink();
+    final p = percent;
+    if (p == null) return const SizedBox.shrink();
 
-    final color = PriceFormatter.priceMovementColor(raw);
-    final kind = PriceFormatter.priceMovementArrowKind(raw);
+    final rounded = double.parse(p.toStringAsFixed(1));
+    final color = rounded > 0
+        ? AppColors.trendPositive
+        : rounded < 0
+        ? AppColors.marketTrendDown
+        : AppColors.textWolf;
+    final sign = rounded > 0 ? '+' : '';
+    final label = ['$sign${rounded.toStringAsFixed(1)}%', ?suffix].join(' ');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -149,9 +174,9 @@ class _MovementChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (kind == 'up' || kind == 'down')
+          if (rounded != 0)
             SvgPicture.asset(
-              kind == 'up' ? AppAssets.iconArrowUp : AppAssets.iconArrowDown,
+              rounded > 0 ? AppAssets.iconArrowUp : AppAssets.iconArrowDown,
               width: 10,
               height: 10,
               colorFilter: ColorFilter.mode(color, BlendMode.srcIn),

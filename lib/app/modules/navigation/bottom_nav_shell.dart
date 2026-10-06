@@ -9,7 +9,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/exit_app_bottom_sheet.dart';
 import '../collection/collection_view.dart';
-import '../home/home_view.dart';
+import '../dashboard/dashboard_view.dart';
 import '../market/market_view.dart';
 import '../profile/settings_menu_popup.dart';
 import 'bottom_nav_controller.dart';
@@ -22,7 +22,14 @@ class BottomNavShell extends GetView<BottomNavController> {
   /// Nav slot of the settings item (it opens a popup, not a tab).
   static const int _settingsSlot = 3;
 
-  static const _pages = <Widget>[HomeView(), CollectionView(), MarketView()];
+  /// Home first: it is where the app opens, a summary of the market and the
+  /// user's collection that links into the other two. Collection keeps the
+  /// full insights (value chart, top moved, quick stats).
+  static const _pages = <Widget>[
+    DashboardView(),
+    MarketView(),
+    CollectionView(),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -34,12 +41,7 @@ class BottomNavShell extends GetView<BottomNavController> {
       },
       child: Scaffold(
         extendBodyBehindAppBar: false,
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(kShellAppBarHeight),
-          child: GetX<BottomNavController>(
-            builder: (c) => AppHeader(title: c.headerTitle),
-          ),
-        ),
+        appBar: const AppHeader(),
         body: Obx(
           () => LazyTabStack(index: controller.index.value, children: _pages),
         ),
@@ -51,21 +53,28 @@ class BottomNavShell extends GetView<BottomNavController> {
             items: [
               AppNavItem(
                 label: 'Home',
-                asset: AppAssets.navHomeFilled,
-                iconSize: 19,
-                onTap: () => _selectTab(0, 'bottom_nav_home'),
+                asset: AppAssets.navHome,
+                iconSize: 20,
+                onTap: () =>
+                    _selectTab(BottomNavController.homeTab, 'bottom_nav_home'),
+              ),
+              AppNavItem(
+                label: 'Market',
+                asset: AppAssets.navMarket,
+                iconSize: 22,
+                onTap: () => _selectTab(
+                  BottomNavController.marketTab,
+                  'bottom_nav_market',
+                ),
               ),
               AppNavItem(
                 label: 'Collection',
                 asset: AppAssets.navCollectionActive,
                 iconSize: 19,
-                onTap: () => _selectTab(1, 'bottom_nav_collection'),
-              ),
-              AppNavItem(
-                label: 'Benchmark',
-                asset: AppAssets.navMarket,
-                iconSize: 22,
-                onTap: () => _selectTab(2, 'bottom_nav_market'),
+                onTap: () => _selectTab(
+                  BottomNavController.collectionTab,
+                  'bottom_nav_collection',
+                ),
               ),
               AppNavItem(
                 label: 'Settings',
@@ -101,8 +110,8 @@ class BottomNavShell extends GetView<BottomNavController> {
       return;
     }
 
-    if (controller.index.value != 0) {
-      controller.setIndex(0);
+    if (controller.index.value != BottomNavController.homeTab) {
+      controller.setIndex(BottomNavController.homeTab);
       return;
     }
 

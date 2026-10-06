@@ -23,6 +23,8 @@ import '../modules/taste/taste_binding.dart';
 import '../modules/taste/taste_view.dart';
 import '../modules/market/benchmark_detail_binding.dart';
 import '../modules/market/benchmark_detail_view.dart';
+import '../modules/market_index/market_index_binding.dart';
+import '../modules/market_index/market_index_view.dart';
 import '../modules/subscription/subscription_binding.dart';
 import '../modules/subscription/subscription_payment_success_view.dart';
 import '../modules/subscription/subscription_skip_view.dart';
@@ -111,6 +113,11 @@ class AppPages {
       name: AppRoutes.benchmarkDetail,
       page: () => const BenchmarkDetailView(),
       binding: BenchmarkDetailBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.marketIndex,
+      page: () => const MarketIndexView(),
+      binding: MarketIndexBinding(),
     ),
     GetPage(
       name: AppRoutes.subscription,

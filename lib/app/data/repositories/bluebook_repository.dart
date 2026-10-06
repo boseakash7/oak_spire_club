@@ -18,12 +18,14 @@ class BluebookRepository {
     required int limit,
     String? keyword,
     String? categoryId,
+    String? sort,
   }) =>
       _remote.getAll(
         page: page,
         limit: limit,
         keyword: keyword,
         categoryId: categoryId,
+        sort: sort,
       );
 
   Future<BluebookModel> getById(String id) => _remote.getById(id);

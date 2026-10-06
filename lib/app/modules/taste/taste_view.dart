@@ -73,7 +73,7 @@ class TasteView extends GetView<TasteController> {
 /// After a bottle is added: land on the Collection tab with fresh data.
 Future<void> _handleAddedSuccess() async {
   if (Get.isRegistered<BottomNavController>()) {
-    Get.find<BottomNavController>().setIndex(1);
+    Get.find<BottomNavController>().setIndex(BottomNavController.collectionTab);
   }
   if (Get.isRegistered<CollectionController>()) {
     await Get.find<CollectionController>().forceReload();
@@ -365,7 +365,8 @@ class _CategoryRow extends GetView<TasteController> {
       () => AppFilterChipBar<String>(
         items: [
           const AppFilterChipItem('', 'All'),
-          for (final c in controller.categories) AppFilterChipItem(c.id, c.name),
+          for (final c in controller.categories)
+            AppFilterChipItem(c.id, c.name),
         ],
         selected: controller.selectedCategoryId.value,
         onSelected: controller.selectCategory,

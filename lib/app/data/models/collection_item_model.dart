@@ -14,6 +14,7 @@ class CollectionItemModel {
     this.dateAcquired,
     this.bluebook,
     this.priceMovement,
+    this.openedQuantity,
   });
 
   final String id;
@@ -31,6 +32,11 @@ class CollectionItemModel {
   final Map<String, dynamic>? bluebook;
   /// From root or nested `bluebook` (`price_movement`).
   final String? priceMovement;
+
+  /// Opened bottles in a row merged from several collection rows (see
+  /// `CollectionRepository._groupCollectionItems`); null on a single row,
+  /// whose fill says it.
+  final int? openedQuantity;
 
   static const List<String> _imageKeys = [
     'image',
@@ -103,6 +109,7 @@ class CollectionItemModel {
       dateAcquired: json['date_acquired']?.toString(),
       bluebook: bluebook,
       priceMovement: _coalescePriceMovement(json, bluebook),
+      openedQuantity: int.tryParse(json['opened_quantity']?.toString() ?? ''),
     );
   }
 
@@ -120,6 +127,7 @@ class CollectionItemModel {
       'date_acquired': dateAcquired,
       'bluebook': bluebook,
       'price_movement': priceMovement,
+      'opened_quantity': openedQuantity,
     };
   }
 }

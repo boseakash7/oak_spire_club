@@ -9,7 +9,7 @@ import '../../core/animations/app_motion.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_image_url.dart';
-import '../../core/utils/price_formatter.dart';
+import '../../core/utils/thousands_number_input_formatter.dart';
 import '../../core/widgets/app_back_button.dart';
 import '../../core/widgets/collection_form_field.dart';
 import '../../core/widgets/bottle_image.dart';
@@ -348,24 +348,6 @@ class _DateField extends StatelessWidget {
         size: 18,
         color: AppColors.white,
       ),
-    );
-  }
-}
-
-class ThousandsNumberInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final normalized = PriceFormatter.normalizeForApi(newValue.text);
-    if (normalized == null) {
-      return const TextEditingValue(text: '');
-    }
-    final formatted = PriceFormatter.format(normalized, withSymbol: false);
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

@@ -8,19 +8,23 @@ import '../../core/animations/state_switcher.dart';
 import '../../core/animations/staggered_entrance.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/app_filter_chip.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/app_search_field.dart';
-import '../../core/widgets/shimmer_box.dart';
 import 'market_controller.dart';
 import 'market_loading_view.dart';
 import 'widgets/market_bottle_row.dart';
+import 'widgets/market_index_strip.dart';
+import 'widgets/market_movers.dart';
+import 'widgets/market_sort_button.dart';
 
 const double _kInset = 23;
 
-/// The benchmark list: search (typo tolerant, semantic when enabled),
-/// category chips, and an infinitely scrolling list of bottles.
+/// The Market tab: the Oak Spire indexes and biggest movers, then search
+/// (typo tolerant, semantic when enabled), category chips, a sort, and an
+/// infinitely scrolling list of bottles.
 class MarketView extends GetView<MarketController> {
   const MarketView({super.key});
 
@@ -67,13 +71,29 @@ class _MarketList extends GetView<MarketController> {
           physics: AppPlatform.scrollPhysics,
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                _kInset,
-                kShellTabBodyContentTopGap,
-                _kInset,
-                14,
+            const SliverToBoxAdapter(
+              child: SizedBox(height: kShellTabBodyContentTopGap),
+            ),
+            // The market at a glance: indexes, then the biggest movers. Hidden
+            // while searching, when the list is what the user is after.
+            Obx(
+              () => SliverToBoxAdapter(
+                child: controller.keyword.value.trim().isNotEmpty
+                    ? const SizedBox.shrink()
+                    : const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          MarketIndexStrip(inset: _kInset),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: _kInset),
+                            child: MarketMovers(),
+                          ),
+                        ],
+                      ),
               ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(_kInset, 0, _kInset, 14),
               sliver: SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,6 +108,25 @@ class _MarketList extends GetView<MarketController> {
                     ),
                     const SizedBox(height: 12),
                     const _CategoryRow(),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Obx(() {
+                            final updated = controller.lastUpdatedText.value;
+                            if (updated.isEmpty) return const SizedBox.shrink();
+                            return Text(
+                              'Prices ${updated[0].toLowerCase()}${updated.substring(1)}',
+                              style: AppTextStyles.bodyS().copyWith(
+                                fontSize: 11,
+                                color: AppColors.textWolf,
+                              ),
+                            );
+                          }),
+                        ),
+                        const MarketSortButton(),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -99,7 +138,8 @@ class _MarketList extends GetView<MarketController> {
                 // A fresh query / category gets a fresh stagger.
                 final listKey = ValueKey(
                   '${controller.keyword.value}|'
-                  '${controller.selectedCategoryId.value}',
+                  '${controller.selectedCategoryId.value}|'
+                  '${controller.sort.value.name}',
                 );
 
                 if (bottles.isEmpty) {
@@ -107,7 +147,7 @@ class _MarketList extends GetView<MarketController> {
                     child: AppStateSwitcher(
                       stateKey: listKey,
                       child: controller.isSearching.value
-                          ? const _SkeletonRows()
+                          ? const MarketBottleSkeletonList()
                           : const _NoBottlesFound(),
                     ),
                   );
@@ -127,7 +167,7 @@ class _MarketList extends GetView<MarketController> {
                           () => AnimatedSize(
                             duration: const Duration(milliseconds: 200),
                             child: controller.isLoadingMore.value
-                                ? const _SkeletonRows(count: 2)
+                                ? const MarketBottleSkeletonList(count: 2)
                                 : const SizedBox(height: 8),
                           ),
                         );
@@ -177,29 +217,6 @@ class _CategoryRow extends GetView<MarketController> {
           }
           controller.selectCategory(id);
         },
-      ),
-    );
-  }
-}
-
-/// Placeholder rows while the first page of a new query loads, or while the
-/// next page arrives at the bottom.
-class _SkeletonRows extends StatelessWidget {
-  const _SkeletonRows({this.count = 4});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return ShimmerScope(
-      child: Column(
-        children: [
-          for (var i = 0; i < count; i++)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: ShimmerBox(height: 86, width: double.infinity),
-            ),
-        ],
       ),
     );
   }

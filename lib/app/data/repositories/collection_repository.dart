@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../core/cache/app_cache.dart';
 import '../../core/storage/app_storage.dart';
 import '../datasources/collection_remote_datasource.dart';
+import '../models/collection_item_display.dart';
 import '../models/collection_item_model.dart';
 
 class CollectionRepository {
@@ -40,6 +41,8 @@ class CollectionRepository {
 
       final base = entries.first;
       int totalQty = 0;
+      // The merged fill is an average, so it can't say how many are open.
+      int openedQty = 0;
       // Unit price weighted by quantity: 1 at $100 plus 3 at $200 is $175 a
       // bottle, not the $150 a plain average of the rows gives.
       double totalPaid = 0;
@@ -56,6 +59,7 @@ class CollectionRepository {
         final q = int.tryParse(e.quantity ?? '');
         final qty = (q == null || q <= 0) ? 1 : q;
         totalQty += qty;
+        openedQty += e.openedBottleCount;
 
         final p = double.tryParse(e.pricePaid ?? '');
         if (p != null) {
@@ -110,6 +114,7 @@ class CollectionRepository {
           dateAcquired: dateAcquired,
           bluebook: base.bluebook,
           priceMovement: base.priceMovement,
+          openedQuantity: openedQty,
         ),
       );
     }

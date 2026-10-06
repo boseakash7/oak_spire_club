@@ -90,7 +90,8 @@ class AddCollectionController extends GetxController {
     if (args is! Map) return;
     final map = Map<String, dynamic>.from(args);
     final prefillRaw = map['prefill'];
-    _navigateToCollectionOnSuccess = map['navigateToCollectionOnSuccess'] == true;
+    _navigateToCollectionOnSuccess =
+        map['navigateToCollectionOnSuccess'] == true;
     _popBenchmarkDetailOnSuccess = map['popBenchmarkDetailOnSuccess'] == true;
     isEditMode.value = map['editMode'] == true;
     final originalBottleIdRaw = map['originalBottleId']?.toString();
@@ -291,11 +292,16 @@ class AddCollectionController extends GetxController {
 
       // Prevent a visible "flash" of the previous route by preparing the destination
       // (Collection tab) before closing this screen.
-      if (_navigateToCollectionOnSuccess && Get.isRegistered<BottomNavController>()) {
-        Get.find<BottomNavController>().setIndex(1);
+      if (_navigateToCollectionOnSuccess &&
+          Get.isRegistered<BottomNavController>()) {
+        Get.find<BottomNavController>().setIndex(
+          BottomNavController.collectionTab,
+        );
       }
       if (Get.isRegistered<HomeController>()) {
-        unawaited(Get.find<HomeController>().fetchHomeData(forceRefresh: false));
+        unawaited(
+          Get.find<HomeController>().fetchHomeData(forceRefresh: false),
+        );
       }
       if (Get.isRegistered<CollectionController>()) {
         unawaited(Get.find<CollectionController>().forceReload());

@@ -5,9 +5,13 @@ Guidance for Claude Code when working in this repository.
 ## What this is
 
 **Oak Spire Club** (`oakspire_club`) — a Flutter mobile app for bourbon/whiskey collectors.
-Users track a bottle collection, see its market value over time charted against the BSMI
-benchmark index, browse market categories, and pay for a subscription (Razorpay on
-Android, Apple IAP on iOS).
+The app is market-centric. It opens on Home, a one-scroll summary: the market's headline
+index and breadth, the user's collection against it, the biggest movers, and what other
+collectors are adding, newly priced bottles, the most-collected bottles and the top-rated ones.
+Market holds the Oak Spire indexes, the movers and the sortable bottle list, so people can
+check prices and then decide what to do with their collection. Users also track a bottle collection, with its value
+charted against the index, and pay for a subscription (Razorpay on Android, Apple IAP on
+iOS). The product plan is [docs/market-centric-plan.md](docs/market-centric-plan.md).
 
 Ships to Android (`com.oak.spireclub`) and iOS (`com.oak.spireclub`). The desktop/web
 platform folders exist from `flutter create` but are not targets — `analysis_options.yaml`
@@ -29,6 +33,11 @@ flutter pub get
 flutter analyze                 # lints: package:flutter_lints
 flutter test                    # route constants + value/rating/sparkline parsing
 flutter run
+
+# Run the emulator on the host GPU. With hw.gpu.mode=auto this machine falls back to
+# SwiftShader (software), and the emulator process itself segfaults (exit 139, no app
+# error) after a few minutes of Flutter/Impeller rendering:
+#   emulator -avd Medium_Phone -gpu host     (or AVD config.ini: hw.gpu.mode=host)
 
 # Against the local docker backend (oakspireweb) on an Android emulator:
 # run the php container with WEBSITE_URL=10.0.2.2 so the Host header matches,
@@ -114,9 +123,10 @@ else is a full push.
 | `/forgot-password` | `modules/auth/forgot_password` | sign-in |
 | `/reset-password` | `modules/auth/reset_password` | forgot-password (`offNamed`, args `{email}`) |
 | `/shell` | `modules/navigation` | `AuthNavigation.completeSession`, subscription skip/success |
-| `/taste-bottles` | `modules/taste` | home empty state, home chart footer, collection empty state |
+| `/taste-bottles` | `modules/taste` | Collection chart footer, collection empty state, collection FAB |
 | `/add-to-collection` | `modules/add_collection` | taste list + benchmark detail via `AddToCollectionLauncher`; taste "add your own" (no args) |
-| `/benchmark-detail` | `modules/market` | market row (`market_bottle_row`), collection quick-view sheet, home "top moved" |
+| `/benchmark-detail` | `modules/market` | market row (`market_bottle_row`), collection quick-view sheet, Collection "top moved", every Home bottle row |
+| `/market-index` | `modules/market_index` | Market index cards (`MarketIndexCard`), args `{slug, name}` |
 | `/subscription` | `modules/subscription` | settings menu, `SubscriptionLimitNavigation`, post-auth offer |
 | `/subscription-skip` | `modules/subscription` | subscription screen "skip" |
 | `/subscription/payment-success` | `modules/subscription` | after Razorpay verify / Apple IAP subscribe |
@@ -130,21 +140,85 @@ else is a full push.
 
 **Shell tabs** are built in [bottom_nav_shell.dart](lib/app/modules/navigation/bottom_nav_shell.dart)
 as a `LazyTabStack` ([lazy_tab_stack.dart](lib/app/modules/navigation/widgets/lazy_tab_stack.dart)):
-`HomeView` (0), `CollectionView` (1), `MarketView` (2). The fourth nav item (slot 3) is
-Settings, which calls `showSettingsPopup(context)` and sets `settingsMenuOpen`; it is not a tab
-or route. The shell's back handler closes the popup, then returns to Home, then asks to exit.
+`DashboardView` (0, `BottomNavController.homeTab`, the landing tab, labelled "Home"),
+`MarketView` (1, `marketTab`) and `CollectionView` (2, `collectionTab`). The fourth nav item
+(slot 3) is Settings, which calls `showSettingsPopup(context)` and sets `settingsMenuOpen`; it is
+not a tab or route. The shell's back handler closes the popup, then returns to Home, then asks
+to exit.
+
+**Home tab** ([dashboard_view.dart](lib/app/modules/dashboard/dashboard_view.dart),
+`DashboardController`), top to bottom. Every section is a vertical list (no side scrolling),
+movement covers `DashboardController.windowDays` (90), and each section is left out when it has
+nothing to show.
+- **The market**: the headline `MarketIndexCard`, the breadth (rising / falling bottles,
+  `market/highlights?days=90`), and "Prices updated".
+- **Your collection** (`DashboardCollectionCard`): today's value, gain vs paid, the header's move
+  line, the value's line over the chart range (`HomeController.chartMarketPrices`, drawn with
+  `PriceSparklineView`), the Bottles / Sealed / Opened / Rare counts, and the range's move beside
+  the index's (the 6M range has no index match). With no collection it shows an "Add your first
+  bottle" CTA to `/taste-bottles`.
+- **Your bottles on the move** (`DashboardCollectionMovers`): the 3 collection bottles whose 90-day
+  sparkline moved most, either way. It fills in once the sparklines arrive.
+- **Top and worst performers** (`DashboardMovers`): 3 risers and 3 fallers from
+  `market/overview?days=90`. "See all" opens the headline index's page, whose risers / fallers
+  default to the same 90 days.
+- **Hot with collectors**, **New to the market**, **Most collected**, **Top rated in
+  collections**: `DashboardBottleList`s (3 rows each) over `market/highlights`.
+
+Every bottle row is a `DashboardBottleRow` with a 90-day sparkline, drawn on its own card like a
+Collection row (not one card per section). Lay a list of them out with
+`DashboardBottleRow.spaced(rows)`. `DashboardController` fetches
+them in one `sparklines` call for the market rows and one for the collection (shared cache with
+the Collection tab). Community rows show the sparkline's change. Market movers show
+`market.changeOver(windowDays)`.
+
+**The 30-day fallback.** `change_90d` is null until a bottle has a price from 90 days ago, so a
+young price history has no 90-day movers or breadth. `_loadOverview` / `_loadHighlights` then
+fall back to 30 days, and the subtitles show the window they got.
+
+**Opened / sealed counts** are bottles, not rows. A row whose fill is under 100% counts all its
+quantity as opened. `_groupCollectionItems` stores the merged sum in
+`CollectionItemModel.openedQuantity`, because the merged fill is an average.
+`CollectionItemDisplay.openedBottleCount` / `sealedBottleCount` read it, and `HomeController`
+totals them as `totalBottleCount` / `openedBottleCount` / `sealedBottleCount`.
+
+A bottle can appear in several sections, and `BottleImage` makes a Hero from `bottleId`, so the
+view gives each id's Hero to its first appearance only. The other copies pass `bottleId: null`.
+The module is `dashboard`, not `home`, because `HomeController` is the collection-insights
+controller.
+
+**Collection insights.** The old Home sections (value vs index chart, top moved, quick stats)
+render on the Collection tab through `CollectionInsights`, under the value header and only when
+the collection is non-empty. `HomeController` and `modules/home/widgets/` own that data and those
+widgets. It is lazy-put by the shell binding, refreshed when switching to Home or Collection,
+and feeds Home's collection card (including its move line) and (through `items`) Home's collection
+movers.
+
+**Market tab** ([market_view.dart](lib/app/modules/market/market_view.dart)), top to bottom:
+`MarketIndexStrip` (one card per Oak Spire index, headline first), `MarketMovers` (top 5
+rising / falling over 30 days, with "See all" switching the list's sort), then search, category
+chips, the "Prices updated" caption with `MarketSortButton`, and the paged list. The index
+strip and movers hide while a keyword search is active, and so does the sort pill (search is
+relevance-ranked). Both come from `MarketRepository` and are optional: an older server or one
+before the nightly job's first run just shows the list. `MarketBottleRow` shows the 30-day
+change (`bluebook.market.change30d`) when there is one, else the last price move.
+
+**Benchmark detail** also has a **Deal check** (`BenchmarkDealCheck`): the user types an asking
+price and `DealCheck.evaluate` ([deal_check.dart](lib/app/data/deal_check.dart)) places it on the
+low–high bar. The verdict is below low / good (≥5% under) / fair (±5%) / above average / above
+high. It is captioned as thin when `pricing` is thin or manual. The summary's movement chip
+shows the change over the selected chart range, falling back to the last price move. Tags
+include `× retail` (`BottleDetails.retailMultipleLabel`, average ÷ MSRP), as do market rows.
 
 **Shell header** ([app_header.dart](lib/app/core/widgets/app_header.dart)) is the only `AppHeader`
-use. The right side has two lines:
-- Line 1 is the greeting plus a `BottleMetaChip` pill: `PREMIUM` (gold) when
-  `user.hasActiveSubscription || user.isFreeUser`, else `FREE`. It reads
-  `UserSessionController.user` reactively, so call `setUser` after a refresh and the pill flips.
-- Line 2 is `HomeController.headerMoveText`, computed in `_applyHeaderMove` from the chart's
-  daily value series: `▲ $124 today`. When today was flat it shows the 7-day change
-  (`… this week`), and when that is flat too it shows `Steady this week`. It is empty with no
-  collection or no chart data.
-- The header reads `HomeController` only when `Get.isRegistered`, since the shell binding
-  lazy-puts it.
+use, and it is the same on every tab (no tab title).
+- Left: a gold-ringed user icon, then "Hello," over the user's first name
+  (`GreetingFormatter.firstNameFrom`, falling back to "Collector").
+- Right: only the plan badge, `PREMIUM` (gold) when `user.hasActiveSubscription || user.isFreeUser`,
+  else `FREE`.
+- Both read `UserSessionController.user` reactively, so call `setUser` after a refresh and they update.
+- `HomeController.headerMoveText` (`▲ $124 today` / `… this week` / `Steady this week`, computed
+  in `_applyHeaderMove`) is no longer in the header. Home's collection card shows it.
 
 **Collection tab** is a `SliverList` of `CollectionBottleRow`
 ([collection_bottle_row.dart](lib/app/modules/collection/widgets/collection_bottle_row.dart)).
@@ -187,6 +261,9 @@ merges existing collection rows for the same bottle into an edit-mode prefill.
 The Market category chips filter the bluebook list in place; there is no category detail screen
 (the old unreachable `category_detail` module was removed).
 
+Copy on market screens describes prices ("11% under the market average"). It never advises
+("Buy"), and the index page says the figures are not investment advice.
+
 ## API surface
 
 Base URL `https://www.oakspireclub.com/v2/api/`. Every call goes through `ApiClient`; `user_id`
@@ -208,13 +285,17 @@ comes from `AppStorage` at the repository layer.
 | `collection/chart-data` | GET | `chartData` | home chart, collection chart (`look_back` days) |
 | `collection/add` | POST multipart | `add` | add-to-collection (image upload), collection quantity/fill edits |
 | `collection/delete-by-user-bottle` | POST | `deleteByUserBottle` | collection remove / edit-replace |
-| `bluebook/get-all-bluebooks` | GET | `getAll` (no keyword) | market / taste browsing + pagination |
+| `bluebook/get-all-bluebooks` | GET | `getAll` (no keyword) | market / taste browsing + pagination; `sort` (`MarketSort.apiValue`) from Market, rows carry `market` stats |
 | `bluebook/search` | GET | `getAll` (with keyword) | market / taste search: hybrid lexical + semantic, same envelope, `category_id` honoured, SQL fallback server-side |
 | `bluebook/get-by-id` | GET | `getById` | benchmark detail: the catalog facts (`details`: distillery, type, age, ABV, cask…) the list rows don't carry, whichever screen opened it |
 | `bluebook/create` | POST | `create` | add-to-collection when the bottle is not in the bluebook |
 | `bluebook/get-last-update` | GET | `getLastUpdatedReadable` | market "last updated" label |
 | `bluebook/sparklines` | GET | `sparklines` (`ids` ≤ 60, `days`) | collection rows (all bottles, one call) and Benchmark rows (one call per page): 24 as-of samples per bottle; repository never throws, a missing endpoint only costs the sparklines |
 | `bluebook-price-history/chart-data-dashboard` | GET | `getChartDashboard` | benchmark detail chart (`bottleId`, `fromDate`, `endDate`) |
+| `market/overview` | GET | `MarketRemoteDataSource.overview` (`days`) | Market (30) and Home (90, falling back to 30): headline index + top 10 gainers / losers |
+| `market/indexes` | GET | `indexes` | Market index strip |
+| `market/index-detail` | GET | `indexDetail` (`slug`, `days`) | `/market-index`: series, risers, fallers, methodology |
+| `market/highlights` | GET | `highlights` (`days`, breadth window only) | Home: breadth (90, falling back to 30), plus hot / new / most-collected / top-rated bottle lists, each row with a `community` object |
 | `categories/list` | POST + query | `list` | market category chips, taste category chips |
 | `package/get-all` | GET | `getAll` | subscription plan list |
 | `package/payment-create` | POST | `createPayment` | subscription checkout (Razorpay) |
@@ -231,7 +312,8 @@ call; the app only uses `normal` today.
 
 **Cached reads** (24h TTL, cleared on app-version change) are `collection:all:$userId`,
 `collection:chart:$userId:$lookBackDays`, `categories:list:$page:$limit`,
-and `bluebook:last-updated`; plus `bluebook:spark:$id:$days` (6h, one entry per bottle, read
+and `bluebook:last-updated`; `market:overview:$days`, `market:indexes` and
+`market:index:$slug:$days` and `market:highlights:$days` for 1 hour (raw `data` maps, parsed on read); plus `bluebook:spark:$id:$days` (6h, one entry per bottle, read
 and written through `AppCache.peek` / `put` so a batch only requests the misses). `bluebook/get-all-bluebooks`, `bluebook/search`,
 `config/all`, `user/get-by-id`, and everything under `package/` and `auth/` are uncached.
 
@@ -296,11 +378,9 @@ whatever was last persisted, so never assume these are non-null.
 `activeSubscription`) from these. The live user is `UserSessionController.user` (an `Rxn<UserModel>` loaded
 from `AppStorage`). After a refresh, update it with `setUser` so views rebuild.
 
-**Bottom nav indices are not stable.** The Taste tab is commented out in
-[bottom_nav_shell.dart](lib/app/modules/navigation/bottom_nav_shell.dart), so Benchmark is
-index **2**, and the `headerTitle` switch in `BottomNavController` matches. Keep the shell,
-the controller, and `AnalyticsScreens.shellTabScreenName` in sync when tabs change. Settings
-is a popup, not a tab.
+**Bottom nav indices** are `BottomNavController.homeTab` (0), `marketTab` (1) and `collectionTab` (2); call
+sites use those constants, not literals. Keep the shell's `_pages`, `_settingsSlot`
+and `AnalyticsScreens.shellTabScreenName` in sync when tabs change. Settings is a popup, not a tab.
 
 **Analytics.** Custom events only: `AppAnalyticsController.to.logScreenView(key)` emits
 `{key}_view`, `logTap(key, [extra])` emits `{key}_click`, both through `sanitizeKey`. Always guard
@@ -368,8 +448,11 @@ hand-rolling animation:
 - `AppPressable` — press scale + haptic for anything tappable (not a bare `GestureDetector`).
 - `ShimmerScope` around a skeleton — one synced sweep for all its `ShimmerBox`es. Placeholders
   that sit on a `cardSurfaceGradient` card need `AppColors.shimmerOnCardBase/Highlight` (the
-  default base is nearly the card color). `TasteLoadingView` shows how: real-looking card
-  surfaces underneath, with the placeholders in one scope on top.
+  default base is nearly the card color). `ShimmerCardLayers` (with `ShimmerSlot` /
+  `ShimmerLine`, in [shimmer_box.dart](lib/app/core/widgets/shimmer_box.dart)) does this: real card
+  surfaces underneath, the placeholders in one scope on top. `TasteLoadingView` and
+  `MarketLoadingView` (plus `MarketBottleSkeletonList` for search and paging) use it, laid out
+  like the real rows. Don't use a bare full-size `ShimmerBox` as a row placeholder.
 - `AnimatedCountText`, `AnimatedFillBar`, `AppSegmentedRange`, `AppSearchField`,
   `BottleImage` (art + fallback URLs + Hero via `AppHeroTags`), `PricingBadge`.
 - `PriceSparklineView` ([price_sparkline.dart](lib/app/core/widgets/price_sparkline.dart)): the
@@ -380,6 +463,11 @@ hand-rolling animation:
     in when the data arrives.
 - Shell tabs are a `LazyTabStack` (built on first visit, fade-through on switch; hidden tabs get
   `TickerMode(false)` and `HeroMode(false)`).
+
+**Android draws edge to edge** (target SDK 36), so content runs under the system navigation bar
+unless a screen reserves it. A `SafeArea` does. A scroll view with an explicit `padding` drops the
+automatic inset, so add `MediaQuery.paddingOf(context).bottom` to its bottom padding, as
+benchmark detail and the index page do. Sheets add it to their own bottom padding.
 
 **Platform feel** goes through `AppPlatform` (`isCupertino`, `scrollPhysics`, `backIcon`) and
 `showAppDatePicker` (wheel on iOS, calendar on Android); use `RefreshIndicator.adaptive`.
@@ -649,6 +737,8 @@ Registered in `Configs/Application.php` under `commands`, run as `php cli <name>
 | `priceUpdate` | Snapshots every `bluebook` row's average/low/high into `bluebook_price_history` for today. **This is what gives the app's charts any history** — if it stops, every chart flatlines. Intended daily at 00:00 (`changes.txt`). |
 | `priceIndexUpdate` | Recomputes the `secondary_market` row in `price_index` (`trend` up/down plus `movement` %). That row is the `index` object in the chart-data payload. Note it compares today against `date('Y-01-01')`, i.e. Jan 1 of the current year, despite the variable being named `$yesterday`, and divides without a zero guard. |
 | `firebaseMessage` | Sends up to 100 pending `notifications` rows via `kreait/firebase-php`. |
+| `marketStats` | Rewrites `bluebook_market_stats`: each eligible bottle's 30/90/365-day change and 365-day high/low. Nightly after `priceUpdate`. |
+| `marketIndexUpdate` | Brings every `market_indexes` row up to today in `market_index_values` (equal-weighted, chain-linked; `--rebuild` recomputes from `base_date`). Nightly after `priceUpdate`. |
 | `preCacheChart` | Computes `getOverallPriceTrendForEveryone` and **discards the result** — currently a no-op. |
 | `processRazorpayWebhooks` | Drains queued `razorpay_webhook_data` rows through `Package::processQueuedRazorpayWebhookRecord`. |
 
@@ -695,6 +785,7 @@ All paths are under `Application/Controllers/`:
 | `collection/chart-data`, `collection/add` | `Api/V2/Collection.php` (**v2 override**) |
 | `bluebook/*` | `Api/BlueBook.php` (`getAdminBottles` is the paginated, category-filtered market list; `sparklines` serves `bluebook/sparklines`) |
 | `bluebook-price-history/chart-data-dashboard` | `Api/BluebookPriceHistory.php` |
+| `market/overview`, `market/indexes`, `market/index-detail`, `market/highlights` | `Api/Market.php` (models `MarketStats`, `MarketIndex`, `Collection`; cached in Redis under `market#`) |
 | `categories/list`, `categories/detail` | `Api/Category.php` |
 | `package/*` | `Api/Package.php` |
 | `usertoken/*` | `Api/UserToken.php` (`user_fcm` table) |
@@ -725,6 +816,33 @@ The app's `ChartIndexComparison` rebases on top of that.
   `sparklines#v1#<days>#<date>#md5(sorted ids)`.
 - It returns `{id: {points: [{d, p}], first, last, change_pct}}`. The map is cast to an object,
   so an empty result is `{}`, not `[]`.
+
+**Market stats and indexes** (`database/2026-10-05_market_stats_and_indexes.sql`):
+- `MarketStats::eligibleWhere` is the single definition of a "market" bottle: an active admin
+  bottle with average ≥ $30, basis not `manual`, and confidence not `low` / `stale`. Legacy
+  prices with no basis are in, because they are most of the catalog. Movers, sorts and every
+  index use it.
+- An index is equal-weighted and chain-linked. Each day it moves by the mean return of the bottles
+  priced the day before. A bottle's daily return is capped at ±50%, and new bottles never move
+  it. Membership is `rule_type` (`all`, `indexed`, `allocated`, `rare`, or `category` +
+  `rule_value`). Add a category index by inserting a row, then run `marketIndexUpdate`.
+- `bluebook/get-all-bluebooks` `sort`: `name` (default), `price_desc`, `price_asc`, `gain_30d`,
+  `loss_30d`, `premium`. The gain sorts join the stats table and list only bottles that have a
+  30-day change. Every other sort skips the join, because joining 250k rows costs most of a
+  second. `BlueBookHelper::withMarketStats` adds the page's `market` objects in one query.
+
+**Market highlights** (`database/2026-10-06_market_highlights.sql`, `Api\Market::highlights`):
+- `days` (30 / 90 / 365, default 30) sets the breadth window only, and is part of the Redis key.
+- `bluebook_market_stats.first_priced_on` is each bottle's first history date, written by
+  `marketStats`. `MarketStats::newlyPriced` ignores any day on which more than 250 bottles got
+  their first price, because that is a catalog import or the start of the history, not a
+  release. The local catalog's first prices nearly all fall on one import day.
+- The community lists (`Collection::mostCollected`, `hotByAdds`, `topRatedHeld`) count distinct
+  collectors on `normal` rows. They cover active admin bottles only, never a user's own
+  bottles. Each row needs at least `COMMUNITY_MIN_COLLECTORS` (3) collectors, or
+  `COMMUNITY_MIN_RECENT_ADDERS` (2) for hot, so no row shows one user's shelf. With few users
+  these lists are empty, and Home hides them.
+- Each part is wrapped in `_safe`, so a missing table gives an empty part, not an error.
 
 ## Other surfaces, for orientation
 

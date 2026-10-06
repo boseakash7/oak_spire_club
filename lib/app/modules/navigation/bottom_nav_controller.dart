@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 
 import '../../core/analytics/analytics_screens.dart';
 import '../../core/analytics/app_analytics_controller.dart';
-import '../../core/constants/app_constants.dart';
 import '../home/home_controller.dart';
 
 class BottomNavController extends GetxController {
@@ -13,19 +12,10 @@ class BottomNavController extends GetxController {
   /// True while settings popup is visible (settings is not a tab page).
   final settingsMenuOpen = false.obs;
 
-  /// App bar title for the active bottom-nav tab.
-  String get headerTitle {
-    switch (index.value) {
-      case 1:
-        return 'Collection';
-      // case 2:
-      //   return 'Taste';
-      case 2:
-        return 'Benchmark';
-      default:
-        return AppConstants.appName;
-    }
-  }
+  /// Tab indices. Home is the landing tab; Settings (slot 3) is a popup.
+  static const int homeTab = 0;
+  static const int marketTab = 1;
+  static const int collectionTab = 2;
 
   void setIndex(int value) {
     final previous = index.value;
@@ -38,7 +28,11 @@ class BottomNavController extends GetxController {
     }
     index.value = value;
 
-    if (value == 0 && previous != 0 && Get.isRegistered<HomeController>()) {
+    // Home's collection card and Collection's insights (chart, top moved,
+    // quick stats) both read HomeController: refresh it quietly on the way in.
+    if ((value == homeTab || value == collectionTab) &&
+        value != previous &&
+        Get.isRegistered<HomeController>()) {
       unawaited(
         Get.find<HomeController>().fetchHomeData(
           forceRefresh: false,

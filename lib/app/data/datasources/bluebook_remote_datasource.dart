@@ -24,13 +24,15 @@ class BluebookRemoteDataSource {
   static const int sparklinesMaxIds = 60;
 
   /// A page of the market list. With a [keyword] this is a search (ranked by
-  /// relevance, typo tolerant); without one it browses alphabetically.
-  /// [categoryId] filters either way.
+  /// relevance, typo tolerant); without one it browses in [sort] order
+  /// (`name`, `price_desc`, `price_asc`, `gain_30d`, `loss_30d`, `premium`;
+  /// the server falls back to `name`). [categoryId] filters either way.
   Future<List<BluebookModel>> getAll({
     required int page,
     required int limit,
     String? keyword,
     String? categoryId,
+    String? sort,
   }) async {
     final isSearch = keyword != null && keyword.trim().isNotEmpty;
     final response = await _client.get(isSearch ? _search : _getAll, query: {
@@ -39,6 +41,7 @@ class BluebookRemoteDataSource {
       if (keyword != null && keyword.trim().isNotEmpty) 'keyword': keyword.trim(),
       if (categoryId != null && categoryId.trim().isNotEmpty)
         'category_id': categoryId.trim(),
+      if (!isSearch && sort != null) 'sort': sort,
     });
 
     final json = _client.parseEnvelope(response);

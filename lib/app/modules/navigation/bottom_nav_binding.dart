@@ -1,11 +1,13 @@
 import 'package:get/get.dart';
 
 import '../collection/collection_controller.dart';
+import '../dashboard/dashboard_controller.dart';
 import '../home/home_controller.dart';
 import '../market/market_controller.dart';
 import 'bottom_nav_controller.dart';
 import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/categories_repository.dart';
+import '../../data/repositories/market_repository.dart';
 
 class BottomNavBinding extends Bindings {
   @override
@@ -14,6 +16,13 @@ class BottomNavBinding extends Bindings {
     // when leaving a tab and Get.find fails on return (CollectionView Obx).
     Get.lazyPut<BottomNavController>(() => BottomNavController(), fenix: true);
     Get.lazyPut<HomeController>(() => HomeController(), fenix: true);
+    Get.lazyPut<DashboardController>(
+      () => DashboardController(
+        marketRepo: Get.find<MarketRepository>(),
+        bluebookRepo: Get.find<BluebookRepository>(),
+      ),
+      fenix: true,
+    );
     Get.lazyPut<CollectionController>(
       () => CollectionController(),
       fenix: true,
@@ -22,6 +31,7 @@ class BottomNavBinding extends Bindings {
       () => MarketController(
         bluebookRepo: Get.find<BluebookRepository>(),
         categoriesRepo: Get.find<CategoriesRepository>(),
+        marketRepo: Get.find<MarketRepository>(),
       ),
       fenix: true,
     );

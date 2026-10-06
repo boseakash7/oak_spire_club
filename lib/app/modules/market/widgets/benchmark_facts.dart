@@ -104,9 +104,7 @@ class _FactRow extends StatelessWidget {
             child: Text(
               fact.value,
               textAlign: TextAlign.right,
-              style: AppTextStyles.bodyM().copyWith(
-                color: AppColors.textCream,
-              ),
+              style: AppTextStyles.bodyM().copyWith(color: AppColors.textCream),
             ),
           ),
         ],

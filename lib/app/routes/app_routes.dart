@@ -12,6 +12,7 @@ class AppRoutes {
   static const String addToCollection = '/add-to-collection';
   static const String tasteBottles = '/taste-bottles';
   static const String benchmarkDetail = '/benchmark-detail';
+  static const String marketIndex = '/market-index';
   static const String subscription = '/subscription';
   static const String subscriptionSkip = '/subscription-skip';
   static const String subscriptionPaymentSuccess = '/subscription/payment-success';

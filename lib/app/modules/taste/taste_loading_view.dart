@@ -25,19 +25,20 @@ class TasteLoadingView extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final rows = ((constraints.maxHeight - _kHeaderHeight) /
-                (_kRowHeight + _kRowGap))
-            .ceil()
-            .clamp(1, 12);
+        final rows =
+            ((constraints.maxHeight - _kHeaderHeight) /
+                    (_kRowHeight + _kRowGap))
+                .ceil()
+                .clamp(1, 12);
         return SingleChildScrollView(
           physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: _kInset),
-          child: _Layered(
+          child: ShimmerCardLayers(
             builder: (placeholders) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 8),
-                _Slot(
+                ShimmerSlot(
                   placeholders: placeholders,
                   child: const ShimmerBox(
                     height: 46,
@@ -48,9 +49,12 @@ class TasteLoadingView extends StatelessWidget {
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 34,
-                  child: Align(
+                  // Chips run past the right edge on narrow phones, like the
+                  // real bar.
+                  child: OverflowBox(
                     alignment: Alignment.centerLeft,
-                    child: _Slot(
+                    maxWidth: double.infinity,
+                    child: ShimmerSlot(
                       placeholders: placeholders,
                       child: const Row(
                         children: [
@@ -86,7 +90,9 @@ class TasteBottleSkeletonList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Layered(builder: (placeholders) => _rows(count, placeholders));
+    return ShimmerCardLayers(
+      builder: (placeholders) => _rows(count, placeholders),
+    );
   }
 }
 
@@ -105,53 +111,6 @@ Widget _rows(int count, bool placeholders) {
         ),
     ],
   );
-}
-
-/// Paints the same layout twice: card surfaces underneath, then the
-/// placeholder blocks inside one [ShimmerScope], so a single sweep runs over
-/// the details while the cards stay the colour of the real rows.
-class _Layered extends StatelessWidget {
-  const _Layered({required this.builder});
-
-  /// Builds the layout; `placeholders` is false for the card layer.
-  final Widget Function(bool placeholders) builder;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        builder(false),
-        Positioned.fill(
-          child: ShimmerScope(
-            baseColor: AppColors.shimmerOnCardBase,
-            highlightColor: AppColors.shimmerOnCardHighlight,
-            child: builder(true),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// A header placeholder: drawn in the shimmer layer, kept as empty space of
-/// the same size in the card layer.
-class _Slot extends StatelessWidget {
-  const _Slot({required this.placeholders, required this.child});
-
-  final bool placeholders;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    if (placeholders) return child;
-    return Visibility(
-      visible: false,
-      maintainSize: true,
-      maintainAnimation: true,
-      maintainState: true,
-      child: child,
-    );
-  }
 }
 
 /// The surface of a bottle row (same as `_BottleRow` in the taste view).
@@ -191,9 +150,9 @@ class _RowPlaceholders extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Line(widthFactor: nameWidth, height: 11),
+                  ShimmerLine(widthFactor: nameWidth, height: 11),
                   const SizedBox(height: 7),
-                  _Line(widthFactor: nameWidth * 0.55, height: 11),
+                  ShimmerLine(widthFactor: nameWidth * 0.55, height: 11),
                   const SizedBox(height: 9),
                   const ShimmerBox(height: 8, width: 64, radius: 4),
                 ],
@@ -212,22 +171,6 @@ class _RowPlaceholders extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _Line extends StatelessWidget {
-  const _Line({required this.widthFactor, required this.height});
-
-  final double widthFactor;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    return FractionallySizedBox(
-      alignment: Alignment.centerLeft,
-      widthFactor: widthFactor,
-      child: ShimmerBox(height: height, width: double.infinity, radius: 4),
     );
   }
 }

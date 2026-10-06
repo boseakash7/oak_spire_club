@@ -71,9 +71,20 @@ class HomeController extends GetxController {
   /// Movement % from chart `first_price` / `last_price`; null → left bar at 0%.
   final collectionMovedPercent = Rxn<double>();
 
+  /// Collection rows (one per bottle, duplicates merged).
   final totalCollectionCount = 0.obs;
   final totalDrunkCount = 0.obs;
   final totalRareCount = 0.obs;
+
+  /// Physical bottles (quantities summed), and how many of them are opened
+  /// or still sealed.
+  final totalBottleCount = 0.obs;
+  final openedBottleCount = 0.obs;
+  final sealedBottleCount = 0.obs;
+
+  /// The collection as `collection/all` returned it, grouped. Home ranks
+  /// these by their 90-day price lines.
+  final items = <CollectionItemModel>[].obs;
 
   /// From `collection/chart-data` → `collection_rating_percentage`.
   final collectionRatingText = '—'.obs;
@@ -141,9 +152,7 @@ class HomeController extends GetxController {
         ..clear()
         ..addAll(fetched);
       hasCollection.value = fetched.isNotEmpty;
-      totalCollectionCount.value = fetched.length;
-      totalDrunkCount.value = fetched.where((item) => item.isDrunk).length;
-      totalRareCount.value = fetched.where((item) => item.isRareFind).length;
+      _applyCounts(fetched);
       topMovedBottles.assignAll(_pickTopMovedByPriceMovement(fetched));
 
       final formatter = NumberFormat.currency(
@@ -157,16 +166,38 @@ class HomeController extends GetxController {
       await _loadChart(formatter: formatter, forceRefresh: forceRefresh);
     } catch (_) {
       topMovedBottles.clear();
-      totalDrunkCount.value = list.where((item) => item.isDrunk).length;
-      totalRareCount.value = list.where((item) => item.isRareFind).length;
       _clearChartSeries();
-      _applyFallbackValue(
-        list,
-        NumberFormat.currency(locale: 'en_US', symbol: r'$', decimalDigits: 0),
-      );
+      // A failed fetch (list still empty) keeps the last figures and counts
+      // rather than zeroing a collection that is still there.
+      if (list.isNotEmpty) {
+        _applyFallbackValue(
+          list,
+          NumberFormat.currency(
+            locale: 'en_US',
+            symbol: r'$',
+            decimalDigits: 0,
+          ),
+        );
+      }
     } finally {
       if (showSkeleton) isLoading.value = false;
     }
+  }
+
+  void _applyCounts(Iterable<CollectionItemModel> list) {
+    var bottles = 0;
+    var opened = 0;
+    for (final item in list) {
+      bottles += item.displayQuantity;
+      opened += item.openedBottleCount;
+    }
+    totalCollectionCount.value = list.length;
+    totalBottleCount.value = bottles;
+    openedBottleCount.value = opened;
+    sealedBottleCount.value = bottles - opened;
+    totalDrunkCount.value = list.where((item) => item.isDrunk).length;
+    totalRareCount.value = list.where((item) => item.isRareFind).length;
+    items.assignAll(list);
   }
 
   /// Highest [price_movement] first; one row per bluebook bottle; max [limit].
@@ -227,8 +258,7 @@ class HomeController extends GetxController {
     NumberFormat formatter,
   ) {
     topMovedBottles.assignAll(_pickTopMovedByPriceMovement(list));
-    totalDrunkCount.value = list.where((item) => item.isDrunk).length;
-    totalRareCount.value = list.where((item) => item.isRareFind).length;
+    _applyCounts(list);
     _clearChartSeries();
     _applyValueFigures(list, formatter);
     movedText.value = 'Moved — in last 3 months';

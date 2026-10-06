@@ -13,6 +13,7 @@ import '../../core/widgets/app_back_button.dart';
 import '../../core/widgets/app_segmented_range.dart';
 import '../../core/widgets/bottle_image.dart';
 import 'benchmark_detail_controller.dart';
+import 'widgets/benchmark_deal_check.dart';
 import 'widgets/benchmark_facts.dart';
 import 'widgets/benchmark_ownership_card.dart';
 import 'widgets/benchmark_price_chart.dart';
@@ -85,7 +86,13 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
               child: FadeSlideEntrance(index: 2, child: BenchmarkPriceChart()),
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(_kInset, 14, _kInset, 32),
+              // Clear Android's navigation bar (the app draws edge to edge).
+              padding: EdgeInsets.fromLTRB(
+                _kInset,
+                14,
+                _kInset,
+                32 + MediaQuery.paddingOf(context).bottom,
+              ),
               sliver: SliverToBoxAdapter(
                 child: FadeSlideEntrance(
                   index: 3,
@@ -122,6 +129,7 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                         ],
                       ),
                       const SizedBox(height: 24),
+                      const BenchmarkDealCheck(),
                       const BenchmarkFacts(),
                       const BenchmarkOwnershipCard(),
                     ],
