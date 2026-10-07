@@ -14,9 +14,9 @@ import '../../routes/app_routes.dart';
 import '../home/home_controller.dart';
 import '../navigation/bottom_nav_controller.dart';
 
-/// The Home tab: the market at a glance (headline index, breadth, top and
-/// worst performers), the user's collection against it, and what other
-/// collectors hold, add and rate (`market/highlights`). Every movement on it
+/// The Home tab: the market at a glance (headline index, breadth, the
+/// biggest movers), the user's collection against it, what other collectors
+/// hold, add and rate, and newly priced bottles (`market/highlights`). Every movement on it
 /// covers [windowDays], and every bottle row carries its price line over
 /// that window.
 ///
@@ -51,9 +51,11 @@ class DashboardController extends GetxController {
   /// price from [windowDays] ago yet (a young price history).
   static const int fallbackDays = 30;
 
-  /// Rows shown per list: each mover direction, the collection's movers and
-  /// each community list.
+  /// Rows shown per list: the collection's movers and each community list.
   static const int rowsShown = 3;
+
+  /// Rows per direction in "Biggest movers" (one direction shows at a time).
+  static const int moversShown = 5;
 
   HomeController get _home => Get.find<HomeController>();
 
@@ -113,14 +115,14 @@ class DashboardController extends GetxController {
     return short.hasBreadth ? short : h;
   }
 
-  /// The market's risers, [rowsShown] at most.
+  /// The market's risers, [moversShown] at most.
   List<BluebookModel> get gainers =>
-      overview.value?.gainers.take(rowsShown).toList(growable: false) ??
+      overview.value?.gainers.take(moversShown).toList(growable: false) ??
       const [];
 
-  /// The market's fallers, [rowsShown] at most.
+  /// The market's fallers, [moversShown] at most.
   List<BluebookModel> get losers =>
-      overview.value?.losers.take(rowsShown).toList(growable: false) ??
+      overview.value?.losers.take(moversShown).toList(growable: false) ??
       const [];
 
   /// A community list cut to [rowsShown].
@@ -215,6 +217,10 @@ class DashboardController extends GetxController {
       await _home.forceReload();
     }
   }
+
+  void logMoversToggle(bool rising) => _logTap('home_movers_toggle', {
+    'direction': rising ? 'rising' : 'falling',
+  });
 
   void logOpen(String section, String bottleId) => _logTap(
     'home_highlight_open',

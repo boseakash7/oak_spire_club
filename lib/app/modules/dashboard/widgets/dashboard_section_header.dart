@@ -5,7 +5,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 
 /// A Home section's title, an optional one-line explanation under it, and an
-/// optional text action on the right.
+/// optional text action (or any [trailing] widget) on the right.
 class DashboardSectionHeader extends StatelessWidget {
   const DashboardSectionHeader({
     super.key,
@@ -13,12 +13,16 @@ class DashboardSectionHeader extends StatelessWidget {
     this.subtitle,
     this.actionLabel,
     this.onAction,
+    this.trailing,
   });
 
   final String title;
   final String? subtitle;
   final String? actionLabel;
   final VoidCallback? onAction;
+
+  /// Shown after the action, e.g. a toggle.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +67,7 @@ class DashboardSectionHeader extends StatelessWidget {
                 ),
               ),
             ),
+          ?trailing,
         ],
       ),
     );

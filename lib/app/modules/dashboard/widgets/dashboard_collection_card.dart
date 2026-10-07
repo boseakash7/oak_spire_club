@@ -15,7 +15,6 @@ import '../../../core/widgets/shimmer_box.dart';
 import '../../../data/models/market_models.dart';
 import '../../../data/models/price_sparkline.dart';
 import '../../home/home_controller.dart';
-import 'dashboard_section_header.dart';
 
 final _wholeDollars = NumberFormat.currency(
   locale: 'en_US',
@@ -23,7 +22,8 @@ final _wholeDollars = NumberFormat.currency(
   decimalDigits: 0,
 );
 
-/// "Your collection": today's value, the gain against what was paid, the
+/// "Your collection", titled inside the card like Market's index cards:
+/// today's value, the gain against what was paid, the
 /// move today (or this week), the value's line over the chart range, how
 /// many bottles there are and how many are sealed or opened, and the
 /// collection's move over the range beside the Oak Spire Index's. Tapping it
@@ -49,13 +49,13 @@ class DashboardCollectionCard extends StatelessWidget {
 
     return Obx(() {
       final has = home.hasCollection.value;
-      final Widget body;
       if (!has && home.isLoading.value) {
-        body = const ShimmerScope(
-          child: ShimmerBox(height: 196, width: double.infinity),
+        return const ShimmerScope(
+          child: ShimmerBox(height: 212, width: double.infinity),
         );
-      } else if (!has) {
-        body = AppCard(
+      }
+      if (!has) {
+        return AppCard(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
           child: AppEmptyState(
             compact: true,
@@ -68,21 +68,8 @@ class DashboardCollectionCard extends StatelessWidget {
             onAction: onAddFirst,
           ),
         );
-      } else {
-        body = _ValueCard(home: home, index: index, onOpen: onOpen);
       }
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          DashboardSectionHeader(
-            title: 'Your collection',
-            actionLabel: has ? 'Open' : null,
-            onAction: has ? onOpen : null,
-          ),
-          body,
-        ],
-      );
+      return _ValueCard(home: home, index: index, onOpen: onOpen);
     });
   }
 }
@@ -132,6 +119,26 @@ class _ValueCard extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Your collection',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodyS().copyWith(
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: AppColors.textWolf,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -192,23 +199,18 @@ class _ValueCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
-                        color: AppColors.textWolf,
-                      ),
-                      if (showChart) ...[
-                        const SizedBox(height: 2),
+                  if (showChart) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const SizedBox(height: 4),
                         PriceSparklineView(data: chart, width: 112, height: 44),
                         const SizedBox(height: 4),
                         Text('Value · ${range.label}', style: caption),
                       ],
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),

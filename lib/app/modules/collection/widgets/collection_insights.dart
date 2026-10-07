@@ -6,11 +6,10 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../home/home_controller.dart';
 import '../../home/widgets/home_chart_footer.dart';
 import '../../home/widgets/home_quick_stats.dart';
-import '../../home/widgets/home_top_moved.dart';
 import '../../home/widgets/home_value_chart.dart';
 
 /// What used to be the Home tab, now under the Collection value header: the
-/// value vs index chart, the collection's top movers and quick stats.
+/// value vs index chart and quick stats.
 /// [HomeController] still owns the data; Market is the landing tab now.
 class CollectionInsights extends StatelessWidget {
   const CollectionInsights({super.key, required this.inset});
@@ -63,10 +62,6 @@ class CollectionInsights extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Top moved bottles', style: AppTextStyles.bodyL()),
-                const SizedBox(height: 12),
-                HomeTopMoved(home: home, trailingInset: inset),
-                const SizedBox(height: 18),
                 Text('Quick stats', style: AppTextStyles.bodyL()),
                 const SizedBox(height: 12),
                 HomeQuickStats(home: home),

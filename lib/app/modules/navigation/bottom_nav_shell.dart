@@ -24,7 +24,7 @@ class BottomNavShell extends GetView<BottomNavController> {
 
   /// Home first: it is where the app opens, a summary of the market and the
   /// user's collection that links into the other two. Collection keeps the
-  /// full insights (value chart, top moved, quick stats).
+  /// full insights (value chart and quick stats).
   static const _pages = <Widget>[
     DashboardView(),
     MarketView(),

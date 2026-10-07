@@ -6,9 +6,9 @@ Guidance for Claude Code when working in this repository.
 
 **Oak Spire Club** (`oakspire_club`) — a Flutter mobile app for bourbon/whiskey collectors.
 The app is market-centric. It opens on Home, a one-scroll summary: the market's headline
-index and breadth, the user's collection against it, the biggest movers, and what other
-collectors are adding, newly priced bottles, the most-collected bottles and the top-rated ones.
-Market holds the Oak Spire indexes, the movers and the sortable bottle list, so people can
+index and breadth, the user's collection against it, the biggest movers, what other collectors
+are adding, the most-collected bottles, the top-rated ones, and last the newly priced bottles.
+Market holds the Oak Spire indexes and the sortable bottle list, so people can
 check prices and then decide what to do with their collection. Users also track a bottle collection, with its value
 charted against the index, and pay for a subscription (Razorpay on Android, Apple IAP on
 iOS). The product plan is [docs/market-centric-plan.md](docs/market-centric-plan.md).
@@ -125,7 +125,7 @@ else is a full push.
 | `/shell` | `modules/navigation` | `AuthNavigation.completeSession`, subscription skip/success |
 | `/taste-bottles` | `modules/taste` | Collection chart footer, collection empty state, collection FAB |
 | `/add-to-collection` | `modules/add_collection` | taste list + benchmark detail via `AddToCollectionLauncher`; taste "add your own" (no args) |
-| `/benchmark-detail` | `modules/market` | market row (`market_bottle_row`), collection quick-view sheet, Collection "top moved", every Home bottle row |
+| `/benchmark-detail` | `modules/market` | market row (`market_bottle_row`), collection quick-view sheet, every Home bottle row |
 | `/market-index` | `modules/market_index` | Market index cards (`MarketIndexCard`), args `{slug, name}` |
 | `/subscription` | `modules/subscription` | settings menu, `SubscriptionLimitNavigation`, post-auth offer |
 | `/subscription-skip` | `modules/subscription` | subscription screen "skip" |
@@ -150,20 +150,24 @@ to exit.
 `DashboardController`), top to bottom. Every section is a vertical list (no side scrolling),
 movement covers `DashboardController.windowDays` (90), and each section is left out when it has
 nothing to show.
-- **The market**: the headline `MarketIndexCard`, the breadth (rising / falling bottles,
-  `market/highlights?days=90`), and "Prices updated".
-- **Your collection** (`DashboardCollectionCard`): today's value, gain vs paid, the header's move
+- **The market** (`DashboardMarketPulse`): one card, the headline `MarketIndexCard` with
+  `title: 'The market'` and a `footer` holding the breadth (rising / falling bottles,
+  `market/highlights?days=90`) and "Prices updated".
+- **Your collection** (`DashboardCollectionCard`): titled inside the card. Today's value, gain vs paid, the header's move
   line, the value's line over the chart range (`HomeController.chartMarketPrices`, drawn with
   `PriceSparklineView`), the Bottles / Sealed / Opened / Rare counts, and the range's move beside
   the index's (the 6M range has no index match). With no collection it shows an "Add your first
   bottle" CTA to `/taste-bottles`.
 - **Your bottles on the move** (`DashboardCollectionMovers`): the 3 collection bottles whose 90-day
   sparkline moved most, either way. It fills in once the sparklines arrive.
-- **Top and worst performers** (`DashboardMovers`): 3 risers and 3 fallers from
-  `market/overview?days=90`. "See all" opens the headline index's page, whose risers / fallers
-  default to the same 90 days.
-- **Hot with collectors**, **New to the market**, **Most collected**, **Top rated in
-  collections**: `DashboardBottleList`s (3 rows each) over `market/highlights`.
+- **Biggest movers** (`DashboardMovers`): a Rising / Falling toggle over 5 risers or 5 fallers
+  (`DashboardController.moversShown`) from `market/overview?days=90`. "See all" opens the headline
+  index's page, whose risers / fallers default to the same 90 days. (It used to be on Market.)
+- **Hot with collectors**, **Most collected**, **Top rated in collections**, then last **New
+  to the market**: `DashboardBottleList`s (3 rows each) over `market/highlights`.
+
+The two cards at the top (market, collection) carry their titles inside, on the card's top line in
+`MarketIndexCard`'s style (muted `bodyS` + chevron), not a `DashboardSectionHeader` above them.
 
 Every bottle row is a `DashboardBottleRow` with a 90-day sparkline, drawn on its own card like a
 Collection row (not one card per section). Lay a list of them out with
@@ -187,7 +191,7 @@ view gives each id's Hero to its first appearance only. The other copies pass `b
 The module is `dashboard`, not `home`, because `HomeController` is the collection-insights
 controller.
 
-**Collection insights.** The old Home sections (value vs index chart, top moved, quick stats)
+**Collection insights.** The old Home sections (value vs index chart, quick stats)
 render on the Collection tab through `CollectionInsights`, under the value header and only when
 the collection is non-empty. `HomeController` and `modules/home/widgets/` own that data and those
 widgets. It is lazy-put by the shell binding, refreshed when switching to Home or Collection,
@@ -195,11 +199,10 @@ and feeds Home's collection card (including its move line) and (through `items`)
 movers.
 
 **Market tab** ([market_view.dart](lib/app/modules/market/market_view.dart)), top to bottom:
-`MarketIndexStrip` (one card per Oak Spire index, headline first), `MarketMovers` (top 5
-rising / falling over 30 days, with "See all" switching the list's sort), then search, category
-chips, the "Prices updated" caption with `MarketSortButton`, and the paged list. The index
-strip and movers hide while a keyword search is active, and so does the sort pill (search is
-relevance-ranked). Both come from `MarketRepository` and are optional: an older server or one
+`MarketIndexStrip` (one card per Oak Spire index, headline first), then search, category
+chips, the "Prices updated" caption with `MarketSortButton`, and the paged list. The biggest
+movers are on Home. The index strip hides while a keyword search is active, and so does the sort
+pill (search is relevance-ranked). The strip comes from `MarketRepository` and is optional: an older server or one
 before the nightly job's first run just shows the list. `MarketBottleRow` shows the 30-day
 change (`bluebook.market.change30d`) when there is one, else the last price move.
 
@@ -292,7 +295,7 @@ comes from `AppStorage` at the repository layer.
 | `bluebook/get-last-update` | GET | `getLastUpdatedReadable` | market "last updated" label |
 | `bluebook/sparklines` | GET | `sparklines` (`ids` ≤ 60, `days`) | collection rows (all bottles, one call) and Benchmark rows (one call per page): 24 as-of samples per bottle; repository never throws, a missing endpoint only costs the sparklines |
 | `bluebook-price-history/chart-data-dashboard` | GET | `getChartDashboard` | benchmark detail chart (`bottleId`, `fromDate`, `endDate`) |
-| `market/overview` | GET | `MarketRemoteDataSource.overview` (`days`) | Market (30) and Home (90, falling back to 30): headline index + top 10 gainers / losers |
+| `market/overview` | GET | `MarketRemoteDataSource.overview` (`days`) | Market (30, the index strip's fallback) and Home (90, falling back to 30): headline index + top 10 gainers / losers |
 | `market/indexes` | GET | `indexes` | Market index strip |
 | `market/index-detail` | GET | `indexDetail` (`slug`, `days`) | `/market-index`: series, risers, fallers, methodology |
 | `market/highlights` | GET | `highlights` (`days`, breadth window only) | Home: breadth (90, falling back to 30), plus hot / new / most-collected / top-rated bottle lists, each row with a `community` object |

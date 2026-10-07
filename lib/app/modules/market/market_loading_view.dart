@@ -16,15 +16,12 @@ const double _kIndexHeight = 128;
 const double _kIndexWideWidth = 236;
 const double _kIndexWidth = 196;
 
-/// Movers title block above the rows.
-const double _kMoversHeaderHeight = 36;
-
 /// Name-line widths, varied so the skeleton reads as a list, not a grid.
 const List<double> _kNameWidths = [0.9, 0.7, 0.82, 0.62, 0.86, 0.74];
 
 /// First load of Market, laid out like the top of the real tab: the index
-/// strip, the "Biggest movers" heading and enough bottle rows to fill the
-/// screen. Placeholders sit on real card surfaces under one shimmer sweep.
+/// strip and enough bottle rows to fill the screen. Placeholders sit on real
+/// card surfaces under one shimmer sweep.
 class MarketLoadingView extends StatelessWidget {
   const MarketLoadingView({super.key});
 
@@ -33,11 +30,7 @@ class MarketLoadingView extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         const above =
-            kShellTabBodyContentTopGap +
-            _kIndexHeight +
-            AppSpacing.lg +
-            _kMoversHeaderHeight +
-            AppSpacing.sm;
+            kShellTabBodyContentTopGap + _kIndexHeight + AppSpacing.lg;
         final rows =
             ((constraints.maxHeight - above) / (_kRowHeight + _kRowGap))
                 .ceil()
@@ -77,39 +70,7 @@ class MarketLoadingView extends StatelessWidget {
                 const SizedBox(height: AppSpacing.lg),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: _kInset),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      ShimmerSlot(
-                        placeholders: placeholders,
-                        child: const SizedBox(
-                          height: _kMoversHeaderHeight,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    ShimmerBox(
-                                      height: 14,
-                                      width: 124,
-                                      radius: 4,
-                                    ),
-                                    SizedBox(height: 7),
-                                    ShimmerBox(height: 9, width: 72, radius: 4),
-                                  ],
-                                ),
-                              ),
-                              ShimmerBox(height: 32, width: 134, radius: 16),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      _rows(rows, placeholders),
-                    ],
-                  ),
+                  child: _rows(rows, placeholders),
                 ),
               ],
             ),

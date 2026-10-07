@@ -4,7 +4,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/shimmer_box.dart';
 
-/// Home's skeleton: the index card, the collection card, the movers card and
+/// Home's skeleton: the market card, the collection card, the movers card and
 /// a strip of bottle cards, in one shimmer sweep.
 class DashboardLoadingView extends StatelessWidget {
   const DashboardLoadingView({super.key});
@@ -23,9 +23,9 @@ class DashboardLoadingView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _Block(heights: [14, 128]),
+            const _Block(heights: [0, 164]),
             const SizedBox(height: AppSpacing.xl),
-            const _Block(heights: [14, 132]),
+            const _Block(heights: [0, 212]),
             const SizedBox(height: AppSpacing.xl),
             const _Block(heights: [14, 196]),
             const SizedBox(height: AppSpacing.xl),
@@ -51,7 +51,8 @@ class DashboardLoadingView extends StatelessWidget {
   }
 }
 
-/// A section title bar, then a full-width card.
+/// A section title bar (none when its height is 0, for a card titled
+/// inside), then a full-width card.
 class _Block extends StatelessWidget {
   const _Block({required this.heights});
 
@@ -64,8 +65,10 @@ class _Block extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ShimmerBox(height: heights[0], width: 120, radius: 6),
-          const SizedBox(height: AppSpacing.sm),
+          if (heights[0] > 0) ...[
+            ShimmerBox(height: heights[0], width: 120, radius: 6),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           ShimmerBox(height: heights[1], width: double.infinity),
         ],
       ),

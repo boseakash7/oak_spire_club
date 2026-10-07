@@ -71,13 +71,29 @@ class MarketIndexStrip extends GetView<MarketController> {
 }
 
 /// One index: name, level, today's and 30-day change, and its recent line.
+///
+/// With a [footer] the card sizes to its content instead of filling a fixed
+/// height, so it can sit in a list (Home's market card).
 class MarketIndexCard extends StatelessWidget {
-  const MarketIndexCard({super.key, required this.index, this.wide = false});
+  const MarketIndexCard({
+    super.key,
+    required this.index,
+    this.wide = false,
+    this.title,
+    this.footer,
+  });
 
   final MarketIndexSummary index;
 
   /// The headline card: larger number, longer sparkline.
   final bool wide;
+
+  /// Replaces the index name on the card's top line; the name then leads
+  /// the bottle count instead.
+  final String? title;
+
+  /// Shown under a divider at the bottom of the card.
+  final Widget? footer;
 
   void _open() {
     if (Get.isRegistered<AppAnalyticsController>()) {
@@ -117,13 +133,14 @@ class MarketIndexCard extends StatelessWidget {
       child: AppCard(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Column(
+          mainAxisSize: footer == null ? MainAxisSize.max : MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    index.name,
+                    title ?? index.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.bodyS().copyWith(
@@ -162,7 +179,10 @@ class MarketIndexCard extends StatelessWidget {
                   ),
               ],
             ),
-            const Spacer(),
+            if (footer == null)
+              const Spacer()
+            else
+              const SizedBox(height: AppSpacing.sm),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -187,9 +207,12 @@ class MarketIndexCard extends StatelessWidget {
                           ),
                         ),
                       Text(
-                        index.stale
-                            ? 'Not updated recently'
-                            : '${NumberFormat.decimalPattern('en_US').format(index.constituents)} bottles',
+                        [
+                          if (title != null) index.name,
+                          index.stale
+                              ? 'Not updated recently'
+                              : '${NumberFormat.decimalPattern('en_US').format(index.constituents)} bottles',
+                        ].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: caption,
@@ -204,6 +227,12 @@ class MarketIndexCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (footer != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              const Divider(height: 1, color: AppColors.cardBorder),
+              const SizedBox(height: AppSpacing.sm),
+              footer!,
+            ],
           ],
         ),
       ),

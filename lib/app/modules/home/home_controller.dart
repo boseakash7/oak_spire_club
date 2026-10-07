@@ -89,9 +89,6 @@ class HomeController extends GetxController {
   /// From `collection/chart-data` → `collection_rating_percentage`.
   final collectionRatingText = '—'.obs;
 
-  /// Up to 10 collection bottles with highest `price_movement` (from `collection/all`).
-  final topMovedBottles = <CollectionItemModel>[].obs;
-
   /// Market value line — index-style (first point in window = 100).
   final chartSeriesK = <double>[].obs;
 
@@ -153,7 +150,6 @@ class HomeController extends GetxController {
         ..addAll(fetched);
       hasCollection.value = fetched.isNotEmpty;
       _applyCounts(fetched);
-      topMovedBottles.assignAll(_pickTopMovedByPriceMovement(fetched));
 
       final formatter = NumberFormat.currency(
         locale: 'en_US',
@@ -165,7 +161,6 @@ class HomeController extends GetxController {
 
       await _loadChart(formatter: formatter, forceRefresh: forceRefresh);
     } catch (_) {
-      topMovedBottles.clear();
       _clearChartSeries();
       // A failed fetch (list still empty) keeps the last figures and counts
       // rather than zeroing a collection that is still there.
@@ -198,30 +193,6 @@ class HomeController extends GetxController {
     totalDrunkCount.value = list.where((item) => item.isDrunk).length;
     totalRareCount.value = list.where((item) => item.isRareFind).length;
     items.assignAll(list);
-  }
-
-  /// Highest [price_movement] first; one row per bluebook bottle; max [limit].
-  static List<CollectionItemModel> _pickTopMovedByPriceMovement(
-    Iterable<CollectionItemModel> items, {
-    int limit = 10,
-  }) {
-    final ranked = <({CollectionItemModel item, double movement})>[];
-    for (final item in items) {
-      final movement = item.priceMovementValue;
-      if (movement == null) continue;
-      ranked.add((item: item, movement: movement));
-    }
-    ranked.sort((a, b) => b.movement.compareTo(a.movement));
-
-    final seenBottleIds = <String>{};
-    final out = <CollectionItemModel>[];
-    for (final row in ranked) {
-      final dedupeKey = row.item.bluebookBottleId ?? row.item.id;
-      if (!seenBottleIds.add(dedupeKey)) continue;
-      out.add(row.item);
-      if (out.length >= limit) break;
-    }
-    return out;
   }
 
   /// Sets the hero value, the invested line and the unrealised gain from
@@ -257,7 +228,6 @@ class HomeController extends GetxController {
     Iterable<CollectionItemModel> list,
     NumberFormat formatter,
   ) {
-    topMovedBottles.assignAll(_pickTopMovedByPriceMovement(list));
     _applyCounts(list);
     _clearChartSeries();
     _applyValueFigures(list, formatter);

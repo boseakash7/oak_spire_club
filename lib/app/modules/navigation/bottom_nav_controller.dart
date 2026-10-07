@@ -28,7 +28,7 @@ class BottomNavController extends GetxController {
     }
     index.value = value;
 
-    // Home's collection card and Collection's insights (chart, top moved,
+    // Home's collection card and Collection's insights (chart and
     // quick stats) both read HomeController: refresh it quietly on the way in.
     if ((value == homeTab || value == collectionTab) &&
         value != previous &&

@@ -26,9 +26,9 @@ final _shortDate = DateFormat('d MMM', 'en_US');
 
 /// The Home tab, where the app opens. Top to bottom: the market (headline
 /// index and breadth), the user's collection against it, the collection's
-/// biggest moves, the market's top and worst performers, then what
-/// collectors are adding, what is newly priced, what collectors hold most and
-/// the highest-rated bottles they hold. Every section is a vertical list, its
+/// biggest moves, the market's biggest movers, then what collectors are
+/// adding, what they hold most, the highest-rated bottles they hold, and
+/// last what is newly priced. Every section is a vertical list, its
 /// movements cover [DashboardController.windowDays], and each hides when it
 /// has nothing to show.
 class DashboardView extends GetView<DashboardController> {
@@ -128,6 +128,7 @@ class _DashboardContent extends GetView<DashboardController> {
                     heroIds: moverHeroes,
                     onSeeAll: controller.openAllPerformers,
                     onOpen: (id) => controller.logOpen('movers', id),
+                    onDirectionChanged: controller.logMoversToggle,
                   ),
                 if (hot.isNotEmpty)
                   DashboardBottleList(
@@ -138,19 +139,6 @@ class _DashboardContent extends GetView<DashboardController> {
                     captionOf: (i) => 'Added by ${_collectors(i.added30d)}',
                     sparklines: sparks,
                     heroIds: listHeroes(hot),
-                    onOpen: controller.logOpen,
-                  ),
-                if (fresh.isNotEmpty)
-                  DashboardBottleList(
-                    section: 'new',
-                    title: 'New to the market',
-                    subtitle: 'First priced in the last 30 days',
-                    items: fresh,
-                    captionOf: (i) => i.firstPricedOn == null
-                        ? 'Newly priced'
-                        : 'First priced ${_shortDate.format(i.firstPricedOn!)}',
-                    sparklines: sparks,
-                    heroIds: listHeroes(fresh),
                     onOpen: controller.logOpen,
                   ),
                 if (held.isNotEmpty)
@@ -175,6 +163,19 @@ class _DashboardContent extends GetView<DashboardController> {
                         ' · held by ${i.collectors ?? '—'}',
                     sparklines: sparks,
                     heroIds: listHeroes(rated),
+                    onOpen: controller.logOpen,
+                  ),
+                if (fresh.isNotEmpty)
+                  DashboardBottleList(
+                    section: 'new',
+                    title: 'New to the market',
+                    subtitle: 'First priced in the last 30 days',
+                    items: fresh,
+                    captionOf: (i) => i.firstPricedOn == null
+                        ? 'Newly priced'
+                        : 'First priced ${_shortDate.format(i.firstPricedOn!)}',
+                    sparklines: sparks,
+                    heroIds: listHeroes(fresh),
                     onOpen: controller.logOpen,
                   ),
               ];

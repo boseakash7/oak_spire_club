@@ -5,15 +5,16 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/price_formatter.dart';
+import '../../../core/widgets/app_card.dart';
 import '../../../data/models/market_models.dart';
 import '../../market/widgets/market_index_strip.dart';
-import 'dashboard_section_header.dart';
 
 final _count = NumberFormat.decimalPattern('en_US');
 
-/// "The market": the headline Oak Spire Index (it opens the index's page),
-/// then how many market bottles rose and fell over the window, and when
-/// prices were last updated. Renders nothing when there is neither.
+/// "The market", one card titled inside like Market's index cards: the
+/// headline Oak Spire Index (the card opens the index's page), then how many
+/// market bottles rose and fell over the window, and when prices were last
+/// updated. Renders nothing when there is neither an index nor a breadth.
 class DashboardMarketPulse extends StatelessWidget {
   const DashboardMarketPulse({
     super.key,
@@ -63,24 +64,40 @@ class DashboardMarketPulse extends StatelessWidget {
           )
         : null;
 
-    return Column(
+    final footer = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const DashboardSectionHeader(title: 'The market'),
-        if (index != null)
-          SizedBox(
-            height: 128,
-            child: MarketIndexCard(index: index, wide: true),
-          ),
-        if (breadth != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          breadth,
-        ],
+        ?breadth,
         if (lastUpdated != null) ...[
-          const SizedBox(height: AppSpacing.xxs),
+          if (breadth != null) const SizedBox(height: AppSpacing.xxs),
           Text('Prices updated $lastUpdated', style: caption),
         ],
       ],
+    );
+
+    if (index != null) {
+      return MarketIndexCard(
+        index: index,
+        wide: true,
+        title: 'The market',
+        footer: footer,
+      );
+    }
+
+    // Breadth with no index yet: the same card, without the index.
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'The market',
+            style: AppTextStyles.bodyS().copyWith(color: AppColors.textMuted),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          footer,
+        ],
+      ),
     );
   }
 }

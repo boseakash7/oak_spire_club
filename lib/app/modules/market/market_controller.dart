@@ -26,11 +26,8 @@ enum MarketSort {
   final String label;
 }
 
-/// The movers list shown under the index card.
-enum MoversDirection { gainers, losers }
-
-/// The Market tab (the app's landing tab): the Oak Spire indexes, today's
-/// biggest movers, and the paged, sortable bottle list.
+/// The Market tab: the Oak Spire indexes and the paged, sortable bottle list.
+/// The biggest movers are on Home.
 class MarketController extends GetxController with PagedBottleSearch {
   MarketController({
     required BluebookRepository bluebookRepo,
@@ -44,14 +41,13 @@ class MarketController extends GetxController with PagedBottleSearch {
   final CategoriesRepository _categoriesRepo;
   final MarketRepository _marketRepo;
 
-  /// Headline index + movers; null until it loads or when the server has
-  /// none (an older server, or before the nightly job's first run).
+  /// The headline index, which the strip falls back to when `market/indexes`
+  /// has none; null until it loads or when the server has none (an older
+  /// server, or before the nightly job's first run).
   final overview = Rxn<MarketOverview>();
 
   /// Every index with values, headline first, for the index strip.
   final indexes = <MarketIndexSummary>[].obs;
-
-  final moversDirection = MoversDirection.gainers.obs;
 
   final sort = MarketSort.name.obs;
 
@@ -105,21 +101,6 @@ class MarketController extends GetxController with PagedBottleSearch {
     ]);
   }
 
-  /// The movers list for the selected direction.
-  List<BluebookModel> get movers {
-    final o = overview.value;
-    if (o == null) return const [];
-    return moversDirection.value == MoversDirection.gainers
-        ? o.gainers
-        : o.losers;
-  }
-
-  void setMoversDirection(MoversDirection value) {
-    if (moversDirection.value == value) return;
-    moversDirection.value = value;
-    _logTap('market_movers_toggle', {'direction': value.name});
-  }
-
   void setSort(MarketSort value) {
     if (sort.value == value) return;
     sort.value = value;
@@ -135,7 +116,6 @@ class MarketController extends GetxController with PagedBottleSearch {
           .overview(forceRefresh: forceRefresh)
           .then((o) {
             overview.value = o.isEmpty ? null : o;
-            _loadMoverSparklines(o, forceRefresh: forceRefresh);
           })
           .catchError((_) {}),
       _marketRepo
@@ -143,20 +123,6 @@ class MarketController extends GetxController with PagedBottleSearch {
           .then(indexes.assignAll)
           .catchError((_) {}),
     ]);
-  }
-
-  /// The movers are not on a list page, so their sparklines come in one
-  /// request of their own.
-  void _loadMoverSparklines(MarketOverview o, {required bool forceRefresh}) {
-    final ids = {
-      for (final b in [...o.gainers, ...o.losers]) b.id,
-    }.toList();
-    if (ids.isEmpty) return;
-    unawaited(
-      _bluebookRepo
-          .sparklines(ids, forceRefresh: forceRefresh)
-          .then(sparklines.addAll),
-    );
   }
 
   void _logTap(String key, Map<String, Object> params) {

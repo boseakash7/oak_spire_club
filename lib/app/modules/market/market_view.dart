@@ -17,12 +17,11 @@ import 'market_controller.dart';
 import 'market_loading_view.dart';
 import 'widgets/market_bottle_row.dart';
 import 'widgets/market_index_strip.dart';
-import 'widgets/market_movers.dart';
 import 'widgets/market_sort_button.dart';
 
 const double _kInset = 23;
 
-/// The Market tab: the Oak Spire indexes and biggest movers, then search
+/// The Market tab: the Oak Spire indexes, then search
 /// (typo tolerant, semantic when enabled), category chips, a sort, and an
 /// infinitely scrolling list of bottles.
 class MarketView extends GetView<MarketController> {
@@ -74,22 +73,13 @@ class _MarketList extends GetView<MarketController> {
             const SliverToBoxAdapter(
               child: SizedBox(height: kShellTabBodyContentTopGap),
             ),
-            // The market at a glance: indexes, then the biggest movers. Hidden
-            // while searching, when the list is what the user is after.
+            // The market at a glance: the indexes. Hidden while searching,
+            // when the list is what the user is after.
             Obx(
               () => SliverToBoxAdapter(
                 child: controller.keyword.value.trim().isNotEmpty
                     ? const SizedBox.shrink()
-                    : const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          MarketIndexStrip(inset: _kInset),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: _kInset),
-                            child: MarketMovers(),
-                          ),
-                        ],
-                      ),
+                    : const MarketIndexStrip(inset: _kInset),
               ),
             ),
             SliverPadding(
