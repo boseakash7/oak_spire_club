@@ -8,10 +8,51 @@ import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import '../../data/models/price_sparkline.dart';
 import '../../data/repositories/bluebook_repository.dart';
+import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/utils/rating_formatter.dart';
 import '../../data/repositories/collection_repository.dart';
+import '../../routes/app_routes.dart';
 import '../home/home_controller.dart';
 
-enum CollectionFilter { all, opened, notOpened, rareFind }
+/// What the All bottles list shows. Each value is one of the Collection tab's
+/// quick-stat tiles and matches the bottles that tile counts (see
+/// [CollectionValueCalculator.holdingCounts] for the last four).
+enum CollectionFilter {
+  all('All bottles'),
+  drunk('Drunk'),
+  rated('Rated'),
+  rare('Rare'),
+  duplicates('Duplicates'),
+  doubled('Doubled'),
+  gaining('Gaining value'),
+  losing('Losing value');
+
+  const CollectionFilter(this.label);
+
+  /// The list's title while this filter is on.
+  final String label;
+
+  bool matches(CollectionItemModel item) {
+    switch (this) {
+      case CollectionFilter.all:
+        return true;
+      case CollectionFilter.drunk:
+        return item.isDrunk;
+      case CollectionFilter.rated:
+        return RatingFormatter.outOfTen(item.ratingRaw) != null;
+      case CollectionFilter.rare:
+        return item.isRareFind;
+      case CollectionFilter.duplicates:
+        return item.displayQuantity > 1;
+      case CollectionFilter.doubled:
+        return (item.gainPercent ?? 0) >= 100;
+      case CollectionFilter.gaining:
+        return (item.gainPercent ?? 0) > 0;
+      case CollectionFilter.losing:
+        return (item.gainPercent ?? 0) < 0;
+    }
+  }
+}
 
 enum CollectionSort { name, price, gain, fillRate, addedTime }
 
@@ -134,9 +175,21 @@ class CollectionController extends GetxController {
 
   Future<void> forceReload() => load(forceRefresh: true);
 
-  void setFilter(CollectionFilter value) => filter.value = value;
+  /// Opens the All bottles list showing [value]'s bottles: a quick-stat
+  /// tile, or "View all bottles" for every one.
+  void openBottles([CollectionFilter value = CollectionFilter.all]) {
+    if (Get.isRegistered<AppAnalyticsController>()) {
+      unawaited(
+        AppAnalyticsController.to.logTap('collection_view_all', {
+          'filter': value.name,
+        }),
+      );
+    }
+    filter.value = value;
+    Get.toNamed(AppRoutes.collectionBottles);
+  }
 
-  /// Back to "All" — used by the no-results empty state.
+  /// Back to every bottle: the list's filter pill and no-results state.
   void clearFilter() => filter.value = CollectionFilter.all;
 
   bool get hasActiveSort =>
@@ -153,9 +206,7 @@ class CollectionController extends GetxController {
 
   List<CollectionItemModel> get filteredItems {
     final f = filter.value;
-    final list = (f == CollectionFilter.all)
-        ? items.toList()
-        : items.where((e) => _matches(e, f)).toList();
+    final list = items.where(f.matches).toList();
 
     list.sort(_compare);
     return list;
@@ -195,19 +246,6 @@ class CollectionController extends GetxController {
     }
 
     return asc ? res : -res;
-  }
-
-  bool _matches(CollectionItemModel e, CollectionFilter f) {
-    switch (f) {
-      case CollectionFilter.all:
-        return true;
-      case CollectionFilter.opened:
-        return e.isOpenedHeuristic;
-      case CollectionFilter.notOpened:
-        return !e.isOpenedHeuristic;
-      case CollectionFilter.rareFind:
-        return e.isRareFind;
-    }
   }
 
   String resolveBottleId(CollectionItemModel item) {

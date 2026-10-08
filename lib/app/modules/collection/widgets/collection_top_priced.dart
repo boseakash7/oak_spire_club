@@ -1,16 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../core/analytics/app_analytics_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/common_primary_button.dart';
 import '../../../data/models/collection_item_display.dart';
 import '../../../data/portfolio_breakdown.dart';
-import '../../../routes/app_routes.dart';
 import '../collection_controller.dart';
 import 'collection_bottle_row.dart';
 import 'collection_quick_view.dart';
@@ -24,13 +20,6 @@ class CollectionTopPriced extends StatelessWidget {
   final CollectionController controller;
 
   static const int _shown = 5;
-
-  void _openAll() {
-    if (Get.isRegistered<AppAnalyticsController>()) {
-      unawaited(AppAnalyticsController.to.logTap('collection_view_all'));
-    }
-    Get.toNamed(AppRoutes.collectionBottles);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +62,7 @@ class CollectionTopPriced extends StatelessWidget {
           ],
           CommonPrimaryButton(
             label: 'View all bottles (${items.length})',
-            onPressed: _openAll,
+            onPressed: controller.openBottles,
           ),
         ],
       );

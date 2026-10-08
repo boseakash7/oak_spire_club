@@ -260,11 +260,4 @@ extension CollectionItemDisplay on CollectionItemModel {
 
   /// Bottles in this row still sealed.
   int get sealedBottleCount => displayQuantity - openedBottleCount;
-
-  bool get isOpenedHeuristic {
-    final t = type?.toLowerCase() ?? '';
-    if (t.contains('opened') && !t.contains('unopened')) return true;
-    if (t == 'consumed' || t == 'empty') return true;
-    return fillRatio < 0.995;
-  }
 }

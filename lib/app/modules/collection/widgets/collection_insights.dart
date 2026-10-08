@@ -48,7 +48,10 @@ class CollectionInsights extends StatelessWidget {
               children: [
                 Text('Quick stats', style: AppTextStyles.bodyL()),
                 const SizedBox(height: 12),
-                HomeQuickStats(home: home),
+                HomeQuickStats(
+                  home: home,
+                  onOpen: controller.openBottles,
+                ),
               ],
             ),
           ),

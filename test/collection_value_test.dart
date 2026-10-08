@@ -3,6 +3,7 @@ import 'package:oakspire_club/app/core/utils/rating_formatter.dart';
 import 'package:oakspire_club/app/data/collection_value_calculator.dart';
 import 'package:oakspire_club/app/data/models/collection_item_model.dart';
 import 'package:oakspire_club/app/data/models/price_sparkline.dart';
+import 'package:oakspire_club/app/modules/collection/collection_controller.dart';
 
 CollectionItemModel _row({
   required String paid,
@@ -28,6 +29,23 @@ void main() {
     expect(c.doubled, 1);
     expect(c.gaining, 2);
     expect(c.losing, 1);
+  });
+
+  test('quick-stat filters list the bottles their tiles count', () {
+    final rows = [
+      _row(paid: '100', qty: '2', average: '250'),
+      _row(paid: '100', qty: '1', average: '120'),
+      _row(paid: '100', qty: '3', average: '80'),
+      _row(paid: '100', qty: '1'),
+      _row(paid: '0', qty: '1', average: '90'),
+    ];
+    final c = CollectionValueCalculator.holdingCounts(rows);
+    int count(CollectionFilter f) => rows.where(f.matches).length;
+    expect(count(CollectionFilter.all), rows.length);
+    expect(count(CollectionFilter.duplicates), c.duplicates);
+    expect(count(CollectionFilter.doubled), c.doubled);
+    expect(count(CollectionFilter.gaining), c.gaining);
+    expect(count(CollectionFilter.losing), c.losing);
   });
 
   group('CollectionValueCalculator.summarize', () {

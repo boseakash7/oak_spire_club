@@ -230,7 +230,10 @@ bottom, all built by `CollectionInsights`
 - **Quick stats** (`HomeQuickStats`): a two-column grid of 8 one-line tiles (gold icon, label,
   number; the number scales down rather than push the label out): collection, drunk, rating,
   rare, then duplicates, doubled (+100% or more), gaining and losing value. The last four come from `CollectionValueCalculator.holdingCounts`, which
-  works per bottle against that bottle's price paid.
+  works per bottle against that bottle's price paid. Each tile is tappable and opens All bottles
+  filtered to what it counts (`CollectionController.openBottles(CollectionFilter.x)`; Collection
+  opens every bottle, Rating opens the rated ones). `CollectionFilter.matches` must agree with
+  the tile's count.
 - **Collection value** (`CollectionValueCard`): a full-width card, titled inside, with today's
   value, the invested / gain caption and the gain-vs-paid badge. (There is no heading above the
   page any more.)
@@ -251,7 +254,9 @@ bottom, all built by `CollectionInsights`
 - **Top priced bottles** (`CollectionTopPriced`): the 5 highest by one bottle's price
   (`PortfolioBreakdown.topPriced`), as `CollectionBottleRow`s, then a "View all bottles (N)" button.
 - **All bottles** ([collection_bottles_view.dart](lib/app/modules/collection/collection_bottles_view.dart),
-  `/collection/bottles`): the sort menu, the filter chips and the full list. It used to be on the tab.
+  `/collection/bottles`): the sort menu, the active quick-stat filter as a gold pill (tap clears
+  it), and the list. The title is the filter's label and count. There are no filter chips: the
+  quick stats are the filters. "View all bottles" opens it unfiltered.
 
 An empty collection shows the "Browse bottles" empty state in place of all three.
 

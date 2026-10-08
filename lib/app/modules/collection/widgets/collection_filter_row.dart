@@ -7,10 +7,11 @@ import '../../../core/animations/app_overlay_entrance.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/widgets/app_filter_chip.dart';
+import '../../../core/widgets/app_pressable.dart';
 import '../collection_controller.dart';
 
-/// Sort button (opens an anchored menu) and the Opened / Rare filter chips.
+/// Sort button (opens an anchored menu) and, when the list was opened from a
+/// quick-stat tile, that tile's filter as a pill that clears it.
 class CollectionFilterRow extends StatefulWidget {
   const CollectionFilterRow({super.key, required this.controller});
 
@@ -186,22 +187,66 @@ class _CollectionFilterRowState extends State<CollectionFilterRow>
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Obx(
-              () => AppFilterChipBar<CollectionFilter>(
-                items: const [
-                  AppFilterChipItem(CollectionFilter.all, 'All'),
-                  AppFilterChipItem(CollectionFilter.opened, 'Opened'),
-                  AppFilterChipItem(CollectionFilter.notOpened, 'Not opened'),
-                  AppFilterChipItem(CollectionFilter.rareFind, 'Rare Find'),
-                ],
-                selected: widget.controller.filter.value,
-                onSelected: widget.controller.setFilter,
-                // Keep chips from sliding under the fixed sort icon.
-                clipToBounds: true,
-              ),
-            ),
+            child: Obx(() {
+              final filter = widget.controller.filter.value;
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: AnimatedSwitcher(
+                  duration: AppMotion.of(context, AppMotion.fast),
+                  child: filter == CollectionFilter.all
+                      ? const SizedBox.shrink()
+                      : _ActiveFilterPill(
+                          key: ValueKey(filter),
+                          label: filter.label,
+                          onClear: widget.controller.clearFilter,
+                        ),
+                ),
+              );
+            }),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The quick-stat filter the list was opened with; tapping it shows every
+/// bottle again.
+class _ActiveFilterPill extends StatelessWidget {
+  const _ActiveFilterPill({
+    super.key,
+    required this.label,
+    required this.onClear,
+  });
+
+  final String label;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPressable(
+      onTap: onClear,
+      haptic: PressHaptic.selection,
+      semanticLabel: 'Clear filter $label',
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.only(left: 14, right: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(42),
+          gradient: AppColors.goldGradient,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              style: AppTextStyles.uiChip().copyWith(color: AppColors.black),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.close_rounded, size: 16, color: AppColors.black),
+          ],
+        ),
       ),
     );
   }

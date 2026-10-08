@@ -7,7 +7,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/animated_count_text.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_pressable.dart';
 import '../../../data/collection_value_calculator.dart';
+import '../../collection/collection_controller.dart';
 import '../home_controller.dart';
 
 final _count = NumberFormat.decimalPattern('en_US');
@@ -15,14 +17,21 @@ final _count = NumberFormat.decimalPattern('en_US');
 /// One Quick Stats tile. Modelled as data so the grid is a list, not a
 /// switch over hard-coded indices.
 class _QuickStat {
-  const _QuickStat.count(this.label, this.icon, int this.count)
+  const _QuickStat.count(this.label, this.icon, this.filter, int this.count)
     : ratingText = null;
 
-  const _QuickStat.rating(this.label, this.icon, String this.ratingText)
-    : count = null;
+  const _QuickStat.rating(
+    this.label,
+    this.icon,
+    this.filter,
+    String this.ratingText,
+  ) : count = null;
 
   final String label;
   final IconData icon;
+
+  /// The bottles this tile counts, shown in the list it opens.
+  final CollectionFilter filter;
   final int? count;
   final String? ratingText;
 
@@ -31,11 +40,13 @@ class _QuickStat {
 
 /// "Quick Stats": collection size, bottles drunk, rating, rare finds, then
 /// duplicates and how many bottles are worth more (or less) than was paid.
-/// One line per tile (icon, label, number), two tiles to a row.
+/// One line per tile (icon, label, number), two tiles to a row. Tapping a
+/// tile calls [onOpen] with its filter, to list the bottles it counts.
 class HomeQuickStats extends StatelessWidget {
-  const HomeQuickStats({super.key, required this.home});
+  const HomeQuickStats({super.key, required this.home, required this.onOpen});
 
   final HomeController home;
+  final ValueChanged<CollectionFilter> onOpen;
 
   static const double _tileHeight = 48;
   static const double _gap = 10;
@@ -49,41 +60,49 @@ class HomeQuickStats extends StatelessWidget {
           _QuickStat.count(
             'Collection',
             Icons.liquor_rounded,
+            CollectionFilter.all,
             home.totalCollectionCount.value,
           ),
           _QuickStat.count(
             'Drunk',
             Icons.local_bar_rounded,
+            CollectionFilter.drunk,
             home.totalDrunkCount.value,
           ),
           _QuickStat.rating(
             'Rating',
             Icons.star_rounded,
+            CollectionFilter.rated,
             home.collectionRatingText.value,
           ),
           _QuickStat.count(
             'Rare',
             Icons.diamond_rounded,
+            CollectionFilter.rare,
             home.totalRareCount.value,
           ),
           _QuickStat.count(
             'Duplicates',
             Icons.copy_all_rounded,
+            CollectionFilter.duplicates,
             counts.duplicates,
           ),
           _QuickStat.count(
             'Doubled',
             Icons.rocket_launch_rounded,
+            CollectionFilter.doubled,
             counts.doubled,
           ),
           _QuickStat.count(
             'Gaining',
             Icons.trending_up_rounded,
+            CollectionFilter.gaining,
             counts.gaining,
           ),
           _QuickStat.count(
             'Losing',
             Icons.trending_down_rounded,
+            CollectionFilter.losing,
             counts.losing,
           ),
         ];
@@ -100,7 +119,12 @@ class HomeQuickStats extends StatelessWidget {
                 child: SizedBox(
                   width: width,
                   height: _tileHeight,
-                  child: _StatTile(stat: stat),
+                  child: AppPressable(
+                    onTap: () => onOpen(stat.filter),
+                    haptic: PressHaptic.selection,
+                    semanticLabel: 'Show ${stat.filter.label.toLowerCase()}',
+                    child: _StatTile(stat: stat),
+                  ),
                 ),
               ),
           ],

@@ -17,9 +17,10 @@ import 'widgets/collection_quick_view.dart';
 
 const double _kInset = 23;
 
-/// Every bottle in the collection, from the Collection tab's "View all
-/// bottles": the sort menu, the filter chips and one row per bottle, each
-/// opening its quick view. Shares [CollectionController] with the tab, so an
+/// The collection's bottles, from the Collection tab's "View all bottles"
+/// (every one) or a quick-stat tile (the bottles it counts, see
+/// [CollectionFilter]): the sort menu, the active filter and one row per
+/// bottle, each opening its quick view. Shares [CollectionController] with the tab, so an
 /// edit here shows there too.
 class CollectionBottlesView extends GetView<CollectionController> {
   const CollectionBottlesView({super.key});
@@ -36,7 +37,8 @@ class CollectionBottlesView extends GetView<CollectionController> {
         titleSpacing: 0,
         title: Obx(
           () => Text(
-            'All bottles (${controller.items.length})',
+            '${controller.filter.value.label} '
+            '(${controller.filteredItems.length})',
             style: AppTextStyles.titleM().copyWith(color: AppColors.textCream),
           ),
         ),
