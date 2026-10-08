@@ -291,7 +291,6 @@ movers free; wishlist size, alerts and longer chart ranges premium.
   stopped again afterwards. The local database has the new `notifications` columns and the
   `wishlist` table (empty: the test rows were deleted).
 - **php and apache were recreated with `WEBSITE_URL=10.0.2.2`** for the emulator (restore below).
-- **The Android emulator** (`Medium_Phone`) is still running.
 - Recorded on 10-05 and not re-checked since:
   - **Containers** ran with `WEBSITE_URL=10.0.2.2` (for the emulator). To restore them:
     ```bash
