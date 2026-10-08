@@ -19,7 +19,7 @@ const double _kInset = 23;
 
 /// The collection's bottles, from the Collection tab's "View all bottles"
 /// (every one) or a quick-stat tile (the bottles it counts, see
-/// [CollectionFilter]): the sort menu, the active filter and one row per
+/// [CollectionFilter]): the sort menu, the filter chips and one row per
 /// bottle, each opening its quick view. Shares [CollectionController] with the tab, so an
 /// edit here shows there too.
 class CollectionBottlesView extends GetView<CollectionController> {

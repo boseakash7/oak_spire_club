@@ -18,19 +18,22 @@ import '../home/home_controller.dart';
 /// quick-stat tiles and matches the bottles that tile counts (see
 /// [CollectionValueCalculator.holdingCounts] for the last four).
 enum CollectionFilter {
-  all('All bottles'),
-  drunk('Drunk'),
-  rated('Rated'),
-  rare('Rare'),
-  duplicates('Duplicates'),
-  doubled('Doubled'),
-  gaining('Gaining value'),
-  losing('Losing value');
+  all('All bottles', 'All'),
+  drunk('Drunk', 'Drunk'),
+  rated('Rated', 'Rated'),
+  rare('Rare', 'Rare'),
+  duplicates('Duplicates', 'Duplicates'),
+  doubled('Doubled', 'Doubled'),
+  gaining('Gaining value', 'Gaining'),
+  losing('Losing value', 'Losing');
 
-  const CollectionFilter(this.label);
+  const CollectionFilter(this.label, this.chipLabel);
 
   /// The list's title while this filter is on.
   final String label;
+
+  /// The filter's chip on the All bottles list.
+  final String chipLabel;
 
   bool matches(CollectionItemModel item) {
     switch (this) {
@@ -189,7 +192,9 @@ class CollectionController extends GetxController {
     Get.toNamed(AppRoutes.collectionBottles);
   }
 
-  /// Back to every bottle: the list's filter pill and no-results state.
+  void setFilter(CollectionFilter value) => filter.value = value;
+
+  /// Back to every bottle: the no-results state.
   void clearFilter() => filter.value = CollectionFilter.all;
 
   bool get hasActiveSort =>
