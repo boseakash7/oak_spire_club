@@ -161,6 +161,9 @@ nothing to show.
   bottle" CTA to `/taste-bottles`.
 - **Your bottles on the move** (`DashboardCollectionMovers`): the 3 collection bottles whose 90-day
   sparkline moved most, either way. It fills in once the sparklines arrive.
+- **Your wishlist** (`DashboardWishlist`): 3 wishlist bottles from `WishlistController.highlights`,
+  at their target first, then the biggest moves since added. "See all" opens the Collection tab on
+  its Wishlist.
 - **Biggest movers** (`DashboardMovers`): a Rising / Falling toggle over 5 risers or 5 fallers
   (`DashboardController.moversShown`) from `market/overview?days=90`. "See all" opens the headline
   index's page, whose risers / fallers default to the same 90 days. (It used to be on Market.)
@@ -224,7 +227,9 @@ use, and it is the same on every tab (no tab title).
 - `HomeController.headerMoveText` (`▲ $124 today` / `… this week` / `Steady this week`, computed
   in `_applyHeaderMove`) is no longer in the header. Home's collection card shows it.
 
-**Collection tab** ([collection_view.dart](lib/app/modules/collection/collection_view.dart)), top to
+**Collection tab** ([collection_view.dart](lib/app/modules/collection/collection_view.dart)) opens on
+an **Owned · Wishlist** switch (`CollectionController.segment`, `CollectionSegment`). Wishlist shows
+`WishlistContent` (see **Wishlist** below) and hides the add button. Owned is, top to
 bottom, all built by `CollectionInsights`
 ([collection_insights.dart](lib/app/modules/collection/widgets/collection_insights.dart)):
 - **Quick stats** (`HomeQuickStats`): a two-column grid of 8 one-line tiles (gold icon, label,
@@ -260,6 +265,25 @@ bottom, all built by `CollectionInsights`
   filter's label and count.
 
 An empty collection shows the "Browse bottles" empty state in place of all three.
+
+**Wishlist** (`modules/wishlist/`, data `WishlistRepository` → `wishlist/*`) is bottles the user
+wants: the market average on the day it was added (`added_price`, fixed) and an optional target.
+- `WishlistController` is put once in `AppBinding` (lazy, `fenix`) and shared by every screen. It
+  reloads when `UserSessionController.user` changes to another user. Read `wantedIds` for a
+  bookmark's state.
+- Added from the bookmark on each `MarketBottleRow` (`WishlistBookmark`, one tap, no target), the
+  bottle page's **Want / Wanted** pill (`showWishlistSheet`: target with quick chips for market
+  low / −10% / −20%, and a note), or the Deal check's "Set $X as my wishlist target".
+- `WishlistContent`: what the list costs today and its move since added, `at target` /
+  `within 10% of target` chips, All / At target / Falling / Rising (`WishlistFilter`), and
+  `WishlistRow`s. A row opens `showWishlistActionsSheet`: View bottle, **I bought it**, Edit target,
+  Remove.
+- **I bought it** (`WishlistController.markBought`) opens add-to-collection with the target (or
+  today's price) as the price paid and `navigateToCollectionOnSuccess: false`. With that flag on,
+  the add screen `Get.until`s the shell and returns no result. On `true` the bottle leaves the
+  wishlist and the tab shows Owned.
+- The figures are on `WishlistItem`: `changeSinceAdded`, `atTarget`, `aboveTargetPercent`, and
+  `nearTarget` (within 10% above).
 
 The list is a `SliverList` of `CollectionBottleRow`
 ([collection_bottle_row.dart](lib/app/modules/collection/widgets/collection_bottle_row.dart)).
@@ -348,12 +372,14 @@ comes from `AppStorage` at the repository layer.
 | `usertoken/delete-user-fcm` | POST | `deleteUserFcm` | logout |
 | `notification-preferences/update` | POST | `updatePreference` | nothing — settings/notifications toggles only drive FCM topics and `AppStorage` |
 
-`CollectionType` (`normal` \| `wishlist`) is sent as the `type` field on every `collection/*`
-call; the app only uses `normal` today.
+Every `collection/*` call sends `type=normal`, the only type the server accepts now. The
+wishlist has its own endpoints: `wishlist/all` (GET), `wishlist/save` (POST, add or update the
+target and note) and `wishlist/remove` (POST), via `WishlistRemoteDataSource` /
+`WishlistRepository`.
 
 **Cached reads** (24h TTL, cleared on app-version change) are `collection:all:$userId`,
-`collection:chart:$userId:$lookBackDays`, `categories:list:$page:$limit`,
-and `bluebook:last-updated`; `market:overview:$days`, `market:indexes` and
+`collection:chart:$userId:$lookBackDays`, `wishlist:all:$userId` (cleared on every wishlist change),
+`categories:list:$page:$limit`, and `bluebook:last-updated`; `market:overview:$days`, `market:indexes` and
 `market:index:$slug:$days` and `market:highlights:$days` for 1 hour (raw `data` maps, parsed on read); plus `bluebook:spark:$id:$days` (6h, one entry per bottle, read
 and written through `AppCache.peek` / `put` so a batch only requests the misses). `bluebook/get-all-bluebooks`, `bluebook/search`,
 `config/all`, `user/get-by-id`, and everything under `package/` and `auth/` are uncached.
@@ -740,10 +766,10 @@ lowercase properties. Everything else is fetched explicitly with `Model::get`.
 
 `admin`, `api_access_token`, `app_config`, `blogs`, `blog_comments`, `bluebook`,
 `bluebook_price_history`, `categories`, `collections`, `collection_limits`, `email_otp`,
-`favorites`, `firebase_tokens`, `good_pour`, `issues`, `last_updates`, `notifications`,
+`favorites` (no code uses it now), `firebase_tokens`, `good_pour`, `issues`, `last_updates`, `notifications`,
 `notification_preference_types`, `orders`, `packages`, `price_index`, `ratings`,
 `razorpay_webhook_data`, `transactions`, `users`, `user_fcm`, `user_notification_preferences`,
-`wheel_of_destiny`, plus `test_apple_data` (written ad hoc by the Apple webhook).
+`wheel_of_destiny`, `wishlist`, plus `test_apple_data` (written ad hoc by the Apple webhook).
 
 **`db.sql` is stale.** It is a 13-table dump from the older Bourboneur schema, missing
 `collections`, `categories`, `bluebook_price_history`, `price_index`, `collection_limits` and
@@ -849,6 +875,7 @@ All paths are under `Application/Controllers/`:
 | `bluebook/*` | `Api/BlueBook.php` (`getAdminBottles` is the paginated, category-filtered market list; `sparklines` serves `bluebook/sparklines`) |
 | `bluebook-price-history/chart-data-dashboard` | `Api/BluebookPriceHistory.php` |
 | `market/overview`, `market/indexes`, `market/index-detail`, `market/highlights` | `Api/Market.php` (models `MarketStats`, `MarketIndex`, `Collection`; cached in Redis under `market#`) |
+| `wishlist/all`, `wishlist/save`, `wishlist/remove` | `Api/Wishlist.php` (model `Wishlist`, table from `database/2026-10-08_wishlist.sql`; rows carry the bottle with `pricing`, `details`, `market`) |
 | `categories/list`, `categories/detail` | `Api/Category.php` |
 | `package/*` | `Api/Package.php` |
 | `usertoken/*` | `Api/UserToken.php` (`user_fcm` table) |
@@ -921,7 +948,12 @@ The app's `ChartIndexComparison` rebases on top of that.
   `collection_download_url` handed to the app in `config/all`.
 - **`Api\ShareMarket::snp`** fetches S&P 500 history from Yahoo Finance for comparison charts.
 - **Unused by this app**: `wheel_of_destiny`, `good_pour`, blogs/blog comments (the blog lives in
-  the marketing site), `favorites`, and `rating/*`.
+  the marketing site), and `rating/*`.
+- **Removed:** the `favorites` API (`Api\Favorite`, its model and helper; the table stays) and the
+  collection's `wishlist` type (`collection/add` now rejects it, and `collection/all` returns
+  `normal` rows only). The `wishlist` table replaced both. Its `bluebook_id` is in the ingest
+  merge's `POLICIES` (collapse, unique per user + bottle); every new table that points at a bottle
+  needs an entry there.
 
 ## Working in there
 

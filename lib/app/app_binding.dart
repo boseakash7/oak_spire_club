@@ -13,6 +13,7 @@ import 'data/datasources/package_remote_datasource.dart';
 import 'core/firebase/fcm_token_sync_service.dart';
 import 'data/datasources/user_remote_datasource.dart';
 import 'data/datasources/user_token_remote_datasource.dart';
+import 'data/datasources/wishlist_remote_datasource.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/bluebook_price_history_repository.dart';
 import 'data/repositories/bluebook_repository.dart';
@@ -23,8 +24,10 @@ import 'data/repositories/market_repository.dart';
 import 'data/repositories/package_repository.dart';
 import 'data/repositories/user_repository.dart';
 import 'data/repositories/user_token_repository.dart';
+import 'data/repositories/wishlist_repository.dart';
 import 'modules/session/app_config_controller.dart';
 import 'modules/session/user_session_controller.dart';
+import 'modules/wishlist/wishlist_controller.dart';
 
 class AppBinding extends Bindings {
   @override
@@ -65,6 +68,25 @@ class AppBinding extends Bindings {
     );
     Get.lazyPut<MarketRepository>(
       () => MarketRepository(Get.find<MarketRemoteDataSource>()),
+      fenix: true,
+    );
+
+    Get.lazyPut<WishlistRemoteDataSource>(
+      () => WishlistRemoteDataSource(Get.find<ApiClient>()),
+      fenix: true,
+    );
+    Get.lazyPut<WishlistRepository>(
+      () => WishlistRepository(Get.find<WishlistRemoteDataSource>()),
+      fenix: true,
+    );
+    // Shared by the shell's tabs and the bottle page; it follows the
+    // signed-in user, so it lives as long as the app.
+    Get.lazyPut<WishlistController>(
+      () => WishlistController(
+        repo: Get.find<WishlistRepository>(),
+        bluebookRepo: Get.find<BluebookRepository>(),
+        collectionRepo: Get.find<CollectionRepository>(),
+      ),
       fenix: true,
     );
 

@@ -6,8 +6,6 @@ import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../models/collection_item_model.dart';
 
-enum CollectionType { wishlist, normal }
-
 class CollectionRemoteDataSource {
   CollectionRemoteDataSource(this._client);
   final ApiClient _client;
@@ -17,10 +15,13 @@ class CollectionRemoteDataSource {
   static const String _add = 'collection/add';
   static const String _deleteByUserBottle = 'collection/delete-by-user-bottle';
 
+  /// The server's collection type. The wishlist has its own endpoints
+  /// ([WishlistRemoteDataSource]), so `normal` is the only one.
+  static const String _type = 'normal';
+
   Future<Map<String, dynamic>> add({
     required String bottleId,
     required String userId,
-    CollectionType type = CollectionType.normal,
     int quantity = 1,
     int fill = 100,
     double pricePaid = 0,
@@ -32,7 +33,7 @@ class CollectionRemoteDataSource {
     final fields = <String, String>{
       'bottle_id': bottleId,
       'user_id': userId,
-      'type': type.name,
+      'type': _type,
       'quantity': quantity.toString(),
       'fill': fill.toString(),
       'price_paid': pricePaid.toString(),
@@ -95,12 +96,11 @@ class CollectionRemoteDataSource {
   Future<void> deleteByUserBottle({
     required String bottleId,
     required String userId,
-    CollectionType type = CollectionType.normal,
   }) async {
     final json = await _client.postJson(_deleteByUserBottle, {
       'bottle_id': bottleId,
       'user_id': userId,
-      'type': type.name,
+      'type': _type,
     });
     final data = json['data'];
     if (data == null) return;
@@ -108,11 +108,10 @@ class CollectionRemoteDataSource {
 
   Future<List<CollectionItemModel>> all({
     required String userId,
-    CollectionType type = CollectionType.normal,
   }) async {
     final response = await _client.get(
       _all,
-      query: {'user_id': userId, 'type': type.name},
+      query: {'user_id': userId, 'type': _type},
     );
     final json = _client.parseEnvelope(response);
 

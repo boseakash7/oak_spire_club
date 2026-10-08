@@ -19,6 +19,8 @@ import 'widgets/dashboard_collection_card.dart';
 import 'widgets/dashboard_collection_movers.dart';
 import 'widgets/dashboard_market_pulse.dart';
 import 'widgets/dashboard_movers.dart';
+import 'widgets/dashboard_wishlist.dart';
+import '../wishlist/wishlist_controller.dart';
 
 const double _kInset = AppSpacing.gutter;
 
@@ -26,7 +28,7 @@ final _shortDate = DateFormat('d MMM', 'en_US');
 
 /// The Home tab, where the app opens. Top to bottom: the market (headline
 /// index and breadth), the user's collection against it, the collection's
-/// biggest moves, the market's biggest movers, then what collectors are
+/// biggest moves, the wishlist, the market's biggest movers, then what collectors are
 /// adding, what they hold most, the highest-rated bottles they hold, and
 /// last what is newly priced. Every section is a vertical list, its
 /// movements cover [DashboardController.windowDays], and each hides when it
@@ -74,6 +76,11 @@ class _DashboardContent extends GetView<DashboardController> {
               final gainers = controller.gainers;
               final losers = controller.losers;
               final mine = controller.collectionMovers;
+              final wishlist = WishlistController.to;
+              final wanted = wishlist.highlights();
+              final wantedSparks = Map<String, PriceSparkline>.of(
+                wishlist.sparklines,
+              );
               // Copied so this Obx rebuilds as the price lines arrive.
               final sparks = Map<String, PriceSparkline>.of(
                 controller.sparklines,
@@ -94,6 +101,7 @@ class _DashboardContent extends GetView<DashboardController> {
               final mineHeroes = claim([
                 for (final m in mine) ?m.item.bluebookBottleId,
               ]);
+              final wantedHeroes = claim([for (final w in wanted) w.bottleId]);
               final moverHeroes = claim([
                 for (final b in [...gainers, ...losers]) b.id,
               ]);
@@ -118,6 +126,15 @@ class _DashboardContent extends GetView<DashboardController> {
                     windowDays: days,
                     heroIds: mineHeroes,
                     onOpen: (id) => controller.logOpen('your_movers', id),
+                  ),
+                if (wanted.isNotEmpty)
+                  DashboardWishlist(
+                    items: wanted,
+                    atTargetCount: wishlist.atTargetCount,
+                    sparklines: wantedSparks,
+                    heroIds: wantedHeroes,
+                    onSeeAll: controller.openWishlist,
+                    onOpen: (id) => controller.logOpen('wishlist', id),
                   ),
                 if (gainers.isNotEmpty || losers.isNotEmpty)
                   DashboardMovers(

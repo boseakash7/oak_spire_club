@@ -336,6 +336,9 @@ class BenchmarkDetailController extends GetxController {
     }
   }
 
+  /// A real catalog id, so the bottle can go on the wishlist.
+  bool get canWishlist => _canLoadPriceChart;
+
   bool get _canLoadPriceChart {
     final id = bottleId;
     return id != null && id.isNotEmpty && id != 'null';

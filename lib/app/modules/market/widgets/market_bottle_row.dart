@@ -22,12 +22,13 @@ import '../../../core/widgets/pricing_badge.dart';
 import '../../../data/models/bluebook_model.dart';
 import '../../../data/models/price_sparkline.dart';
 import '../../../routes/app_routes.dart';
+import '../../wishlist/widgets/wishlist_bookmark.dart';
 import '../benchmark_detail_controller.dart';
 
 /// One bottle in the benchmark list: art, name, distillery and region, type /
 /// age / ABV chips and rating on the left; price, what it rests on, a 90-day
 /// sparkline, movement and range on the right. Tapping opens the bottle, its
-/// art flying across.
+/// art flying across; the bookmark on the art adds it to the wishlist.
 class MarketBottleRow extends StatelessWidget {
   const MarketBottleRow({super.key, required this.bottle, this.sparkline});
 
@@ -92,17 +93,27 @@ class MarketBottleRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 10, 12, 10),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox.square(
-                dimension: 66,
-                child: BottleImage(
-                  url: AppImageUrl.resolve(bottle.image),
-                  bottleId: bottle.id,
-                  cacheWidthPx: 200,
-                  padding: const EdgeInsets.all(4),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox.square(
+                    dimension: 66,
+                    child: BottleImage(
+                      url: AppImageUrl.resolve(bottle.image),
+                      bottleId: bottle.id,
+                      cacheWidthPx: 200,
+                      padding: const EdgeInsets.all(4),
+                    ),
+                  ),
                 ),
-              ),
+                Positioned(
+                  left: -4,
+                  top: -6,
+                  child: WishlistBookmark(bottleId: bottle.id),
+                ),
+              ],
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(

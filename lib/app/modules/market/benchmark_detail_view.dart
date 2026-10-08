@@ -10,8 +10,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_add_pill.dart';
 import '../../core/widgets/app_back_button.dart';
+import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/app_segmented_range.dart';
 import '../../core/widgets/bottle_image.dart';
+import '../wishlist/widgets/wishlist_sheet.dart';
+import '../wishlist/wishlist_controller.dart';
 import 'benchmark_detail_controller.dart';
 import 'widgets/benchmark_deal_check.dart';
 import 'widgets/benchmark_facts.dart';
@@ -65,9 +68,18 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                   ),
                 ),
               ),
+              actions: [
+                if (controller.canWishlist)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Center(child: _WantButton(controller: controller)),
+                  ),
+              ],
               flexibleSpace: _HeroHeader(
                 expandedHeight: _expandedHeight,
                 title: controller.productName,
+                // Leaves room for the Want button.
+                titleRightInset: controller.canWishlist ? 128 : 24,
                 image: BottleImage(
                   url: controller.imageUrl,
                   bottleId: controller.bottleId,
@@ -151,10 +163,12 @@ class _HeroHeader extends StatelessWidget {
     required this.expandedHeight,
     required this.title,
     required this.image,
+    this.titleRightInset = 24,
   });
 
   final double expandedHeight;
   final String title;
+  final double titleRightInset;
   final Widget image;
 
   @override
@@ -220,7 +234,7 @@ class _HeroHeader extends StatelessWidget {
             ),
             Positioned(
               left: 64,
-              right: 24,
+              right: titleRightInset,
               top: topPad,
               height: kToolbarHeight,
               child: IgnorePointer(
@@ -244,6 +258,75 @@ class _HeroHeader extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// "Want" / "Wanted": opens the wishlist sheet to add the bottle or edit its
+/// target.
+class _WantButton extends StatelessWidget {
+  const _WantButton({required this.controller});
+
+  final BenchmarkDetailController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final wishlist = WishlistController.to;
+    return Obx(() {
+      final wanted = wishlist.isWanted(controller.bottleId);
+      return AppPressable(
+        onTap: () {
+          if (Get.isRegistered<AppAnalyticsController>()) {
+            unawaited(
+              AppAnalyticsController.to.logTap('benchmark_detail_want', {
+                'wanted': wanted ? 1 : 0,
+              }),
+            );
+          }
+          showWishlistSheet(
+            context,
+            bottleId: controller.bottleId!,
+            name: controller.productName,
+            average: controller.averageValue,
+            low: controller.lowValue,
+          );
+        },
+        haptic: PressHaptic.tap,
+        semanticLabel: wanted ? 'Edit your wishlist entry' : 'Add to wishlist',
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: wanted
+                ? AppColors.goldBright.withValues(alpha: 0.18)
+                : AppColors.black.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(
+              color: wanted
+                  ? AppColors.tagGoldBorder
+                  : AppColors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                wanted ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                size: 17,
+                color: wanted ? AppColors.goldBright : AppColors.white,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                wanted ? 'Wanted' : 'Want',
+                style: AppTextStyles.bodyM().copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: wanted ? AppColors.goldBright : AppColors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
   }
 }
 

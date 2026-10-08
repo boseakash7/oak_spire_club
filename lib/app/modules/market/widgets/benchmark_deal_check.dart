@@ -10,8 +10,10 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/price_formatter.dart';
 import '../../../core/utils/thousands_number_input_formatter.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_pressable.dart';
 import '../../../core/widgets/collection_form_field.dart';
 import '../../../data/deal_check.dart';
+import '../../wishlist/wishlist_controller.dart';
 import '../benchmark_detail_controller.dart';
 
 /// "Is this asking price fair?" — type a price from a shelf or a listing and
@@ -93,7 +95,16 @@ class _BenchmarkDealCheckState extends State<BenchmarkDealCheck> {
                     alignment: Alignment.topCenter,
                     child: check == null
                         ? const SizedBox(width: double.infinity)
-                        : _Result(check: check, thin: _thin),
+                        : _Result(
+                            check: check,
+                            thin: _thin,
+                            onSetTarget: _c.canWishlist
+                                ? () => WishlistController.to.setTarget(
+                                    _c.bottleId!,
+                                    check.asking,
+                                  )
+                                : null,
+                          ),
                   );
                 }),
               ],
@@ -112,10 +123,13 @@ class _BenchmarkDealCheckState extends State<BenchmarkDealCheck> {
 }
 
 class _Result extends StatelessWidget {
-  const _Result({required this.check, required this.thin});
+  const _Result({required this.check, required this.thin, this.onSetTarget});
 
   final DealCheck check;
   final bool thin;
+
+  /// Makes the asking price the bottle's wishlist target; null hides it.
+  final VoidCallback? onSetTarget;
 
   Color get _color {
     if (check.verdict.isFavourable) return AppColors.trendPositive;
@@ -173,6 +187,30 @@ class _Result extends StatelessWidget {
             Text(
               'Based on limited price data. Treat it as a rough guide.',
               style: caption,
+            ),
+          ],
+          if (onSetTarget != null) ...[
+            const SizedBox(height: 12),
+            AppPressable(
+              onTap: onSetTarget,
+              haptic: PressHaptic.tap,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.track_changes_rounded,
+                    size: 16,
+                    color: AppColors.goldBright,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Set ${money(check.asking)} as my wishlist target',
+                    style: AppTextStyles.bodyM().copyWith(
+                      color: AppColors.goldBright,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],

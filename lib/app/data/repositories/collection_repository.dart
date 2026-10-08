@@ -138,7 +138,6 @@ class CollectionRepository {
     await _remote.add(
       bottleId: bottleId,
       userId: userId,
-      type: CollectionType.normal,
       quantity: quantity,
       fill: fill,
       pricePaid: pricePaid,
@@ -163,7 +162,6 @@ class CollectionRepository {
     await _remote.deleteByUserBottle(
       bottleId: bottleId,
       userId: userId,
-      type: CollectionType.normal,
     );
 
     final cache = Get.find<AppCache>();
@@ -222,10 +220,7 @@ class CollectionRepository {
       ttl: _ttl,
       forceRefresh: forceRefresh,
       fetch: () async {
-        final raw = await _remote.all(
-          userId: userId,
-          type: CollectionType.normal,
-        );
+        final raw = await _remote.all(userId: userId);
         return _groupCollectionItems(raw);
       },
       encode: (list) => list.map((e) => e.toJson()).toList(),

@@ -13,6 +13,8 @@ import '../../data/repositories/market_repository.dart';
 import '../../routes/app_routes.dart';
 import '../home/home_controller.dart';
 import '../navigation/bottom_nav_controller.dart';
+import '../collection/collection_controller.dart';
+import '../wishlist/wishlist_controller.dart';
 
 /// The Home tab: the market at a glance (headline index, breadth, the
 /// biggest movers), the user's collection against it, what other collectors
@@ -186,6 +188,8 @@ class DashboardController extends GetxController {
     await Future.wait([
       load(forceRefresh: true),
       if (Get.isRegistered<HomeController>()) _home.forceReload(),
+      if (Get.isRegistered<WishlistController>())
+        WishlistController.to.forceReload(),
     ]);
   }
 
@@ -201,6 +205,13 @@ class DashboardController extends GetxController {
         'name': index?.name ?? 'Oak Spire Index',
       },
     );
+  }
+
+  /// "See all" on Home's wishlist: the Collection tab, on its Wishlist.
+  void openWishlist() {
+    _logTap('home_wishlist_see_all');
+    Get.find<CollectionController>().showWishlist();
+    Get.find<BottomNavController>().setIndex(BottomNavController.collectionTab);
   }
 
   void openCollection() {

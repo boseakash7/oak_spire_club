@@ -59,6 +59,9 @@ enum CollectionFilter {
 
 enum CollectionSort { name, price, gain, fillRate, addedTime }
 
+/// The Collection tab's two views: the bottles owned, or the wishlist.
+enum CollectionSegment { owned, wishlist }
+
 final _wholeDollars = NumberFormat.currency(
   locale: 'en_US',
   symbol: r'$',
@@ -88,6 +91,9 @@ class CollectionController extends GetxController {
 
   /// [gainPercent] as a badge label, e.g. `+27.7%`.
   final trendShort = '—'.obs;
+
+  /// Owned or Wishlist, switched at the top of the tab.
+  final segment = CollectionSegment.owned.obs;
 
   final sort = CollectionSort.name.obs;
   final sortAscending = true.obs;
@@ -177,6 +183,22 @@ class CollectionController extends GetxController {
   }
 
   Future<void> forceReload() => load(forceRefresh: true);
+
+  void setSegment(CollectionSegment value) {
+    if (segment.value == value) return;
+    segment.value = value;
+    if (Get.isRegistered<AppAnalyticsController>()) {
+      unawaited(
+        AppAnalyticsController.to.logTap('collection_segment', {
+          'segment': value.name,
+        }),
+      );
+    }
+  }
+
+  void showOwned() => segment.value = CollectionSegment.owned;
+
+  void showWishlist() => segment.value = CollectionSegment.wishlist;
 
   /// Opens the All bottles list showing [value]'s bottles: a quick-stat
   /// tile, or "View all bottles" for every one.

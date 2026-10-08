@@ -11,20 +11,24 @@ import '../../core/constants/app_assets.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/app_pressable.dart';
 import '../../routes/app_routes.dart';
+import '../wishlist/widgets/wishlist_content.dart';
+import '../wishlist/wishlist_controller.dart';
 import 'collection_controller.dart';
 import 'collection_loading_view.dart';
 import 'widgets/collection_insights.dart';
 
 const double _kInset = 23;
 
-/// The Collection tab: quick stats, the collection's value, the portfolio
-/// mix, the value chart, the top priced bottles and "View all bottles",
-/// which opens the full list ([CollectionBottlesView]). See
-/// [CollectionInsights].
+/// The Collection tab. An Owned · Wishlist switch at the top; Owned shows
+/// quick stats, the collection's value, the portfolio mix, the value chart,
+/// the top priced bottles and "View all bottles", which opens the full list
+/// ([CollectionBottlesView], see [CollectionInsights]); Wishlist shows
+/// [WishlistContent].
 class CollectionView extends GetView<CollectionController> {
   const CollectionView({super.key});
 
@@ -41,11 +45,14 @@ class CollectionView extends GetView<CollectionController> {
                 clipBehavior: Clip.none,
                 children: [
                   _CollectionBody(controller: controller),
-                  Positioned(
-                    right: 16,
-                    bottom: 24 + MediaQuery.paddingOf(context).bottom,
-                    child: _AddBottleFab(controller: controller),
-                  ),
+                  // Adding to the wishlist happens from Market and the bottle
+                  // page, so the add button is for owned bottles only.
+                  if (controller.segment.value == CollectionSegment.owned)
+                    Positioned(
+                      right: 16,
+                      bottom: 24 + MediaQuery.paddingOf(context).bottom,
+                      child: _AddBottleFab(controller: controller),
+                    ),
                 ],
               ),
       );
@@ -75,7 +82,11 @@ class _CollectionBody extends StatelessWidget {
     if (Get.isRegistered<AppAnalyticsController>()) {
       unawaited(AppAnalyticsController.to.logTap('collection_pull_refresh'));
     }
-    await controller.forceReload();
+    if (controller.segment.value == CollectionSegment.wishlist) {
+      await WishlistController.to.forceReload();
+    } else {
+      await controller.forceReload();
+    }
   }
 
   @override
@@ -93,7 +104,28 @@ class _CollectionBody extends StatelessWidget {
                 const SliverToBoxAdapter(
                   child: SizedBox(height: kShellTabBodyContentTopGap),
                 ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(
+                    _kInset,
+                    0,
+                    _kInset,
+                    AppSpacing.md,
+                  ),
+                  sliver: SliverToBoxAdapter(
+                    child: _SegmentSwitch(controller: controller),
+                  ),
+                ),
                 Obx(() {
+                  if (controller.segment.value == CollectionSegment.wishlist) {
+                    return SliverPadding(
+                      padding: EdgeInsets.only(
+                        bottom: 48 + MediaQuery.paddingOf(context).bottom,
+                      ),
+                      sliver: const SliverToBoxAdapter(
+                        child: WishlistContent(inset: _kInset),
+                      ),
+                    );
+                  }
                   if (controller.items.isEmpty) {
                     return SliverFillRemaining(
                       hasScrollBody: false,
@@ -127,6 +159,88 @@ class _CollectionBody extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Owned · Wishlist, a gold pill sliding under the chosen half.
+class _SegmentSwitch extends StatelessWidget {
+  const _SegmentSwitch({required this.controller});
+
+  final CollectionController controller;
+
+  static const double _height = 38;
+
+  @override
+  Widget build(BuildContext context) {
+    final wishlist = WishlistController.to;
+    return Obx(() {
+      final onWishlist = controller.segment.value == CollectionSegment.wishlist;
+      final count = wishlist.items.length;
+      Widget half(String label, CollectionSegment value) {
+        final selected = controller.segment.value == value;
+        return Expanded(
+          child: AppPressable(
+            onTap: () => controller.setSegment(value),
+            haptic: PressHaptic.selection,
+            scale: 0.97,
+            semanticLabel: label,
+            child: SizedBox(
+              height: _height,
+              child: Center(
+                child: AnimatedDefaultTextStyle(
+                  duration: AppMotion.of(context, AppMotion.fast),
+                  style: AppTextStyles.bodyM().copyWith(
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected ? AppColors.black : AppColors.textMuted,
+                  ),
+                  child: Text(label),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      return Container(
+        height: _height + 6,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceChip,
+          borderRadius: BorderRadius.circular(AppRadii.chip),
+          border: Border.all(color: AppColors.tagInactiveBorder),
+        ),
+        child: Stack(
+          children: [
+            AnimatedAlign(
+              alignment: onWishlist
+                  ? Alignment.centerRight
+                  : Alignment.centerLeft,
+              duration: AppMotion.of(context, AppMotion.medium),
+              curve: AppMotion.emphasized,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                child: Container(
+                  height: _height,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.goldGradient,
+                    borderRadius: BorderRadius.circular(AppRadii.chip),
+                  ),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                half('Owned', CollectionSegment.owned),
+                half(
+                  count > 0 ? 'Wishlist · $count' : 'Wishlist',
+                  CollectionSegment.wishlist,
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
   }
 }
 
