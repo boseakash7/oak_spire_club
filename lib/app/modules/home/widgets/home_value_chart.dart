@@ -12,68 +12,21 @@ import '../../../core/widgets/shimmer_box.dart';
 import '../../../core/utils/price_formatter.dart';
 import '../home_controller.dart';
 
-/// Horizontal inset from screen edge. Wide enough that the value-axis labels
-/// clear the screen edge while the plot still reads as near-full-bleed.
-const double kHomeChartHorizontalInset = 12;
+final _indexLevel = NumberFormat('#,##0.0', 'en_US');
 
-/// Gutter reserved for the "% since window start" labels on the left.
-const double _kValueAxisWidth = 38;
+String _pctLabel(double pct) =>
+    '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%';
 
-/// Gutter reserved for the date labels under the plot.
-const double _kDateAxisHeight = 22;
-
-FlLine _homeDottedGridLine(double _) => FlLine(
-  color: AppColors.chartGridLine,
-  strokeWidth: 0.7,
-  dashArray: const [3, 4],
-);
-
-/// Legend row below the home chart.
-class HomeChartLegend extends StatelessWidget {
-  const HomeChartLegend({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final home = Get.find<HomeController>();
-    // BSMI only when the chart actually has an index line to show.
-    return Obx(
-      () => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _legendSwatch(
-            color: AppColors.chartLineMarketValue,
-            label: 'Market Value',
-          ),
-          if (home.chartBsmiSeriesK.isNotEmpty) ...[
-            const SizedBox(width: 22),
-            _legendSwatch(color: AppColors.chartLineBsmi, label: 'BSMI'),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _legendSwatch({required Color color, required String label}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 14,
-          height: 3,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(label, style: AppTextStyles.bodyS()),
-      ],
-    );
-  }
-}
-
+/// The collection's value against the Oak Spire Index, both rebased to 100
+/// at the start of the range: smooth lines that never overshoot a point
+/// (history moves in steps), a dashed "start" baseline, and a soft gold wash
+/// under the collection. No axes, grid or dots; the scoreboard above it and
+/// the touch tooltip carry the numbers. Drawn on the card it sits in, so it
+/// paints no background.
 class HomeValueChart extends StatefulWidget {
-  const HomeValueChart({super.key});
+  const HomeValueChart({super.key, this.height = 210});
+
+  final double height;
 
   @override
   State<HomeValueChart> createState() => _HomeValueChartState();
@@ -141,7 +94,7 @@ class _HomeValueChartState extends State<HomeValueChart>
   Widget build(BuildContext context) {
     final home = Get.find<HomeController>();
     return SizedBox(
-      height: 210,
+      height: widget.height,
       width: double.infinity,
       child: Obx(() {
         final series = home.chartSeriesK.toList(growable: false);
@@ -158,11 +111,10 @@ class _HomeValueChartState extends State<HomeValueChart>
             return const ShimmerBox(
               height: double.infinity,
               width: double.infinity,
-              radius: 0,
+              radius: 8,
             );
           }
-          return ColoredBox(
-            color: AppColors.chartPlotBackground,
+          return SizedBox.expand(
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -185,10 +137,11 @@ class _HomeValueChartState extends State<HomeValueChart>
           );
         }
 
-        final bsmi = home.chartBsmiSeriesK.toList(growable: false);
+        final bsmi = home.chartIndexSeriesK.toList(growable: false);
+        final indexName = home.chartIndexName.value;
         final dates = home.chartPointDates.toList(growable: false);
         final marketPrices = home.chartMarketPrices.toList(growable: false);
-        final bsmiPrices = home.chartBsmiPrices.toList(growable: false);
+        final bsmiPrices = home.chartIndexPrices.toList(growable: false);
         final minY = home.chartMinY.value;
         final maxY = home.chartMaxYk.value;
         _scheduleDrawReplay(home.chartRevision.value);
@@ -227,71 +180,35 @@ class _HomeValueChartState extends State<HomeValueChart>
           bsmiSpots.isEmpty ? 0.0 : bsmiSpots.last.x,
         );
         final maxXSafe = math.max(maxX, 1.0);
-        final ySpan = maxY - minY;
-        final hInterval = ySpan > 0 ? ySpan / 4 : 1.0;
-        final vInterval = maxXSafe / 4;
+        // Room above and below so end dots and the baseline aren't clipped.
+        final pad = math.max((maxY - minY) * 0.08, 0.5);
+        final lo = math.min(minY, 100.0) - pad;
+        final hi = math.max(maxY, 100.0) + pad;
 
         final chart = LineChart(
           LineChartData(
             minX: 0,
             maxX: maxXSafe,
-            minY: minY,
-            maxY: maxY,
-            backgroundColor: AppColors.chartPlotBackground,
-            titlesData: FlTitlesData(
-              show: true,
-              topTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-              rightTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: _kValueAxisWidth,
-                  interval: hInterval > 0 ? hInterval : 1,
-                  getTitlesWidget: (value, meta) =>
-                      _valueAxisLabel(value, meta, minY: minY, maxY: maxY),
-                ),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: _kDateAxisHeight,
-                  interval: vInterval > 0 ? vInterval : 1,
-                  getTitlesWidget: (value, meta) =>
-                      _dateAxisLabel(value, meta, dates: dates),
-                ),
-              ),
-            ),
+            minY: lo,
+            maxY: hi,
+            backgroundColor: Colors.transparent,
+            // No value or date labels: the scoreboard and the touch tooltip
+            // carry the numbers, and the plot gets the full width.
+            titlesData: const FlTitlesData(show: false),
             borderData: FlBorderData(show: false),
             clipData: const FlClipData.all(),
+            // Where both lines start (100): above it is a gain.
             extraLinesData: ExtraLinesData(
               horizontalLines: [
                 HorizontalLine(
-                  y: minY,
-                  color: AppColors.chartGridLine,
-                  strokeWidth: 1,
-                  dashArray: const [3, 4],
-                ),
-                HorizontalLine(
-                  y: maxY,
+                  y: 100,
                   color: AppColors.chartGridLine,
                   strokeWidth: 1,
                   dashArray: const [3, 4],
                 ),
               ],
             ),
-            gridData: FlGridData(
-              show: true,
-              drawHorizontalLine: true,
-              drawVerticalLine: true,
-              horizontalInterval: hInterval > 0 ? hInterval : 1,
-              verticalInterval: vInterval > 0 ? vInterval : 1,
-              getDrawingHorizontalLine: _homeDottedGridLine,
-              getDrawingVerticalLine: _homeDottedGridLine,
-            ),
+            gridData: const FlGridData(show: false),
             lineTouchData: LineTouchData(
               handleBuiltInTouches: true,
               getTouchedSpotIndicator: chartCrosshairIndicators,
@@ -305,83 +222,90 @@ class _HomeValueChartState extends State<HomeValueChart>
                   vertical: 8,
                 ),
                 getTooltipItems: (touchedSpots) {
-                  return touchedSpots.map((spot) {
-                    final i = spot.x.round().clamp(0, series.length - 1);
-                    final dateLabel = formatChartTooltipDate(
-                      i < dates.length ? dates[i] : '',
-                    );
-                    final String label;
-                    final double displayValue;
-                    final Color color;
-                    if (spot.barIndex == 1 &&
-                        bsmiPrices.length == series.length) {
-                      label = 'BSMI';
-                      displayValue = bsmiPrices[i];
-                      color = AppColors.chartLineBsmi;
-                    } else {
-                      label = 'Market Value';
-                      displayValue = i < marketPrices.length
-                          ? marketPrices[i]
-                          : 0;
-                      color = AppColors.chartLineMarketValue;
-                    }
-                    final priceText = PriceFormatter.format(
-                      displayValue.round().toString(),
-                    );
-                    return LineTooltipItem(
-                      '$dateLabel\n$label: $priceText',
-                      AppTextStyles.caption().copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    );
-                  }).toList();
+                  // fl_chart wants one item per touched line; the first
+                  // carries the date.
+                  return [
+                    for (final (k, spot) in touchedSpots.indexed)
+                      () {
+                        final i = spot.x.round().clamp(0, series.length - 1);
+                        final isIndex =
+                            spot.barIndex == 1 &&
+                            bsmiPrices.length == series.length;
+                        final pct = (isIndex ? bsmi[i] : series[i]) - 100;
+                        final value = isIndex
+                            ? _indexLevel.format(bsmiPrices[i])
+                            : PriceFormatter.format(
+                                (i < marketPrices.length ? marketPrices[i] : 0)
+                                    .round()
+                                    .toString(),
+                              );
+                        final label = isIndex ? indexName : 'Your collection';
+                        final color = isIndex
+                            ? AppColors.chartLineBsmi
+                            : AppColors.chartLineMarketValue;
+                        final style = AppTextStyles.caption().copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        );
+                        return LineTooltipItem(
+                          k == 0
+                              ? '${formatChartTooltipDate(i < dates.length ? dates[i] : '')}\n'
+                              : '',
+                          AppTextStyles.caption().copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                          textAlign: TextAlign.left,
+                          children: [
+                            TextSpan(text: '$label: $value ', style: style),
+                            TextSpan(
+                              text: _pctLabel(pct),
+                              style: style.copyWith(
+                                color: PriceFormatter.percentColor(pct),
+                              ),
+                            ),
+                          ],
+                        );
+                      }(),
+                  ];
                 },
               ),
             ),
             lineBarsData: [
               LineChartBarData(
                 spots: spots,
-                isCurved: series.length > 2,
-                curveSmoothness: 0.25,
+                // Smooth, but clamped at each point so a step in the
+                // history can't swing the curve past it.
+                isCurved: true,
+                curveSmoothness: 0.3,
+                preventCurveOverShooting: true,
                 color: AppColors.chartLineMarketValue,
-                barWidth: 2,
-                dotData: FlDotData(
-                  show: series.length <= 9,
-                  getDotPainter: (spot, percent, bar, index) {
-                    return FlDotCirclePainter(
-                      radius: index == spots.length - 1 ? 3.4 : 2.6,
-                      color: AppColors.chartLineMarketValue,
-                      strokeWidth: index == spots.length - 1 ? 2 : 1.5,
-                      strokeColor: Colors.black.withValues(alpha: 0.25),
-                    );
-                  },
-                ),
+                barWidth: 2.2,
+                isStrokeCapRound: true,
+                dotData: const FlDotData(show: false),
                 belowBarData: BarAreaData(
                   show: true,
-                  gradient: AppColors.chartMarketValueArea,
+                  cutOffY: lo,
+                  applyCutOffY: true,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.chartLineMarketValue.withValues(alpha: 0.20),
+                      AppColors.chartLineMarketValue.withValues(alpha: 0),
+                    ],
+                  ),
                 ),
               ),
               if (bsmiSpots.isNotEmpty)
                 LineChartBarData(
                   spots: bsmiSpots,
-                  isCurved: bsmi.length > 2,
-                  curveSmoothness: 0.25,
+                  isCurved: true,
+                  curveSmoothness: 0.3,
+                  preventCurveOverShooting: true,
                   color: AppColors.chartLineBsmi,
                   barWidth: 2,
-                  dotData: FlDotData(
-                    show: bsmi.length <= 9,
-                    getDotPainter: (spot, percent, bar, index) {
-                      return FlDotCirclePainter(
-                        radius: 3,
-                        color: AppColors.chartLineBsmi,
-                      );
-                    },
-                  ),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    gradient: AppColors.chartBsmiArea,
-                  ),
+                  isStrokeCapRound: true,
+                  dotData: const FlDotData(show: false),
                 ),
             ],
           ),
@@ -425,48 +349,6 @@ List<TouchedSpotIndicatorData?> chartCrosshairIndicators(
       ),
     );
   }).toList();
-}
-
-/// Both series are rebased to 100 at the window start, so the value axis reads
-/// most clearly as percent change from that start, not as raw index points.
-Widget _valueAxisLabel(
-  double value,
-  TitleMeta meta, {
-  required double minY,
-  required double maxY,
-}) {
-  // Skip the extremes: the dashed bounding lines already mark them.
-  if ((value - minY).abs() < 0.001 || (value - maxY).abs() < 0.001) {
-    return const SizedBox.shrink();
-  }
-  final delta = value - 100;
-  final label = '${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(0)}%';
-  return SideTitleWidget(
-    meta: meta,
-    space: 6,
-    child: Text(label, style: AppTextStyles.micro()),
-  );
-}
-
-Widget _dateAxisLabel(
-  double value,
-  TitleMeta meta, {
-  required List<String> dates,
-}) {
-  final i = value.round();
-  if (i < 0 || i >= dates.length) return const SizedBox.shrink();
-  final parsed = DateTime.tryParse(dates[i].trim());
-  if (parsed == null) return const SizedBox.shrink();
-  return SideTitleWidget(
-    meta: meta,
-    space: 4,
-    // Keep the first / last date inside the plot instead of clipped.
-    fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
-    child: Text(
-      DateFormat('MMM d').format(parsed),
-      style: AppTextStyles.micro(),
-    ),
-  );
 }
 
 /// Tooltip date label, shared with the benchmark detail chart.

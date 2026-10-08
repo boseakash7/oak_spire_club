@@ -10,6 +10,7 @@ import '../../data/collection_value_calculator.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import '../../data/repositories/collection_repository.dart';
+import '../../data/repositories/market_repository.dart';
 import '../session/user_session_controller.dart';
 
 /// Collection value chart lookback (Figma home — 1M / 3M / 6M / 1Y chips).
@@ -35,6 +36,15 @@ enum HomeChartRange {
 
   /// Max points to plot for this filter (was hard-coded to 9 for all ranges).
   int get chartPointLimit => lookBackDays;
+
+  /// The `market/index-detail` window covering this range (30 / 90 / 180 /
+  /// 365; 6M asks for 180).
+  int get indexDays => switch (this) {
+    HomeChartRange.m1 => 30,
+    HomeChartRange.m3 => 90,
+    HomeChartRange.m6 => 180,
+    HomeChartRange.y1 => 365,
+  };
 
   String get movedPeriodLabel => switch (this) {
     HomeChartRange.m1 => 'last month',
@@ -92,13 +102,17 @@ class HomeController extends GetxController {
   /// Market value line — index-style (first point in window = 100).
   final chartSeriesK = <double>[].obs;
 
-  /// BSMI line — same rebasing (`index_data` aligned to market dates).
-  final chartBsmiSeriesK = <double>[].obs;
+  /// The Oak Spire Index line, same rebasing (its daily values, as of each
+  /// market date). Empty when the index can't be loaded.
+  final chartIndexSeriesK = <double>[].obs;
+
+  /// The compared index's name, for the legend and tooltip.
+  final chartIndexName = 'Oak Spire Index'.obs;
 
   /// Raw prices + dates for chart touch tooltips (aligned to [chartSeriesK]).
   final chartPointDates = <String>[].obs;
   final chartMarketPrices = <double>[].obs;
-  final chartBsmiPrices = <double>[].obs;
+  final chartIndexPrices = <double>[].obs;
   final chartMinY = 90.0.obs;
   final chartMaxYk = 110.0.obs;
   final selectedChartRange = HomeChartRange.m3.obs;
@@ -118,6 +132,7 @@ class HomeController extends GetxController {
   final isLoading = false.obs;
 
   final _repo = Get.find<CollectionRepository>();
+  final _marketRepo = Get.find<MarketRepository>();
 
   @override
   void onInit() {
@@ -243,10 +258,10 @@ class HomeController extends GetxController {
     headerMoveText.value = '';
     headerMoveUp.value = null;
     chartSeriesK.clear();
-    chartBsmiSeriesK.clear();
+    chartIndexSeriesK.clear();
     chartPointDates.clear();
     chartMarketPrices.clear();
-    chartBsmiPrices.clear();
+    chartIndexPrices.clear();
     chartMinY.value = emptyChartMinY;
     chartMaxYk.value = emptyChartMaxYk;
     collectionMovedPercent.value = null;
@@ -285,10 +300,13 @@ class HomeController extends GetxController {
     required bool forceRefresh,
   }) async {
     final range = selectedChartRange.value;
-    final chart = await _repo.fetchChartData(
-      lookBackDays: range.lookBackDays,
-      forceRefresh: forceRefresh,
-    );
+    final (chart, indexPoints) = await (
+      _repo.fetchChartData(
+        lookBackDays: range.lookBackDays,
+        forceRefresh: forceRefresh,
+      ),
+      _loadIndexPoints(range, forceRefresh: forceRefresh),
+    ).wait;
     if (chart == null) {
       _clearChartSeries();
       _applyMovedForRange(percent: null, period: range.movedPeriodLabel);
@@ -300,19 +318,16 @@ class HomeController extends GetxController {
     final marketPoints = ChartIndexComparison.parsePriceSeries(chart['data']);
     _applyHeaderMove(marketPoints, formatter);
     if (marketPoints.isNotEmpty) {
-      final indexPoints = ChartIndexComparison.parsePriceSeries(
-        chart['index_data'],
-      );
       final compared = ChartIndexComparison.buildComparedSeries(
         marketPoints: marketPoints,
         indexPoints: indexPoints,
         maxPoints: range.chartPointLimit,
       );
       chartSeriesK.assignAll(compared.marketIndex);
-      chartBsmiSeriesK.assignAll(compared.bsmiIndex);
+      chartIndexSeriesK.assignAll(compared.bsmiIndex);
       chartPointDates.assignAll(compared.dates);
       chartMarketPrices.assignAll(compared.marketPrices);
-      chartBsmiPrices.assignAll(compared.bsmiPrices);
+      chartIndexPrices.assignAll(compared.bsmiPrices);
       chartMinY.value = compared.minY;
       chartMaxYk.value = compared.maxY;
       chartRevision.value++;
@@ -328,6 +343,35 @@ class HomeController extends GetxController {
       last: last,
     );
     _applyMovedForRange(percent: percent, period: period);
+  }
+
+  /// The headline Oak Spire Index over [range], as `{date, price}` points.
+  /// Optional like every market part: on failure the chart shows the
+  /// collection alone.
+  Future<List<Map<String, dynamic>>> _loadIndexPoints(
+    HomeChartRange range, {
+    required bool forceRefresh,
+  }) async {
+    try {
+      final indexes = await _marketRepo.indexes(forceRefresh: forceRefresh);
+      final headline =
+          indexes.where((i) => i.isHeadline).firstOrNull ?? indexes.firstOrNull;
+      final detail = await _marketRepo.indexDetail(
+        slug: headline?.slug ?? 'market',
+        days: range.indexDays,
+        forceRefresh: forceRefresh,
+      );
+      final index = detail.index;
+      if (index == null) return const [];
+      chartIndexName.value = index.name;
+      final day = DateFormat('yyyy-MM-dd');
+      return [
+        for (final p in index.series)
+          {'date': day.format(p.date), 'price': p.value},
+      ];
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Today's change from the daily value series, falling back to the last

@@ -36,35 +36,38 @@ class CollectionLoadingView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ShimmerBox(height: 16, width: 130, radius: 6),
-                            SizedBox(height: 10),
-                            ShimmerBox(height: 32, width: 180, radius: 8),
-                          ],
-                        ),
+                  // Quick stats: a two-column grid of one-line tiles.
+                  const ShimmerBox(height: 16, width: 96, radius: 6),
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                    builder: (context, c) {
+                      final w = (c.maxWidth - 10) / 2;
+                      return Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          for (var i = 0; i < 8; i++)
+                            ShimmerBox(height: 48, width: w, radius: 12),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  // The value card, the portfolio mix and the value chart.
+                  for (final h in const [92.0, 168.0, 200.0]) ...[
+                    LayoutBuilder(
+                      builder: (context, c) => ShimmerBox(
+                        height: h,
+                        width: c.maxWidth,
+                        radius: AppRadii.card,
                       ),
-                      const ShimmerBox(height: 24, width: 56, radius: 6),
-                    ],
-                  ),
-                  const SizedBox(height: 22),
-                  Row(
-                    children: const [
-                      ShimmerBox(height: 28, width: 28, radius: 8),
-                      SizedBox(width: 10),
-                      ShimmerBox(height: 27, width: 56, radius: 20),
-                      SizedBox(width: 8),
-                      ShimmerBox(height: 27, width: 72, radius: 20),
-                      SizedBox(width: 8),
-                      ShimmerBox(height: 27, width: 88, radius: 20),
-                    ],
-                  ),
-                  const SizedBox(height: 22),
-                  for (var i = 0; i < 5; i++) ...[
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  // The top priced bottles.
+                  const ShimmerBox(height: 16, width: 150, radius: 6),
+                  const SizedBox(height: AppSpacing.sm),
+                  for (var i = 0; i < 3; i++) ...[
                     if (i > 0) const SizedBox(height: AppSpacing.sm),
                     LayoutBuilder(
                       builder: (context, c) => ShimmerBox(

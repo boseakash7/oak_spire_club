@@ -3,8 +3,9 @@ import 'dart:math' as math;
 /// Index-style chart comparison (bourboneur `chart_page/chart.dart`).
 ///
 /// Each series is rebased so its first point in the window = 100, then
-/// `(price / firstPrice) * 100`, so Market Value and BSMI can be compared
-/// on one axis as relative performance, not raw dollars.
+/// `(price / firstPrice) * 100`, so the collection's value and an index (the
+/// Oak Spire Index on Collection) compare on one axis as relative
+/// performance, not raw dollars.
 class ChartIndexComparison {
   ChartIndexComparison._();
 
@@ -43,33 +44,35 @@ class ChartIndexComparison {
     }).toList();
   }
 
-  /// Align `index_data` prices to market-value dates; carry forward last known.
+  /// The index's value as of each market date: its latest point on or before
+  /// that date (dates are `Y-m-d`, so they compare as strings). Market dates
+  /// before the index's first point take that first value, so the lines start
+  /// together. Empty when the index has no points.
   static List<Map<String, dynamic>> alignIndexToMarketDates({
     required List<Map<String, dynamic>> marketPoints,
     required List<Map<String, dynamic>> indexPoints,
   }) {
-    if (marketPoints.isEmpty || indexPoints.isEmpty) return [];
+    if (marketPoints.isEmpty) return [];
 
-    final indexByDate = <String, double>{};
-    for (final p in indexPoints) {
-      final date = p['date']?.toString();
-      if (date == null || date.isEmpty) continue;
-      final price = double.tryParse(p['price']?.toString() ?? '');
-      if (price != null) indexByDate[date] = price;
-    }
+    final index = <(String, double)>[
+      for (final p in indexPoints)
+        if ((p['date']?.toString() ?? '').isNotEmpty &&
+            double.tryParse(p['price']?.toString() ?? '') != null)
+          (p['date'].toString(), double.parse(p['price'].toString())),
+    ]..sort((a, b) => a.$1.compareTo(b.$1));
+    if (index.isEmpty) return [];
 
-    final aligned = <Map<String, dynamic>>[];
-    double? lastPrice;
-    for (final m in marketPoints) {
-      final date = m['date']?.toString() ?? '';
-      if (indexByDate.containsKey(date)) {
-        lastPrice = indexByDate[date];
-      }
-      if (lastPrice == null) continue;
-      aligned.add({'date': date, 'price': lastPrice.toString()});
-    }
-
-    return aligned.length == marketPoints.length ? aligned : [];
+    var j = 0;
+    return [
+      for (final m in marketPoints)
+        () {
+          final date = m['date']?.toString() ?? '';
+          while (j + 1 < index.length && index[j + 1].$1.compareTo(date) <= 0) {
+            j++;
+          }
+          return {'date': date, 'price': index[j].$2.toString()};
+        }(),
+    ];
   }
 
   static List<double> _pricesFromPoints(List<Map<String, dynamic>> points) {
@@ -116,7 +119,9 @@ class ChartIndexComparison {
       bsmiIndex: bsmiIndex,
       dates: _datesFromPoints(window),
       marketPrices: _pricesFromPoints(window),
-      bsmiPrices: bsmiWindow.isEmpty ? <double>[] : _pricesFromPoints(bsmiWindow),
+      bsmiPrices: bsmiWindow.isEmpty
+          ? <double>[]
+          : _pricesFromPoints(bsmiWindow),
       minY: bounds.$1,
       maxY: bounds.$2,
     );
@@ -151,13 +156,13 @@ class ChartComparedSeriesResult {
   });
 
   const ChartComparedSeriesResult.empty()
-      : marketIndex = const [],
-        bsmiIndex = const [],
-        dates = const [],
-        marketPrices = const [],
-        bsmiPrices = const [],
-        minY = 90,
-        maxY = 110;
+    : marketIndex = const [],
+      bsmiIndex = const [],
+      dates = const [],
+      marketPrices = const [],
+      bsmiPrices = const [],
+      minY = 90,
+      maxY = 110;
 
   final List<double> marketIndex;
   final List<double> bsmiIndex;

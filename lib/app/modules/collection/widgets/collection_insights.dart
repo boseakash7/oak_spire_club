@@ -2,64 +2,48 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/animations/staggered_entrance.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../home/home_controller.dart';
-import '../../home/widgets/home_chart_footer.dart';
 import '../../home/widgets/home_quick_stats.dart';
-import '../../home/widgets/home_value_chart.dart';
+import '../collection_controller.dart';
+import 'collection_market_chart_card.dart';
+import 'collection_portfolio_mix.dart';
+import 'collection_top_priced.dart';
+import 'collection_value_card.dart';
 
-/// What used to be the Home tab, now under the Collection value header: the
-/// value vs index chart and quick stats.
-/// [HomeController] still owns the data; Market is the landing tab now.
+/// The Collection tab's content for a non-empty collection, top to bottom:
+/// quick stats, the collection's value, the portfolio mix, the "You vs the
+/// market" scoreboard and chart, then the top priced bottles and "View all
+/// bottles".
+/// [HomeController] owns the quick stats and chart data.
 class CollectionInsights extends StatelessWidget {
-  const CollectionInsights({super.key, required this.inset});
+  const CollectionInsights({
+    super.key,
+    required this.controller,
+    required this.inset,
+  });
 
-  /// The tab's side inset. Horizontal strips run past the right edge and the
-  /// chart bleeds to [kHomeChartHorizontalInset].
+  final CollectionController controller;
+
+  /// The tab's side inset.
   final double inset;
 
   @override
   Widget build(BuildContext context) {
     final home = Get.find<HomeController>();
-    final width = MediaQuery.sizeOf(context).width;
+
+    Widget padded(Widget child) => Padding(
+      padding: EdgeInsets.symmetric(horizontal: inset),
+      child: child,
+    );
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FadeSlideEntrance(
-          index: 1,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: kHomeChartHorizontalInset,
-                ),
-                child: SizedBox(
-                  width: width - kHomeChartHorizontalInset * 2,
-                  child: const HomeValueChart(),
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: inset),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(height: 14),
-                    HomeChartLegend(),
-                    HomeChartFooter(),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        FadeSlideEntrance(
-          index: 2,
-          child: Padding(
-            padding: EdgeInsets.only(left: inset),
-            child: Column(
+          child: padded(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Quick stats', style: AppTextStyles.bodyL()),
@@ -69,7 +53,32 @@ class CollectionInsights extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.md),
+        FadeSlideEntrance(
+          index: 1,
+          child: padded(CollectionValueCard(controller: controller)),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        FadeSlideEntrance(
+          index: 2,
+          child: padded(
+            Obx(
+              () => CollectionPortfolioMix(
+                items: controller.items.toList(growable: false),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        FadeSlideEntrance(
+          index: 3,
+          child: padded(const CollectionMarketChartCard()),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        FadeSlideEntrance(
+          index: 4,
+          child: padded(CollectionTopPriced(controller: controller)),
+        ),
       ],
     );
   }

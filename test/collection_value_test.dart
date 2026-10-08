@@ -16,6 +16,20 @@ CollectionItemModel _row({
 });
 
 void main() {
+  test('holdingCounts: duplicates, doubled, gaining, losing', () {
+    final c = CollectionValueCalculator.holdingCounts([
+      _row(paid: '100', qty: '2', average: '250'), // dup, +150%
+      _row(paid: '100', qty: '1', average: '120'), // +20%
+      _row(paid: '100', qty: '3', average: '80'), // dup, -20%
+      _row(paid: '100', qty: '1'), // no market price
+      _row(paid: '0', qty: '1', average: '90'), // no price paid
+    ]);
+    expect(c.duplicates, 2);
+    expect(c.doubled, 1);
+    expect(c.gaining, 2);
+    expect(c.losing, 1);
+  });
+
   group('CollectionValueCalculator.summarize', () {
     test('values priced rows at market, the rest at cost; gain on priced only', () {
       final s = CollectionValueCalculator.summarize([

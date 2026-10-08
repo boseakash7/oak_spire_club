@@ -38,6 +38,8 @@ abstract final class AnalyticsScreens {
         return 'benchmark_detail';
       case AppRoutes.marketIndex:
         return 'market_index';
+      case AppRoutes.collectionBottles:
+        return 'collection_bottles';
       case AppRoutes.subscription:
         return 'subscription';
       case AppRoutes.subscriptionSkip:

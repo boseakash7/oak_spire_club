@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_header.dart';
@@ -11,17 +12,27 @@ const double _kInset = 23;
 const double _kRowHeight = 96;
 const double _kRowGap = 12;
 
-/// Index strip height and card widths (see `MarketIndexStrip`).
+/// Index card height (see `MarketIndexStrip`).
 const double _kIndexHeight = 128;
-const double _kIndexWideWidth = 236;
-const double _kIndexWidth = 196;
+
+/// The search field, category chips and "Prices updated" / sort line above
+/// the list, as `MarketView` lays them out.
+const double _kSearchHeight = 46;
+const double _kChipBarHeight = 34;
+const double _kSortRowHeight = 30;
+const double _kListHeaderHeight =
+    _kSearchHeight + 12 + _kChipBarHeight + 10 + _kSortRowHeight + 14;
+
+/// Chip widths, varied like real category names.
+const List<double> _kChipWidths = [64, 76, 88, 70, 82];
 
 /// Name-line widths, varied so the skeleton reads as a list, not a grid.
 const List<double> _kNameWidths = [0.9, 0.7, 0.82, 0.62, 0.86, 0.74];
 
-/// First load of Market, laid out like the top of the real tab: the index
-/// strip and enough bottle rows to fill the screen. Placeholders sit on real
-/// card surfaces under one shimmer sweep.
+/// First load of Market, laid out like the real tab so nothing jumps when it
+/// lands: the headline index card, the search field, category chips, the
+/// "Prices updated" / sort line, and enough bottle rows to fill the screen.
+/// Placeholders sit on real card surfaces under one shimmer sweep.
 class MarketLoadingView extends StatelessWidget {
   const MarketLoadingView({super.key});
 
@@ -30,7 +41,10 @@ class MarketLoadingView extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         const above =
-            kShellTabBodyContentTopGap + _kIndexHeight + AppSpacing.lg;
+            kShellTabBodyContentTopGap +
+            _kIndexHeight +
+            AppSpacing.lg +
+            _kListHeaderHeight;
         final rows =
             ((constraints.maxHeight - above) / (_kRowHeight + _kRowGap))
                 .ceil()
@@ -42,32 +56,21 @@ class MarketLoadingView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: kShellTabBodyContentTopGap),
-                // The strip runs past the right edge, like the real one.
-                SizedBox(
-                  height: _kIndexHeight,
-                  child: OverflowBox(
-                    alignment: Alignment.centerLeft,
-                    maxWidth: double.infinity,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: _kInset),
-                      child: Row(
-                        children: [
-                          _IndexCard(
-                            placeholders: placeholders,
-                            width: _kIndexWideWidth,
-                            wide: true,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          _IndexCard(
-                            placeholders: placeholders,
-                            width: _kIndexWidth,
-                          ),
-                        ],
-                      ),
-                    ),
+                // One full-width card, as the real strip shows for a single
+                // (headline) index.
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: _kInset),
+                  child: _IndexCard(
+                    placeholders: placeholders,
+                    width: double.infinity,
+                    wide: true,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: _kInset),
+                  child: _ListHeader(placeholders: placeholders),
+                ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: _kInset),
                   child: _rows(rows, placeholders),
@@ -77,6 +80,81 @@ class MarketLoadingView extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// The search field (its outline drawn as a surface), a row of chips, and the
+/// "Prices updated" caption with the sort pill.
+class _ListHeader extends StatelessWidget {
+  const _ListHeader({required this.placeholders});
+
+  final bool placeholders;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          height: _kSearchHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: placeholders
+              ? null
+              : BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+          child: ShimmerSlot(
+            placeholders: placeholders,
+            child: const Row(
+              children: [
+                ShimmerBox(height: 18, width: 18, radius: 9),
+                SizedBox(width: 16),
+                ShimmerBox(height: 12, width: 168, radius: 4),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        ShimmerSlot(
+          placeholders: placeholders,
+          child: SizedBox(
+            height: _kChipBarHeight,
+            // Chips that don't fit are cut off, like the real bar.
+            child: ClipRect(
+              child: OverflowBox(
+                alignment: Alignment.centerLeft,
+                maxWidth: double.infinity,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final (i, w) in _kChipWidths.indexed) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      ShimmerBox(height: 28, width: w, radius: 14),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        ShimmerSlot(
+          placeholders: placeholders,
+          child: const SizedBox(
+            height: _kSortRowHeight,
+            child: Row(
+              children: [
+                ShimmerBox(height: 10, width: 132, radius: 4),
+                Spacer(),
+                ShimmerBox(height: 30, width: 108, radius: 15),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+      ],
     );
   }
 }

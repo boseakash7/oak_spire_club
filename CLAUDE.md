@@ -127,6 +127,7 @@ else is a full push.
 | `/add-to-collection` | `modules/add_collection` | taste list + benchmark detail via `AddToCollectionLauncher`; taste "add your own" (no args) |
 | `/benchmark-detail` | `modules/market` | market row (`market_bottle_row`), collection quick-view sheet, every Home bottle row |
 | `/market-index` | `modules/market_index` | Market index cards (`MarketIndexCard`), args `{slug, name}` |
+| `/collection/bottles` | `modules/collection` | Collection tab "View all bottles" (no binding: shares the shell's `CollectionController`) |
 | `/subscription` | `modules/subscription` | settings menu, `SubscriptionLimitNavigation`, post-auth offer |
 | `/subscription-skip` | `modules/subscription` | subscription screen "skip" |
 | `/subscription/payment-success` | `modules/subscription` | after Razorpay verify / Apple IAP subscribe |
@@ -192,8 +193,8 @@ The module is `dashboard`, not `home`, because `HomeController` is the collectio
 controller.
 
 **Collection insights.** The old Home sections (value vs index chart, quick stats)
-render on the Collection tab through `CollectionInsights`, under the value header and only when
-the collection is non-empty. `HomeController` and `modules/home/widgets/` own that data and those
+render on the Collection tab through `CollectionInsights`, only when the collection is
+non-empty. `HomeController` and `modules/home/widgets/` own that data and those
 widgets. It is lazy-put by the shell binding, refreshed when switching to Home or Collection,
 and feeds Home's collection card (including its move line) and (through `items`) Home's collection
 movers.
@@ -223,7 +224,38 @@ use, and it is the same on every tab (no tab title).
 - `HomeController.headerMoveText` (`▲ $124 today` / `… this week` / `Steady this week`, computed
   in `_applyHeaderMove`) is no longer in the header. Home's collection card shows it.
 
-**Collection tab** is a `SliverList` of `CollectionBottleRow`
+**Collection tab** ([collection_view.dart](lib/app/modules/collection/collection_view.dart)), top to
+bottom, all built by `CollectionInsights`
+([collection_insights.dart](lib/app/modules/collection/widgets/collection_insights.dart)):
+- **Quick stats** (`HomeQuickStats`): a two-column grid of 8 one-line tiles (gold icon, label,
+  number; the number scales down rather than push the label out): collection, drunk, rating,
+  rare, then duplicates, doubled (+100% or more), gaining and losing value. The last four come from `CollectionValueCalculator.holdingCounts`, which
+  works per bottle against that bottle's price paid.
+- **Collection value** (`CollectionValueCard`): a full-width card, titled inside, with today's
+  value, the invested / gain caption and the gain-vs-paid badge. (There is no heading above the
+  page any more.)
+- **Portfolio mix** (`CollectionPortfolioMix`): one card, titled inside, with a Type / Brand toggle.
+  A stacked bar and a legend show each group's share of today's value.
+  `PortfolioBreakdown.of` ([portfolio_breakdown.dart](lib/app/data/portfolio_breakdown.dart)) does the
+  math: a row counts at market value, else what was paid. Type is `details.spiritType`; brand is
+  `details.brand ?? details.distillery`; a blank is "Unspecified". Groups merge case-insensitively,
+  the top 5 show, and the rest fold into "Other". Colors are `AppColors.portfolioMix`.
+- **You vs the market** (`CollectionMarketChartCard`): a scoreboard card. Its header holds the
+  1M / 3M / 6M / 1Y range (`HomeController.setChartRange`); below, the collection's and the Oak Spire
+  Index's moves over the range in big numbers, an "Ahead of / Behind the market by N pts" chip, and
+  `HomeValueChart` (smooth lines with `preventCurveOverShooting`, a dashed start baseline at 100, no dots, gold wash under the
+  collection only; no axes, grid or background). The index line is the headline **Oak Spire Index**
+  (`market/index-detail`, `HomeChartRange.indexDays`: 6M asks for 180), not the server's
+  `index_data` (BSMI); `ChartIndexComparison.alignIndexToMarketDates` takes its value as of each
+  collection date. The touch tooltip shows both values and moves.
+- **Top priced bottles** (`CollectionTopPriced`): the 5 highest by one bottle's price
+  (`PortfolioBreakdown.topPriced`), as `CollectionBottleRow`s, then a "View all bottles (N)" button.
+- **All bottles** ([collection_bottles_view.dart](lib/app/modules/collection/collection_bottles_view.dart),
+  `/collection/bottles`): the sort menu, the filter chips and the full list. It used to be on the tab.
+
+An empty collection shows the "Browse bottles" empty state in place of all three.
+
+The list is a `SliverList` of `CollectionBottleRow`
 ([collection_bottle_row.dart](lib/app/modules/collection/widgets/collection_bottle_row.dart)).
 The old two-column grid and `CollectionBottleCard` are gone.
 - Left side of a row: art, name, maker · region, and type / age / ABV / Rare / rating chips
@@ -487,7 +519,12 @@ with the app icon), not `Get.snackbar`, `ScaffoldMessenger` or `Fluttertoast` di
 Confirmations use `showAppConfirmDialog`. Other dialogs and sheets use `showAppAnimatedDialog` /
 `showAppAnimatedBottomSheet` ([show_app_dialog.dart](lib/app/core/widgets/show_app_dialog.dart)).
 
-**Images.** A bottle `image` is either a full URL or a bare upload file name.
+**Images.** `BottleImage` lets `CachedNetworkImage` draw the placeholder and the fade, because it
+skips both when the image is already in memory; a hand-rolled fade flashed the placeholder on every
+new copy of the art. Its Hero flies the source's art on push (rows and the detail ask for
+different `memCacheWidth`s, so the detail's isn't decoded yet).
+
+A bottle `image` is either a full URL or a bare upload file name.
 `AppImageUrl.resolve` turns it into a URL, using `upload_url` first and then the API host.
 `BottleImage` calls it, so don't concatenate `upload_url` by hand.
 

@@ -304,4 +304,19 @@ class AppColors {
 
   /// Thin, stale, legacy, or an Oak Spire (admin) price.
   static const Color confidenceLow = textWolf;
+
+  // --- Portfolio mix (Collection tab) -----------------------------------------
+
+  /// One color per slice of the collection's value, biggest first. Warm and
+  /// cool hues alternate so neighbouring segments of the bar stay apart.
+  static const List<Color> portfolioMix = [
+    goldBright,
+    chartLineBsmi,
+    Color(0xFFC0703A),
+    Color(0xFF7FA38A),
+    Color(0xFF6F93B8),
+  ];
+
+  /// The "Other" slice and any slice past [portfolioMix].
+  static const Color portfolioMixOther = Color(0xFF5C4A43);
 }

@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/animations/staggered_entrance.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/animated_count_text.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../data/collection_value_calculator.dart';
 import '../home_controller.dart';
 
-/// One Quick Stats tile. Modelled as data so the row is a list, not a switch
-/// over hard-coded indices.
+final _count = NumberFormat.decimalPattern('en_US');
+
+/// One Quick Stats tile. Modelled as data so the grid is a list, not a
+/// switch over hard-coded indices.
 class _QuickStat {
   const _QuickStat.count(this.label, this.icon, int this.count)
     : ratingText = null;
@@ -25,53 +29,81 @@ class _QuickStat {
   bool get isRating => ratingText != null;
 }
 
-/// "Quick Stats": collection size, bottles opened, rating, rare finds.
+/// "Quick Stats": collection size, bottles drunk, rating, rare finds, then
+/// duplicates and how many bottles are worth more (or less) than was paid.
+/// One line per tile (icon, label, number), two tiles to a row.
 class HomeQuickStats extends StatelessWidget {
   const HomeQuickStats({super.key, required this.home});
 
   final HomeController home;
 
-  static const double _side = 100;
+  static const double _tileHeight = 48;
+  static const double _gap = 10;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: _side,
-      child: Obx(() {
+    return LayoutBuilder(
+      builder: (context, constraints) => Obx(() {
+        final counts = CollectionValueCalculator.holdingCounts(home.items);
         final stats = [
           _QuickStat.count(
-            'Total\nCollection',
+            'Collection',
             Icons.liquor_rounded,
             home.totalCollectionCount.value,
           ),
           _QuickStat.count(
-            'Total\nDrunk',
+            'Drunk',
             Icons.local_bar_rounded,
             home.totalDrunkCount.value,
           ),
           _QuickStat.rating(
-            'Collection\nRating',
+            'Rating',
             Icons.star_rounded,
             home.collectionRatingText.value,
           ),
           _QuickStat.count(
-            'Rare\nBottles',
+            'Rare',
             Icons.diamond_rounded,
             home.totalRareCount.value,
           ),
+          _QuickStat.count(
+            'Duplicates',
+            Icons.copy_all_rounded,
+            counts.duplicates,
+          ),
+          _QuickStat.count(
+            'Doubled',
+            Icons.rocket_launch_rounded,
+            counts.doubled,
+          ),
+          _QuickStat.count(
+            'Gaining',
+            Icons.trending_up_rounded,
+            counts.gaining,
+          ),
+          _QuickStat.count(
+            'Losing',
+            Icons.trending_down_rounded,
+            counts.losing,
+          ),
         ];
 
-        return ListView.separated(
-          scrollDirection: Axis.horizontal,
-          clipBehavior: Clip.none,
-          padding: const EdgeInsets.only(right: 8),
-          itemCount: stats.length,
-          separatorBuilder: (context, index) => const SizedBox(width: 14),
-          itemBuilder: (context, index) => StaggeredEntrance(
-            index: index,
-            offsetY: 0.15,
-            child: _StatTile(stat: stats[index]),
-          ),
+        final width = (constraints.maxWidth - _gap) / 2;
+        return Wrap(
+          spacing: _gap,
+          runSpacing: _gap,
+          children: [
+            for (final (i, stat) in stats.indexed)
+              StaggeredEntrance(
+                index: i,
+                offsetY: 0.15,
+                child: SizedBox(
+                  width: width,
+                  height: _tileHeight,
+                  child: _StatTile(stat: stat),
+                ),
+              ),
+          ],
         );
       }),
     );
@@ -85,64 +117,52 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final valueStyle = AppTextStyles.numberL();
+    final valueStyle = AppTextStyles.numberM().copyWith(fontSize: 18);
 
     return AppCard(
-      width: HomeQuickStats._side,
-      height: HomeQuickStats._side,
-      padding: const EdgeInsets.fromLTRB(13, 12, 13, 14),
-      child: Stack(
+      radius: 12,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
         children: [
-          // Faint glyph in the corner gives each tile an identity at a glance.
-          Positioned(
-            right: -6,
-            bottom: -8,
-            child: Icon(
-              stat.icon,
-              size: 44,
-              color: AppColors.goldAccent.withValues(alpha: 0.08),
+          Icon(stat.icon, size: 18, color: AppColors.goldAccent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              stat.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.label().copyWith(color: AppColors.textMuted),
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                stat.label,
-                style: AppTextStyles.label().copyWith(
-                  color: AppColors.textStatLabel,
-                  height: 1.05,
-                ),
-              ),
-              const Spacer(),
-              if (stat.isRating)
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(stat.ratingText!, style: valueStyle),
-                      if (stat.ratingText != '—')
-                        Text(
-                          '/10',
-                          style: AppTextStyles.caption().copyWith(
-                            color: AppColors.textStatLabel,
-                          ),
-                        ),
-                      const SizedBox(width: 6),
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 22,
-                        color: AppColors.textCream,
+          const SizedBox(width: 6),
+          // Right-aligned in a fixed slot: "1,234" fits at full size, and
+          // anything wider shrinks rather than pushing the label out.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 64),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: stat.isRating
+                  ? Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(text: stat.ratingText, style: valueStyle),
+                          if (stat.ratingText != '—')
+                            TextSpan(
+                              text: '/10',
+                              style: AppTextStyles.caption().copyWith(
+                                color: AppColors.textStatLabel,
+                              ),
+                            ),
+                        ],
                       ),
-                    ],
-                  ),
-                )
-              else
-                AnimatedCountInt(value: stat.count ?? 0, style: valueStyle),
-            ],
+                    )
+                  : AnimatedCountText(
+                      value: (stat.count ?? 0).toDouble(),
+                      style: valueStyle,
+                      format: (v) => _count.format(v.round()),
+                    ),
+            ),
           ),
         ],
       ),

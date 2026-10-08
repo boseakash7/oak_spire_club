@@ -102,6 +102,56 @@ class CollectionValueCalculator {
       gainPercent: hasGain ? (gainMarket - gainPaid) / gainPaid * 100 : null,
     );
   }
+
+  /// The Collection tab's holding counts: duplicates, and how many bottles
+  /// trade above or below what was paid. Gains are per row, against that
+  /// row's price paid, so a bottle with no market price or no price paid is
+  /// in none of the gain counts.
+  static CollectionHoldingCounts holdingCounts(
+    Iterable<CollectionItemModel> items,
+  ) {
+    var duplicates = 0;
+    var doubled = 0;
+    var gaining = 0;
+    var losing = 0;
+    for (final item in items) {
+      if (item.displayQuantity > 1) duplicates++;
+      final pct = item.gainPercent;
+      if (pct == null) continue;
+      if (pct >= 100) doubled++;
+      if (pct > 0) gaining++;
+      if (pct < 0) losing++;
+    }
+    return CollectionHoldingCounts(
+      duplicates: duplicates,
+      doubled: doubled,
+      gaining: gaining,
+      losing: losing,
+    );
+  }
+}
+
+/// See [CollectionValueCalculator.holdingCounts]. Each is a count of bottles
+/// (one per bottle, however many copies are held).
+class CollectionHoldingCounts {
+  const CollectionHoldingCounts({
+    required this.duplicates,
+    required this.doubled,
+    required this.gaining,
+    required this.losing,
+  });
+
+  /// Bottles held more than once.
+  final int duplicates;
+
+  /// Worth at least twice what was paid (+100% or more).
+  final int doubled;
+
+  /// Worth more than what was paid ([doubled] are counted here too).
+  final int gaining;
+
+  /// Worth less than what was paid.
+  final int losing;
 }
 
 /// See [CollectionValueCalculator.summarize].

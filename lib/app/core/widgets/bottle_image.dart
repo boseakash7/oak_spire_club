@@ -77,15 +77,20 @@ class BottleImage extends StatelessWidget {
 
     return Hero(
       tag: tag,
-      // Fly the destination's art so it is never letterboxed mid-flight.
+      // Fly the art that is already decoded: the row's on the way in, the
+      // row's again on the way back. The detail asks for a bigger image (a
+      // different cache entry), so flying it would flash the placeholder
+      // until it decodes.
       flightShuttleBuilder: (context, animation, direction, from, to) =>
-          to.widget,
+          direction == HeroFlightDirection.push ? from.widget : to.widget,
       child: art,
     );
   }
 }
 
-/// Tries each URL in turn; the placeholder cross-fades out once one loads.
+/// Tries each URL in turn. An image already in memory shows at once (so a
+/// new copy of the same art, like a Hero's, never flashes the placeholder);
+/// one still loading fades in over the placeholder.
 class _FallbackNetworkImage extends StatefulWidget {
   const _FallbackNetworkImage({
     required this.urls,
@@ -105,21 +110,16 @@ class _FallbackNetworkImage extends StatefulWidget {
 
 class _FallbackNetworkImageState extends State<_FallbackNetworkImage> {
   int _index = 0;
-  bool _loaded = false;
   bool _advanceScheduled = false;
-  bool _loadScheduled = false;
 
   @override
   void didUpdateWidget(_FallbackNetworkImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!listEquals(oldWidget.urls, widget.urls)) {
-      _index = 0;
-      _loaded = false;
-    }
+    if (!listEquals(oldWidget.urls, widget.urls)) _index = 0;
   }
 
-  // Both run from inside a build (image/error builders), so the state change
-  // waits for the next frame.
+  // Runs from inside the error builder, so the state change waits for the
+  // next frame.
   void _advance() {
     if (_advanceScheduled || _index >= widget.urls.length - 1) return;
     _advanceScheduled = true;
@@ -127,20 +127,7 @@ class _FallbackNetworkImageState extends State<_FallbackNetworkImage> {
       if (!mounted) return;
       setState(() {
         _index += 1;
-        _loaded = false;
         _advanceScheduled = false;
-      });
-    });
-  }
-
-  void _markLoaded() {
-    if (_loaded || _loadScheduled) return;
-    _loadScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {
-        _loaded = true;
-        _loadScheduled = false;
       });
     });
   }
@@ -151,45 +138,24 @@ class _FallbackNetworkImageState extends State<_FallbackNetworkImage> {
     final fade = AppMotion.of(context, AppMotion.fast);
     final cacheWidth = widget.cacheWidthPx;
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        AnimatedOpacity(
-          opacity: _loaded ? 0 : 1,
-          duration: fade,
-          child: widget.placeholder,
-        ),
-        AnimatedOpacity(
-          opacity: _loaded ? 1 : 0,
-          duration: fade,
-          curve: AppMotion.enter,
-          child: CachedNetworkImage(
-            imageUrl: url,
-            cacheManager: AppCacheManager.images,
-            memCacheWidth: cacheWidth != null && cacheWidth > 0
-                ? cacheWidth
-                : null,
-            fadeInDuration: Duration.zero,
-            fadeOutDuration: Duration.zero,
-            placeholderFadeInDuration: Duration.zero,
-            imageBuilder: (context, provider) {
-              _markLoaded();
-              return Image(
-                image: provider,
-                fit: widget.fit,
-                filterQuality: FilterQuality.medium,
-                gaplessPlayback: true,
-              );
-            },
-            placeholder: (context, _) => const SizedBox.shrink(),
-            errorWidget: (context, error, stackTrace) {
-              if (kDebugMode) debugPrint('[BottleImage] failed: $url ($error)');
-              _advance();
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-      ],
+    // CachedNetworkImage (OctoImage) skips the placeholder and the fade
+    // when the image resolves synchronously from the memory cache.
+    return CachedNetworkImage(
+      imageUrl: url,
+      cacheManager: AppCacheManager.images,
+      memCacheWidth: cacheWidth != null && cacheWidth > 0 ? cacheWidth : null,
+      fit: widget.fit,
+      filterQuality: FilterQuality.medium,
+      placeholder: (context, _) => widget.placeholder,
+      placeholderFadeInDuration: Duration.zero,
+      fadeInDuration: fade,
+      fadeInCurve: AppMotion.enter,
+      fadeOutDuration: fade,
+      errorWidget: (context, error, stackTrace) {
+        if (kDebugMode) debugPrint('[BottleImage] failed: $url ($error)');
+        _advance();
+        return widget.placeholder;
+      },
     );
   }
 }

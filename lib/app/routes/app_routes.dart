@@ -13,6 +13,7 @@ class AppRoutes {
   static const String tasteBottles = '/taste-bottles';
   static const String benchmarkDetail = '/benchmark-detail';
   static const String marketIndex = '/market-index';
+  static const String collectionBottles = '/collection/bottles';
   static const String subscription = '/subscription';
   static const String subscriptionSkip = '/subscription-skip';
   static const String subscriptionPaymentSuccess = '/subscription/payment-success';

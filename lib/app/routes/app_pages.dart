@@ -15,6 +15,7 @@ import '../modules/auth/verify_otp/verify_otp_binding.dart';
 import '../modules/auth/verify_otp/verify_otp_view.dart';
 import '../modules/add_collection/add_collection_binding.dart';
 import '../modules/add_collection/add_collection_view.dart';
+import '../modules/collection/collection_bottles_view.dart';
 import '../modules/navigation/bottom_nav_binding.dart';
 import '../modules/navigation/bottom_nav_shell.dart';
 import '../modules/splash/splash_binding.dart';
@@ -118,6 +119,11 @@ class AppPages {
       name: AppRoutes.marketIndex,
       page: () => const MarketIndexView(),
       binding: MarketIndexBinding(),
+    ),
+    // No binding: it shares the shell's CollectionController.
+    GetPage(
+      name: AppRoutes.collectionBottles,
+      page: () => const CollectionBottlesView(),
     ),
     GetPage(
       name: AppRoutes.subscription,

@@ -14,19 +14,17 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/app_pressable.dart';
-import '../../data/models/collection_item_display.dart';
-import '../../data/models/collection_item_model.dart';
 import '../../routes/app_routes.dart';
 import 'collection_controller.dart';
 import 'collection_loading_view.dart';
-import 'widgets/collection_bottle_row.dart';
-import 'widgets/collection_filter_row.dart';
 import 'widgets/collection_insights.dart';
-import 'widgets/collection_quick_view.dart';
-import 'widgets/collection_value_header.dart';
 
 const double _kInset = 23;
 
+/// The Collection tab: quick stats, the collection's value, the portfolio
+/// mix, the value chart, the top priced bottles and "View all bottles",
+/// which opens the full list ([CollectionBottlesView]). See
+/// [CollectionInsights].
 class CollectionView extends GetView<CollectionController> {
   const CollectionView({super.key});
 
@@ -92,47 +90,11 @@ class _CollectionBody extends StatelessWidget {
             child: CustomScrollView(
               physics: AppPlatform.scrollPhysics,
               slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(
-                    _kInset,
-                    kShellTabBodyContentTopGap,
-                    _kInset,
-                    0,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: FadeSlideEntrance(
-                      child: CollectionValueHeader(controller: controller),
-                    ),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 18)),
-                // Chart, top movers and quick stats need a bottle to say
-                // anything; the empty state below covers an empty collection.
-                Obx(
-                  () => SliverToBoxAdapter(
-                    child: controller.items.isEmpty
-                        ? const SizedBox.shrink()
-                        : const CollectionInsights(inset: _kInset),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: _kInset),
-                  sliver: SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        FadeSlideEntrance(
-                          index: 3,
-                          child: CollectionFilterRow(controller: controller),
-                        ),
-                        const SizedBox(height: 18),
-                      ],
-                    ),
-                  ),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: kShellTabBodyContentTopGap),
                 ),
                 Obx(() {
-                  final list = controller.filteredItems;
-                  if (list.isEmpty) {
+                  if (controller.items.isEmpty) {
                     return SliverFillRemaining(
                       hasScrollBody: false,
                       child: Padding(
@@ -148,64 +110,21 @@ class _CollectionBody extends StatelessWidget {
                       ),
                     );
                   }
-                  return _List(list: list, controller: controller);
+                  return SliverPadding(
+                    // Room for the add button over the end of the page.
+                    padding: const EdgeInsets.only(bottom: 120),
+                    sliver: SliverToBoxAdapter(
+                      child: CollectionInsights(
+                        controller: controller,
+                        inset: _kInset,
+                      ),
+                    ),
+                  );
                 }),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _List extends StatelessWidget {
-  const _List({required this.list, required this.controller});
-
-  final List<CollectionItemModel> list;
-  final CollectionController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    // Hero tags must be unique on screen; only the first row of a bottle
-    // carries one.
-    final seen = <String>{};
-    final heroIds = [
-      for (final item in list)
-        () {
-          final id = item.bluebookBottleId;
-          return id != null && seen.add(id) ? id : null;
-        }(),
-    ];
-
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(_kInset, 0, _kInset, 120),
-      sliver: SliverList.separated(
-        itemCount: list.length,
-        separatorBuilder: (context, index) =>
-            const SizedBox(height: AppSpacing.sm),
-        itemBuilder: (context, index) {
-          final item = list[index];
-          final bottleId = item.bluebookBottleId;
-          return StaggeredEntrance(
-            id: 'collection-${item.id}',
-            child: Builder(
-              builder: (rowContext) => Obx(
-                () => CollectionBottleRow(
-                  item: item,
-                  heroBottleId: heroIds[index],
-                  // Always read the map: an Obx that reads nothing throws.
-                  sparkline: controller.sparklines[bottleId ?? ''],
-                  onTap: () => showCollectionQuickView(
-                    rowContext,
-                    item: item,
-                    controller: controller,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
       ),
     );
   }
@@ -218,31 +137,19 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (controller.items.isEmpty) {
-      // An empty collection is the moment a user is most likely to bounce,
-      // so send them straight to the bottle browser.
-      return AppEmptyState(
-        icon: Icons.liquor_rounded,
-        title: 'Your collection is empty',
-        message:
-            'Add your first bottle and Oak Spire will track what it is worth '
-            'against the BSMI benchmark.',
-        actionLabel: 'Browse bottles',
-        onAction: () async {
-          final res = await Get.toNamed(AppRoutes.tasteBottles);
-          if (res == true) await controller.forceReload();
-        },
-      );
-    }
-
+    // An empty collection is the moment a user is most likely to bounce, so
+    // send them straight to the bottle browser.
     return AppEmptyState(
-      icon: Icons.filter_alt_off_rounded,
-      title: 'No bottles match this filter',
+      icon: Icons.liquor_rounded,
+      title: 'Your collection is empty',
       message:
-          'Clear the filter to see all ${controller.items.length} bottles in '
-          'your collection.',
-      actionLabel: 'Clear filter',
-      onAction: controller.clearFilter,
+          'Add your first bottle and Oak Spire will track what it is worth '
+          'against the BSMI benchmark.',
+      actionLabel: 'Browse bottles',
+      onAction: () async {
+        final res = await Get.toNamed(AppRoutes.tasteBottles);
+        if (res == true) await controller.forceReload();
+      },
     );
   }
 }
