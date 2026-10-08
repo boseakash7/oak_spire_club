@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../../firebase_options.dart';
+import 'notification_tap_router.dart';
 
 /// Background FCM handler (app terminated / in background).
 @pragma('vm:entry-point')
@@ -51,6 +53,19 @@ abstract final class FirebasePushNotifications {
 
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_onNotificationOpened);
+
+    // A tap that launched the app: FCM's own banner, or one we showed in the
+    // foreground (local notification).
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) {
+      _onNotificationOpened(initial);
+    } else {
+      final launch = await _local.getNotificationAppLaunchDetails();
+      final response = launch?.notificationResponse;
+      if ((launch?.didNotificationLaunchApp ?? false) && response != null) {
+        _onLocalNotificationTap(response);
+      }
+    }
   }
 
   static Future<void> _initLocalNotifications() async {
@@ -111,6 +126,8 @@ abstract final class FirebasePushNotifications {
         android: androidDetails,
         iOS: iosDetails,
       ),
+      // The tap handler reads the message's data back from here.
+      payload: jsonEncode(message.data),
     );
   }
 
@@ -138,11 +155,20 @@ abstract final class FirebasePushNotifications {
     if (kDebugMode) {
       debugPrint('[FCM] Opened from notification: ${message.data}');
     }
+    NotificationTapRouter.handle(message.data);
   }
 
   static void _onLocalNotificationTap(NotificationResponse response) {
     if (kDebugMode) {
       debugPrint('[FCM] Local notification tap: ${response.payload}');
+    }
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) return;
+    try {
+      final data = jsonDecode(payload);
+      if (data is Map) NotificationTapRouter.handle(data.cast<String, dynamic>());
+    } on FormatException {
+      // Not one of ours.
     }
   }
 }

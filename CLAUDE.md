@@ -254,9 +254,10 @@ bottom, all built by `CollectionInsights`
 - **Top priced bottles** (`CollectionTopPriced`): the 5 highest by one bottle's price
   (`PortfolioBreakdown.topPriced`), as `CollectionBottleRow`s, then a "View all bottles (N)" button.
 - **All bottles** ([collection_bottles_view.dart](lib/app/modules/collection/collection_bottles_view.dart),
-  `/collection/bottles`): the sort menu, the active quick-stat filter as a gold pill (tap clears
-  it), and the list. The title is the filter's label and count. There are no filter chips: the
-  quick stats are the filters. "View all bottles" opens it unfiltered.
+  `/collection/bottles`): the sort menu, a chip bar of the quick-stat filters (All, Drunk, Rated,
+  Rare, Duplicates, Doubled, Gaining, Losing: `CollectionFilter.chipLabel`), and the list. The tile
+  that opened it starts its chip selected; "View all bottles" starts on All. The title is the
+  filter's label and count.
 
 An empty collection shows the "Browse bottles" empty state in place of all three.
 
@@ -435,7 +436,11 @@ set up in `bootstrapFirebase`.
 [fcm_topics_summary.txt](fcm_topics_summary.txt) — registration state, subscription tier,
 and per-preference alert topics. `FirebaseNotificationTopics` owns subscribe/unsubscribe;
 the last-applied registration and tier topics are cached in `AppStorage` so switches are
-idempotent.
+idempotent. The admin panel targets them (see the backend's push notifications below), so
+renaming a topic needs the same change in oakspireweb's `Firebase::AUDIENCES` / `CATEGORIES`.
+A tapped notification's `screen` data (`home` / `market` / `collection` / `subscription`) is
+opened by `NotificationTapRouter`. A tap that launches the app waits until the shell is up
+(`BottomNavController.onReady`).
 
 **Theming is dark-only and hand-tuned to Figma.** Colors come from `AppColors`, text from
 `AppTextStyles` (Playfair Display for headings, Roboto/Inter for body, via `google_fonts`),
@@ -781,17 +786,30 @@ Registered in `Configs/Application.php` under `commands`, run as `php cli <name>
 | --- | --- |
 | `priceUpdate` | Snapshots every `bluebook` row's average/low/high into `bluebook_price_history` for today. **This is what gives the app's charts any history** — if it stops, every chart flatlines. Intended daily at 00:00 (`changes.txt`). |
 | `priceIndexUpdate` | Recomputes the `secondary_market` row in `price_index` (`trend` up/down plus `movement` %). That row is the `index` object in the chart-data payload. Note it compares today against `date('Y-01-01')`, i.e. Jan 1 of the current year, despite the variable being named `$yesterday`, and divides without a zero guard. |
-| `firebaseMessage` | Sends up to 100 pending `notifications` rows via `kreait/firebase-php`. |
+| `firebaseMessage` | Sends the admin notifications whose `send_at` has come (`Notification::due` → `dispatch`). Must run every minute on the server for scheduled sends; the dev `price-cron` container deliberately does not run it. |
 | `marketStats` | Rewrites `bluebook_market_stats`: each eligible bottle's 30/90/365-day change and 365-day high/low. Nightly after `priceUpdate`. |
 | `marketIndexUpdate` | Brings every `market_indexes` row up to today in `market_index_values` (equal-weighted, chain-linked; `--rebuild` recomputes from `base_date`). Nightly after `priceUpdate`. |
 | `preCacheChart` | Computes `getOverallPriceTrendForEveryone` and **discards the result** — currently a no-op. |
 | `processRazorpayWebhooks` | Drains queued `razorpay_webhook_data` rows through `Package::processQueuedRazorpayWebhookRecord`. |
 
-**Push notifications only ever go to the topic `uncategorized`** (`Firebase::TOPIC_UNCATEGORIZED`
-is the sole argument `sendMessagesToTopic` is ever called with). The `oakspire_*` topic tree this
-app subscribes to in `FirebaseNotificationTopics` is not targeted by any backend code today, and
-`notification-preferences/update` only writes `user_notification_preferences` rows — it does not
-drive delivery. Treat per-preference push as unimplemented server-side.
+**Push notifications** are sent from admin > Notifications (`Controllers/Notification.php`,
+`database/2026-10-08_notification_topics.sql`). The admin picks an **audience** (`Firebase::AUDIENCES`:
+everyone, all members, premium, paid, free premium, members without premium, new sign-ups, guests,
+signed-out devices) and a **topic** (`Firebase::CATEGORIES`: one of the app's four alert toggles, or
+"Account notice", which ignores them).
+- `Firebase::conditionFor` turns the pair into one FCM condition over the app's `oakspire_*` topics
+  (category `&&` any audience topic). A device gets the message once, and only when the user left
+  that toggle on. A condition holds at most 5 topics. Signed-out devices hold no category topic, so
+  they only take "Account notice".
+- The condition is stored on the row when it is created. `Notification::dispatch` claims the row
+  (`pending` → `sending` in one UPDATE) before sending, so "Send now" and the cron never both send it.
+  The row ends `sent` (with `fcm_message_id`) or `failed` (with `error`). A scheduled row can be
+  canceled.
+- The message carries `screen` data (`Firebase::SCREENS`); the app's `NotificationTapRouter` opens
+  it on tap.
+- Keep `Firebase::AUDIENCES` / `CATEGORIES` in step with the app's `FirebaseNotificationTopics`.
+- `notification-preferences/update` only writes `user_notification_preferences` rows and does not
+  drive delivery. The topics do.
 
 ## Payments
 

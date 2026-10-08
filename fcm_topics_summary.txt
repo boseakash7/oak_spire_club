@@ -52,4 +52,33 @@ prefix: `oakspire_`
 • oakspire_tips
   - Managed by: User Notification Preference toggle "Tips & Product Updates".
 
+
+--------------------------------------------------------------------------------
+4. SENDING (ADMIN PANEL > NOTIFICATIONS, oakspireweb)
+--------------------------------------------------------------------------------
+Each message has an audience and a topic, combined into one FCM condition, so
+a device gets it once:
+
+  topic && (audience topic || audience topic ...)
+
+Audiences (state topics):
+  Everyone ............... free_user, paid_user, trial_user, unregistered_users, topic_logout
+  All members ............ free_user, paid_user, trial_user
+  Premium members ........ free_user, paid_user
+  Paid subscribers ....... paid_user
+  Free premium members ... free_user
+  Members without premium  trial_user
+  New sign-ups ........... registered_users
+  Guests ................. unregistered_users
+  Signed-out devices ..... topic_logout   (only with "Account notice")
+
+Topics (alert preference topics): tips, market, price_movement, collection,
+or "Account notice", which sends whatever the user's toggles say.
+
+Tap data: `screen` = home | market | collection | subscription (or empty),
+opened by NotificationTapRouter.
+
+Keep this file, FirebaseNotificationTopics (app) and Firebase::AUDIENCES /
+CATEGORIES (oakspireweb) in step.
+
 ================================================================================

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../core/analytics/analytics_screens.dart';
 import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/firebase/notification_tap_router.dart';
 import '../home/home_controller.dart';
 
 class BottomNavController extends GetxController {
@@ -16,6 +17,19 @@ class BottomNavController extends GetxController {
   static const int homeTab = 0;
   static const int marketTab = 1;
   static const int collectionTab = 2;
+
+  @override
+  void onReady() {
+    super.onReady();
+    // A push notification tapped before the shell was up opens its screen now.
+    NotificationTapRouter.shellOpened();
+  }
+
+  @override
+  void onClose() {
+    NotificationTapRouter.shellClosed();
+    super.onClose();
+  }
 
   void setIndex(int value) {
     final previous = index.value;
