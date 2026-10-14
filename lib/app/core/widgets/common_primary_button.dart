@@ -13,12 +13,17 @@ class CommonPrimaryButton extends StatefulWidget {
     required this.onPressed,
     this.textStyle,
     this.isLoading = false,
+    this.height = AppButtonSize.regular,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final TextStyle? textStyle;
   final bool isLoading;
+
+  /// [AppButtonSize.regular] for full-width CTAs, [AppButtonSize.compact]
+  /// for an inline action beside other content.
+  final double height;
 
   @override
   State<CommonPrimaryButton> createState() => _CommonPrimaryButtonState();
@@ -39,7 +44,7 @@ class _CommonPrimaryButtonState extends State<CommonPrimaryButton> {
       duration: AppMotion.press,
       curve: AppMotion.pressCurve,
       child: SizedBox(
-        height: AppButtonSize.regular,
+        height: widget.height,
         width: double.infinity,
         child: DecoratedBox(
           decoration: BoxDecoration(

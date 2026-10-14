@@ -1,25 +1,358 @@
-// Plan picker: plan cards, trial pricing, the countdown, the selection mark.
+// Checkout pieces: the offer banner, the Free / Premium plan cards, the
+// Monthly / Yearly switch and the selected plan's price.
 part of '../subscription_view.dart';
 
-class _PackagePlanList extends StatelessWidget {
-  const _PackagePlanList({
-    required this.subscription,
-    required this.useAppleStorePrices,
-    required this.applePriceForPlan,
-    required this.isLoadingApplePrices,
+/// One price as the screen shows it: the App Store's localized price on iOS,
+/// the server's USD price elsewhere.
+class _PlanPrice {
+  const _PlanPrice({required this.label, this.amount, this.symbol = r'$'});
+
+  /// The full price, e.g. `$25` or `₹2,099.00`.
+  final String label;
+
+  /// The number behind [label], for the per-month line. Null hides it.
+  final double? amount;
+  final String symbol;
+}
+
+/// What a plan costs if bought now: [charge], and while an [offer] runs the
+/// package's own price as [regular], shown crossed out.
+class _PlanQuote {
+  const _PlanQuote({required this.charge, this.regular, this.offer});
+
+  final _PlanPrice charge;
+  final _PlanPrice? regular;
+  final PackageOffer? offer;
+}
+
+/// The running offer: its label, the plan it is on, and a countdown to its
+/// real end (admin > Packages > Offer). Tapping it picks that plan. When the
+/// time is up it calls [onEnded] so the screen drops the offer.
+class _OfferBanner extends StatefulWidget {
+  const _OfferBanner({
+    super.key,
+    required this.offer,
+    required this.planLabel,
+    required this.discountPercent,
+    required this.onTap,
+    required this.onEnded,
   });
 
+  final PackageOffer offer;
+  final String planLabel;
+  final int? discountPercent;
+  final VoidCallback onTap;
+  final VoidCallback onEnded;
+
+  @override
+  State<_OfferBanner> createState() => _OfferBannerState();
+}
+
+class _OfferBannerState extends State<_OfferBanner> {
+  static final _endFormat = DateFormat('MMM d, h:mm a');
+
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (!widget.offer.isRunning(DateTime.now())) {
+        _timer?.cancel();
+        widget.onEnded();
+        return;
+      }
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final offer = widget.offer;
+    final title = widget.discountPercent == null
+        ? offer.label
+        : '${offer.label} · ${widget.discountPercent}% off';
+    final muted = AppTextStyles.bodyS().copyWith(
+      fontSize: 11,
+      color: AppColors.textMuted,
+    );
+
+    return AppPressable(
+      onTap: widget.onTap,
+      haptic: PressHaptic.selection,
+      semanticLabel: '$title, ends ${_endFormat.format(offer.endsAt)}',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+        decoration: BoxDecoration(
+          color: AppColors.subscriptionOfferSurface,
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          border: Border.all(color: AppColors.subscriptionOfferBorder),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.local_offer_outlined,
+              size: 18,
+              color: AppColors.goldBright,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.bodyS().copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.goldBright,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${widget.planLabel} · ends ${_endFormat.format(offer.endsAt)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: muted,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('Ends in', style: muted),
+                Text(
+                  offer.countdownAt(DateTime.now()),
+                  style: AppTextStyles.bodyS().copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textCream,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Free and Premium side by side, from `package/limits` (admin > Plan
+/// limits): Free small and dim, Premium larger with a gold edge and a crown.
+class _PlanCards extends StatelessWidget {
+  const _PlanCards({required this.rows});
+
+  final List<PlanComparisonRow> rows;
+
+  static IconData _icon(PlanFeature kind) => switch (kind) {
+    PlanFeature.collection => Icons.liquor_rounded,
+    PlanFeature.insights => Icons.show_chart_rounded,
+    PlanFeature.searches => Icons.search_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            flex: 9,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 18),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+                decoration: BoxDecoration(
+                  color: AppColors.subscriptionFreeCard,
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Free',
+                      style: AppTextStyles.bodyS().copyWith(
+                        fontSize: 13,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      r'$0',
+                      style: AppTextStyles.headingM().copyWith(
+                        fontSize: 18,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    for (final row in rows)
+                      _PlanItem(
+                        icon: row.freeLocked
+                            ? Icons.lock_outline_rounded
+                            : _icon(row.kind),
+                        text: row.free,
+                        premium: false,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            flex: 12,
+            child: Stack(
+              clipBehavior: Clip.none,
+              fit: StackFit.expand,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(12, 20, 10, 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.subscriptionOfferSurface,
+                      borderRadius: BorderRadius.circular(AppRadii.card),
+                      border: Border.all(
+                        color: AppColors.subscriptionPlanBorderSelected,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'The full club',
+                          style: AppTextStyles.headingM().copyWith(
+                            fontSize: 18,
+                            color: AppColors.goldBright,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        for (final row in rows)
+                          _PlanItem(
+                            icon: row.premiumLocked
+                                ? Icons.lock_outline_rounded
+                                : _icon(row.kind),
+                            text: row.premium,
+                            premium: true,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const Positioned(left: 12, top: 0, child: _PremiumTag()),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumTag extends StatelessWidget {
+  const _PremiumTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        gradient: AppColors.goldGradient,
+        borderRadius: BorderRadius.circular(AppRadii.chip),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.workspace_premium_rounded,
+            size: 12,
+            color: AppColors.black,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Premium',
+            style: AppTextStyles.bodyS().copyWith(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlanItem extends StatelessWidget {
+  const _PlanItem({
+    required this.icon,
+    required this.text,
+    required this.premium,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool premium;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: premium ? AppColors.goldBright : AppColors.textWolf,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.bodyS().copyWith(
+                fontSize: 12,
+                height: 1.25,
+                color: premium ? AppColors.textCream : AppColors.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Monthly / Yearly as one pill, one segment per package. A plan with a
+/// running offer says so; otherwise Yearly names its saving against twelve
+/// months of the monthly plan.
+class _PlanSwitch extends StatelessWidget {
+  const _PlanSwitch({required this.subscription, required this.quoteFor});
+
   final SubscriptionController subscription;
-  final bool useAppleStorePrices;
-  final String? Function(SubscriptionPackageModel plan) applePriceForPlan;
-  final bool isLoadingApplePrices;
+  final _PlanQuote Function(SubscriptionPackageModel plan) quoteFor;
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       if (subscription.isLoadingPackages.value) {
         return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 32),
+          padding: EdgeInsets.symmetric(vertical: 24),
           child: Center(
             child: SizedBox(
               width: 28,
@@ -34,486 +367,203 @@ class _PackagePlanList extends StatelessWidget {
       }
 
       final error = subscription.loadError.value;
-      if (error != null && error.isNotEmpty) {
+      final plans = subscription.packages.toList();
+      if ((error != null && error.isNotEmpty) || plans.isEmpty) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: Text(
-            error,
-            style: GoogleFonts.roboto(fontSize: 14, color: AppColors.textWolf),
-          ),
-        );
-      }
-
-      final plans = subscription.packages;
-      if (plans.isEmpty) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Text(
-            'No subscription plans available.',
-            style: GoogleFonts.roboto(fontSize: 14, color: AppColors.textWolf),
+            error != null && error.isNotEmpty
+                ? error
+                : 'No subscription plans available.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodyS().copyWith(color: AppColors.textWolf),
           ),
         );
       }
 
       final selectedId = subscription.selectedPackageId.value;
-      final bestValueIndex = plans.indexWhere((plan) => !plan.isYearly);
+      final saving = PlanPricing.yearlySavingPercent(
+        monthly: _chargeOf(plans, yearly: false),
+        yearly: _chargeOf(plans, yearly: true),
+      );
+
+      String label(SubscriptionPackageModel plan) {
+        final name = plan.isYearly ? 'Yearly' : 'Monthly';
+        if (quoteFor(plan).offer != null) return '$name · offer';
+        if (plan.isYearly && saving != null) return '$name · save $saving%';
+        return name;
+      }
+
+      return Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.cardSurfaceTop,
+          borderRadius: BorderRadius.circular(AppRadii.chip),
+          border: Border.all(color: AppColors.cardBorder),
+        ),
+        child: Row(
+          children: [
+            for (final plan in plans)
+              Expanded(
+                child: _SwitchSegment(
+                  label: label(plan),
+                  selected: plan.id == selectedId,
+                  onTap: () => subscription.selectPackage(plan.id),
+                ),
+              ),
+          ],
+        ),
+      );
+    });
+  }
+
+  double? _chargeOf(
+    List<SubscriptionPackageModel> plans, {
+    required bool yearly,
+  }) {
+    for (final p in plans) {
+      if (p.isYearly == yearly) return quoteFor(p).charge.amount;
+    }
+    return null;
+  }
+}
+
+class _SwitchSegment extends StatelessWidget {
+  const _SwitchSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPressable(
+      onTap: onTap,
+      haptic: PressHaptic.selection,
+      semanticLabel: label,
+      child: AnimatedContainer(
+        duration: AppMotion.of(context, AppMotion.fast),
+        curve: AppMotion.standard,
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          gradient: selected ? AppColors.goldGradient : null,
+          borderRadius: BorderRadius.circular(AppRadii.chip),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.bodyS().copyWith(
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+            color: selected ? AppColors.black : AppColors.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The selected plan's price, large, with "/ month" or "/ year". During an
+/// offer the package's own price sits crossed out beside it and the line
+/// under says the price is kept; otherwise a yearly plan shows what it comes
+/// to a month.
+class _SelectedPlanPrice extends StatelessWidget {
+  const _SelectedPlanPrice({
+    required this.subscription,
+    required this.quoteFor,
+    required this.isLoadingStorePrices,
+  });
+
+  final SubscriptionController subscription;
+  final _PlanQuote Function(SubscriptionPackageModel plan) quoteFor;
+  final bool isLoadingStorePrices;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final plan = subscription.selectedPackage;
+      if (plan == null || subscription.isLoadingPackages.value) {
+        return const SizedBox.shrink();
+      }
+      if (isLoadingStorePrices) {
+        return const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.gold1,
+            ),
+          ),
+        );
+      }
+      final quote = quoteFor(plan);
+      final amount = quote.charge.amount;
+      final muted = AppTextStyles.bodyS().copyWith(color: AppColors.textMuted);
+      final regular = quote.regular;
+
+      final String note;
+      if (quote.offer != null) {
+        note = 'Price kept while you stay subscribed';
+      } else if (plan.isYearly && amount != null && amount > 0) {
+        note =
+            '${quote.charge.symbol}${PlanPricing.amount(PlanPricing.perMonth(amount))} a month';
+      } else {
+        note = plan.billingSubtitle;
+      }
 
       return Column(
         children: [
-          for (var i = 0; i < plans.length; i++) ...[
-            FadeSlideEntrance(
-              index: 5 + i,
-              child: _PricePlanCard(
-                plan: plans[i],
-                isSelected: plans[i].id == selectedId,
-                showBestValue: i == bestValueIndex,
-                onTap: () => subscription.selectPackage(plans[i].id),
-                applePriceLabel: useAppleStorePrices
-                    ? applePriceForPlan(plans[i])
-                    : null,
-                isLoadingApplePrice:
-                    useAppleStorePrices && isLoadingApplePrices,
-              ),
-            ),
-            if (i < plans.length - 1)
-              const SizedBox(height: AppSubscriptionTheme.priceCardGap),
-          ],
-        ],
-      );
-    });
-  }
-}
-
-/// Figma pricing cards 124:314 / 196:284 — 323×58 stacked plan rows.
-
-/// Figma pricing cards 124:314 / 196:284 — 323×58 stacked plan rows.
-class _PricePlanCard extends StatelessWidget {
-  const _PricePlanCard({
-    required this.plan,
-    required this.isSelected,
-    required this.showBestValue,
-    required this.onTap,
-    this.applePriceLabel,
-    this.isLoadingApplePrice = false,
-  });
-
-  final SubscriptionPackageModel plan;
-  final bool isSelected;
-  final bool showBestValue;
-  final VoidCallback onTap;
-  final String? applePriceLabel;
-  final bool isLoadingApplePrice;
-
-  String get _renewalNote {
-    final storePrice = applePriceLabel?.trim();
-    if (storePrice != null && storePrice.isNotEmpty) {
-      return 'After trial will renew at $storePrice';
-    }
-    return plan.renewalNote;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final card = AppPressable(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppMotion.fast,
-        curve: AppMotion.standard,
-        height: AppSubscriptionTheme.priceCardHeight,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(
-            AppSubscriptionTheme.priceCardRadius,
-          ),
-          gradient: AppColors.cardSurfaceGradient,
-          border: Border.all(
-            color: isSelected
-                ? AppColors.subscriptionPlanBorderSelected
-                : AppColors.subscriptionPlanBorderUnselected,
-            width: 1,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(15, 8, 12, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      plan.displayTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.roboto(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        height: 1,
-                        color: AppColors.white,
-                      ),
+          Text.rich(
+            TextSpan(
+              children: [
+                if (regular != null) ...[
+                  TextSpan(
+                    text: regular.label,
+                    style: muted.copyWith(
+                      fontSize: 16,
+                      decoration: TextDecoration.lineThrough,
+                      decorationColor: AppColors.textMuted,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      plan.billingSubtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.roboto(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w400,
-                        height: 1.2,
-                        color: AppColors.subscriptionBillingSubtitle,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              _TrialPriceLabel(
-                priceLabel: applePriceLabel ?? plan.displayPrice,
-                salePrice: double.tryParse(plan.price),
-                isStoreLocalized:
-                    applePriceLabel != null && applePriceLabel!.isNotEmpty,
-                isLoading: isLoadingApplePrice,
-                renewalNote: _renewalNote,
-              ),
-              SizedBox(
-                width: 30,
-                child: isSelected
-                    ? const Center(child: _PlanSelectionIndicator())
-                    : null,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (!showBestValue) return card;
-
-    return Padding(
-      padding: const EdgeInsets.only(
-        top: AppSubscriptionTheme.bestValueBadgeOverlap,
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          card,
-          const Positioned(
-            top: -10,
-            left: 26,
-            child: IgnorePointer(child: _BestValueBadge()),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrialPriceLabel extends StatelessWidget {
-  const _TrialPriceLabel({
-    required this.priceLabel,
-    required this.renewalNote,
-    this.salePrice,
-    this.isStoreLocalized = false,
-    this.isLoading = false,
-  });
-
-  static const double _originalPriceMultiplier = 1.5;
-
-  final String priceLabel;
-  final double? salePrice;
-  final bool isStoreLocalized;
-  final bool isLoading;
-  final String renewalNote;
-
-  String _formatAmount(double amount) {
-    if (amount == amount.roundToDouble()) return amount.toInt().toString();
-    return amount.toStringAsFixed(2);
-  }
-
-  String _leadingCurrencySymbol(String label) {
-    final trimmed = label.trim();
-    var end = 0;
-    while (end < trimmed.length) {
-      final code = trimmed.codeUnitAt(end);
-      final isDigit = code >= 48 && code <= 57;
-      if (isDigit || code == 32) break;
-      end++;
-    }
-    if (end == 0) return r'$';
-    return trimmed.substring(0, end);
-  }
-
-  String? _originalPriceLabel(String saleLabel) {
-    final basePrice = salePrice;
-    if (basePrice == null || basePrice <= 0) return null;
-
-    final originalAmount = basePrice * _originalPriceMultiplier;
-    final formattedAmount = _formatAmount(originalAmount);
-
-    if (isStoreLocalized) {
-      return '${_leadingCurrencySymbol(saleLabel)}$formattedAmount';
-    }
-
-    return r'$' + formattedAmount;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (isLoading) {
-      return const SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: AppColors.gold1,
-        ),
-      );
-    }
-
-    final label = isStoreLocalized ? priceLabel : r'$' + priceLabel;
-    final originalLabel = _originalPriceLabel(label);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              label,
-              textAlign: TextAlign.right,
-              style: GoogleFonts.playfairDisplay(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                height: 1.2,
-                color: AppColors.subscriptionPriceLabel,
-              ),
-            ),
-            if (originalLabel != null) ...[
-              const SizedBox(width: 4),
-              Text(
-                originalLabel,
-                textAlign: TextAlign.right,
-                style: GoogleFonts.roboto(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
-                  height: 1,
-                  color: AppColors.textWolf,
-                  decoration: TextDecoration.lineThrough,
-                  decorationColor: AppColors.textWolf,
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(
-          renewalNote,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.right,
-          style: GoogleFonts.roboto(
-            fontSize: 10,
-            fontWeight: FontWeight.w400,
-            height: 1.06,
-            color: AppColors.textWolf,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BestValueBadge extends StatelessWidget {
-  const _BestValueBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 94,
-      height: 20,
-      padding: const EdgeInsets.only(left: 6, right: 8),
-      decoration: BoxDecoration(
-        color: AppColors.subscriptionPlanBorderSelected,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SvgPicture.asset(
-            AppAssets.subscriptionCrown,
-            width: 13.3,
-            height: 12,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(width: 5),
-          Text(
-            'Best Value',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 10,
-              fontWeight: FontWeight.w400,
-              height: 1,
-              color: AppColors.black,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrialUrgencySection extends StatefulWidget {
-  const _TrialUrgencySection();
-
-  @override
-  State<_TrialUrgencySection> createState() => _TrialUrgencySectionState();
-}
-
-class _TrialUrgencySectionState extends State<_TrialUrgencySection> {
-  static const Duration _period = Duration(hours: 4);
-  static const int _slotsLeft = 9;
-
-  Timer? _timer;
-  Duration _remaining = Duration.zero;
-
-  @override
-  void initState() {
-    super.initState();
-    _tick();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  int _resolveEndMillis() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    var end = AppStorage.trialCountdownEndsAtMillis;
-    if (end == null) {
-      end = now + _period.inMilliseconds;
-      unawaited(AppStorage.setTrialCountdownEndsAtMillis(end));
-      return end;
-    }
-
-    final periodMs = _period.inMilliseconds;
-    if (end <= now) {
-      final elapsed = now - end;
-      final cycles = (elapsed ~/ periodMs) + 1;
-      end += cycles * periodMs;
-      unawaited(AppStorage.setTrialCountdownEndsAtMillis(end));
-    }
-    return end;
-  }
-
-  void _tick() {
-    final remaining = Duration(
-      milliseconds: _resolveEndMillis() - DateTime.now().millisecondsSinceEpoch,
-    );
-    if (!mounted) return;
-    setState(() {
-      _remaining = remaining.isNegative ? Duration.zero : remaining;
-    });
-  }
-
-  String get _formattedRemaining {
-    var seconds = _remaining.inSeconds;
-    if (seconds < 0) seconds = 0;
-    final hours = (seconds ~/ 3600).toString().padLeft(2, '0');
-    final minutes = ((seconds % 3600) ~/ 60).toString().padLeft(2, '0');
-    final secs = (seconds % 60).toString().padLeft(2, '0');
-    return '$hours:$minutes:$secs';
-  }
-
-  double get _progress {
-    final total = _period.inMilliseconds;
-    if (total <= 0) return 0;
-    return (_remaining.inMilliseconds / total).clamp(0.0, 1.0);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text.rich(
-          TextSpan(
-            style: GoogleFonts.roboto(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              height: 1.2,
-              color: AppColors.white,
-            ),
-            children: [
-              const TextSpan(text: 'Free trials expire in '),
-              TextSpan(
-                text: _formattedRemaining,
-                style: GoogleFonts.roboto(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                  color: AppColors.subscriptionTrialTime,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(7),
-          child: SizedBox(
-            height: 8,
-            width: double.infinity,
-            child: ColoredBox(
-              color: AppColors.subscriptionTrialTrack,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  widthFactor: _progress,
-                  heightFactor: 1,
-                  child: const ColoredBox(
-                    color: AppColors.subscriptionPlanBorderSelected,
+                  ),
+                  const TextSpan(text: '  '),
+                ],
+                TextSpan(
+                  text: quote.charge.label,
+                  style: AppTextStyles.headingL().copyWith(
+                    fontSize: 34,
+                    color: AppColors.subscriptionPriceLabel,
                   ),
                 ),
-              ),
+                TextSpan(
+                  text: plan.isYearly ? ' / year' : ' / month',
+                  style: muted,
+                ),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          // Always one line under the price, so the button below holds still
+          // when the plan changes.
+          const SizedBox(height: 4),
+          Text(
+            note,
+            textAlign: TextAlign.center,
+            style: muted.copyWith(
+              fontSize: 12,
+              color: quote.offer != null
+                  ? AppColors.goldBright
+                  : AppColors.textMuted,
             ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Only $_slotsLeft free trials slots left today.',
-          style: GoogleFonts.roboto(
-            fontSize: 10,
-            fontWeight: FontWeight.w400,
-            height: 1.2,
-            color: AppColors.subscriptionBenefitGold,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Selected plan only: gold circle + tick from Figma.
-class _PlanSelectionIndicator extends StatelessWidget {
-  const _PlanSelectionIndicator();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 22,
-      height: 22,
-      child: SvgPicture.asset(
-        AppAssets.subscriptionPlanCheck,
-        width: 22,
-        height: 22,
-        fit: BoxFit.contain,
-      ),
-    );
+        ],
+      );
+    });
   }
 }

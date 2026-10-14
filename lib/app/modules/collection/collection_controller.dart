@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
@@ -75,6 +76,11 @@ class CollectionController extends GetxController {
   final filter = CollectionFilter.all.obs;
   final isLoading = true.obs;
 
+  /// The All bottles search, matched on name, brand, distillery, type and
+  /// region, on top of [filter].
+  final searchCtrl = TextEditingController();
+  final query = ''.obs;
+
   /// What the collection is worth today (see
   /// [CollectionValueCalculator.summarize]), for the count-up animation.
   final valueAmount = 0.0.obs;
@@ -114,6 +120,12 @@ class CollectionController extends GetxController {
   void onInit() {
     super.onInit();
     load();
+  }
+
+  @override
+  void onClose() {
+    searchCtrl.dispose();
+    super.onClose();
   }
 
   Future<void> load({bool forceRefresh = false}) async {
@@ -211,7 +223,15 @@ class CollectionController extends GetxController {
       );
     }
     filter.value = value;
+    clearSearch();
     Get.toNamed(AppRoutes.collectionBottles);
+  }
+
+  void onSearchChanged(String value) => query.value = value.trim();
+
+  void clearSearch() {
+    searchCtrl.clear();
+    query.value = '';
   }
 
   void setFilter(CollectionFilter value) => filter.value = value;
@@ -233,10 +253,31 @@ class CollectionController extends GetxController {
 
   List<CollectionItemModel> get filteredItems {
     final f = filter.value;
-    final list = items.where(f.matches).toList();
+    final words = query.value
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
+    final list = items
+        .where(f.matches)
+        .where((item) => words.isEmpty || _matchesSearch(item, words))
+        .toList();
 
     list.sort(_compare);
     return list;
+  }
+
+  /// Every word must appear somewhere in the bottle's name or catalog facts.
+  static bool _matchesSearch(CollectionItemModel item, List<String> words) {
+    final d = item.details;
+    final haystack = [
+      item.lineTitle,
+      d.brand,
+      d.distillery,
+      d.spiritType,
+      d.region,
+    ].whereType<String>().join(' ').toLowerCase();
+    return words.every(haystack.contains);
   }
 
   int _compare(CollectionItemModel a, CollectionItemModel b) {
@@ -250,8 +291,10 @@ class CollectionController extends GetxController {
         break;
       case CollectionSort.price:
         // Today's value per bottle, or what was paid when there is none.
-        final pa = a.marketAverageValue ?? double.tryParse(a.pricePaid ?? '') ?? 0;
-        final pb = b.marketAverageValue ?? double.tryParse(b.pricePaid ?? '') ?? 0;
+        final pa =
+            a.marketAverageValue ?? double.tryParse(a.pricePaid ?? '') ?? 0;
+        final pb =
+            b.marketAverageValue ?? double.tryParse(b.pricePaid ?? '') ?? 0;
         res = pa.compareTo(pb);
         break;
       case CollectionSort.gain:
@@ -281,6 +324,16 @@ class CollectionController extends GetxController {
     return item.id;
   }
 
+  /// The merged item for [bottleId] as of the last load, or null once gone.
+  CollectionItemModel? itemFor(String bottleId) {
+    for (final item in items) {
+      if (resolveBottleId(item) == bottleId) return item;
+    }
+    return null;
+  }
+
+  /// Adds one sealed bottle to [item], leaving the ones it has alone. The
+  /// [quantity] is the count after the add, as the quick view's stepper has it.
   Future<void> increaseBottleQuantity(
     CollectionItemModel item,
     int quantity, {
@@ -288,30 +341,70 @@ class CollectionController extends GetxController {
   }) async {
     await _repo.addToCollection(
       bottleId: resolveBottleId(item),
-      quantity: quantity,
-      fill: (item.fillRatio * 100).round().clamp(0, 100),
+      quantity: 1,
+      fill: 100,
       pricePaid: double.tryParse(item.pricePaid ?? '') ?? 0,
       image: item.image,
+      append: true,
     );
     if (reloadList) await forceReload();
   }
 
+  /// Removes the most recently added bottle of [item], or all of it once
+  /// [quantity] reaches zero.
   Future<void> decreaseBottleQuantity(
     CollectionItemModel item,
     int quantity, {
     bool reloadList = true,
   }) async {
+    final newest = _newestBottle(item);
     if (quantity <= 0) {
       await _repo.removeFromCollection(bottleId: resolveBottleId(item));
-    } else {
-      await _repo.addToCollection(
-        bottleId: resolveBottleId(item),
-        quantity: quantity,
-        fill: (item.fillRatio * 100).round().clamp(0, 100),
-        pricePaid: double.tryParse(item.pricePaid ?? '') ?? 0,
-        image: item.image,
-      );
+    } else if (newest != null) {
+      await _repo.removeBottle(rowId: newest.id);
     }
     if (reloadList) await forceReload();
   }
+
+  static OwnedBottle? _newestBottle(CollectionItemModel item) {
+    OwnedBottle? newest;
+    for (final b in item.bottles ?? const <OwnedBottle>[]) {
+      if (newest == null ||
+          (b.createdAt ?? 0) > (newest.createdAt ?? 0) ||
+          ((b.createdAt ?? 0) == (newest.createdAt ?? 0) &&
+              (int.tryParse(b.id) ?? 0) > (int.tryParse(newest.id) ?? 0))) {
+        newest = b;
+      }
+    }
+    return newest;
+  }
+
+  /// Sets one bottle's fill. The list is not reloaded: the caller keeps its
+  /// own copy and the list catches up when it next loads.
+  Future<void> setBottleFill(OwnedBottle bottle, int fill) =>
+      _repo.updateBottleFill(rowId: bottle.id, fill: fill);
+
+  /// Saves one bottle's price paid and purchase date (a null one is kept),
+  /// then reloads, because the merged item's paid price and gain
+  /// follow the price.
+  Future<void> editBottle(
+    OwnedBottle bottle, {
+    double? pricePaid,
+    DateTime? purchasedOn,
+  }) async {
+    await _repo.updateBottle(
+      rowId: bottle.id,
+      pricePaid: pricePaid,
+      purchasedOn: purchasedOn,
+    );
+    await forceReload();
+  }
+
+  /// An opened bottle is one under 100%, so opening starts just below it.
+  static const int openedFill = 99;
+
+  Future<void> openBottle(OwnedBottle bottle) =>
+      setBottleFill(bottle, openedFill);
+
+  Future<void> sealBottle(OwnedBottle bottle) => setBottleFill(bottle, 100);
 }

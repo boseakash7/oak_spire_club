@@ -8,6 +8,7 @@ import 'bottom_nav_controller.dart';
 import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/categories_repository.dart';
 import '../../data/repositories/market_repository.dart';
+import '../../data/repositories/package_repository.dart';
 
 class BottomNavBinding extends Bindings {
   @override
@@ -20,6 +21,7 @@ class BottomNavBinding extends Bindings {
       () => DashboardController(
         marketRepo: Get.find<MarketRepository>(),
         bluebookRepo: Get.find<BluebookRepository>(),
+        packageRepo: Get.find<PackageRepository>(),
       ),
       fenix: true,
     );

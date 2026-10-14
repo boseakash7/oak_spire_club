@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/firebase/firebase_notification_topics.dart';
+import '../../../core/storage/app_storage.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/utils/app_snackbar.dart';
 import '../../../core/utils/dispose_after_detach.dart';
@@ -55,6 +56,8 @@ class SignUpController extends GetxController {
         password: passwordController.text,
       );
       await FirebaseNotificationTopics.syncNewRegistrationTopic();
+      // Home opens on a welcome card that guides them to a first bottle.
+      await AppStorage.setWelcomePending(user.id);
       AuthNavigation.afterAuth(user);
     } on ApiException catch (e) {
       AppSnackbar.error(e.message);

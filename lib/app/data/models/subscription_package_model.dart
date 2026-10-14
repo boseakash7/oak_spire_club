@@ -8,7 +8,13 @@ class SubscriptionPackageModel {
     required this.price,
     required this.packageType,
     this.appleStoreId,
+    this.offer,
+    this.trialDays = defaultTrialDays,
   });
+
+  /// The server's default (`razorpay_trial_days`), for a server that doesn't
+  /// send `trial_days` yet.
+  static const int defaultTrialDays = 7;
 
   factory SubscriptionPackageModel.fromJson(Map<String, dynamic> json) {
     return SubscriptionPackageModel(
@@ -17,6 +23,10 @@ class SubscriptionPackageModel {
       price: json['price']?.toString() ?? '',
       packageType: json['package_type']?.toString().toLowerCase() ?? '',
       appleStoreId: json['apple_store_id']?.toString(),
+      offer: PackageOffer.fromJson(json['offer']),
+      trialDays:
+          int.tryParse(json['trial_days']?.toString() ?? '') ??
+          defaultTrialDays,
     );
   }
 
@@ -26,6 +36,36 @@ class SubscriptionPackageModel {
   /// `monthly` | `yearly` — sent as `plan_type` to `package/payment-create`.
   final String packageType;
   final String? appleStoreId;
+
+  /// The offer running when the list was fetched, if any. Check
+  /// [PackageOffer.isRunning] before showing or charging it.
+  final PackageOffer? offer;
+
+  /// Days of free trial a first subscription gets (`razorpay_trial_days`).
+  final int trialDays;
+
+  /// [offer] while it is still running at [now], else null.
+  PackageOffer? offerAt(DateTime now) =>
+      offer != null && offer!.isRunning(now) ? offer : null;
+
+  /// What a subscription started at [now] is charged: the offer price while
+  /// it runs (locked in for every renewal), else [price].
+  String chargePriceAt(DateTime now) => offerAt(now)?.price ?? price;
+
+  /// The App Store product bought at [now]: the offer's while it runs and has
+  /// one, else [appleProductId].
+  String appleProductIdAt(DateTime now) =>
+      offerAt(now)?.appleStoreId ?? appleProductId;
+
+  /// How much [offer] takes off [price] at [now], as a whole percent. Null
+  /// when no offer runs or either price is missing.
+  int? offerPercentOffAt(DateTime now) {
+    final was = double.tryParse(price);
+    final charged = double.tryParse(offerAt(now)?.price ?? '');
+    if (was == null || charged == null || was <= 0) return null;
+    final pct = ((1 - charged / was) * 100).round();
+    return pct > 0 ? pct : null;
+  }
 
   bool get isYearly => packageType == 'yearly';
 
@@ -67,5 +107,58 @@ class SubscriptionPackageModel {
     return isYearly
         ? AppConstants.appleYearlyProductId
         : AppConstants.appleMonthlyProductId;
+  }
+}
+
+/// A package's time-limited, locked-in price (admin > Packages > Offer). The
+/// server sends it only while it runs; [endsAt] is worked out from `ends_in`
+/// against this device's clock, so a wrong clock can't stretch it.
+class PackageOffer {
+  const PackageOffer({
+    required this.price,
+    required this.label,
+    required this.endsAt,
+    this.appleStoreId,
+  });
+
+  static PackageOffer? fromJson(Object? json, {DateTime? receivedAt}) {
+    if (json is! Map) return null;
+    final price = double.tryParse(json['price']?.toString() ?? '');
+    final endsIn = int.tryParse(json['ends_in']?.toString() ?? '');
+    if (price == null || price <= 0 || endsIn == null || endsIn <= 0) {
+      return null;
+    }
+    final apple = json['apple_store_id']?.toString().trim();
+    final label = json['label']?.toString().trim();
+    return PackageOffer(
+      price: json['price'].toString(),
+      label: label == null || label.isEmpty || label == 'null'
+          ? 'Limited offer'
+          : label,
+      endsAt: (receivedAt ?? DateTime.now()).add(Duration(seconds: endsIn)),
+      appleStoreId: apple == null || apple.isEmpty || apple == 'null'
+          ? null
+          : apple,
+    );
+  }
+
+  /// Charged during the offer, e.g. `25.00`.
+  final String price;
+  final String label;
+  final DateTime endsAt;
+
+  /// The App Store product at the offer price; null means no offer on iOS.
+  final String? appleStoreId;
+
+  bool isRunning(DateTime now) => now.isBefore(endsAt);
+
+  /// Time left at [now]: `2d 04:12:09`, or `04:12:09` on the last day.
+  String countdownAt(DateTime now) {
+    final s = endsAt.difference(now).inSeconds.clamp(0, 1 << 31);
+    String two(int n) => n.toString().padLeft(2, '0');
+    final clock =
+        '${two((s ~/ 3600) % 24)}:${two((s % 3600) ~/ 60)}:${two(s % 60)}';
+    final days = s ~/ 86400;
+    return days > 0 ? '${days}d $clock' : clock;
   }
 }

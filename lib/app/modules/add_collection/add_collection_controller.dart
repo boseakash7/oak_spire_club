@@ -40,7 +40,6 @@ class AddCollectionController extends GetxController {
 
   final isSubmitting = false.obs;
   final selected = Rxn<BluebookModel>();
-  final isEditMode = false.obs;
 
   final bottleNameError = RxnString();
   final qtyError = RxnString();
@@ -52,7 +51,9 @@ class AddCollectionController extends GetxController {
   final customImageFile = Rxn<File>();
 
   DateTime? dateAcquired;
-  String? _originalBottleId;
+
+  /// How many of this bottle the user already has. Adding never replaces them.
+  int ownedQuantity = 0;
 
   /// Set from route prefill — stays true for own-bottle flow even after bluebook create.
   bool _isCustomBottleFlow = true;
@@ -93,13 +94,7 @@ class AddCollectionController extends GetxController {
     _navigateToCollectionOnSuccess =
         map['navigateToCollectionOnSuccess'] == true;
     _popBenchmarkDetailOnSuccess = map['popBenchmarkDetailOnSuccess'] == true;
-    isEditMode.value = map['editMode'] == true;
-    final originalBottleIdRaw = map['originalBottleId']?.toString();
-    if (originalBottleIdRaw != null &&
-        originalBottleIdRaw.isNotEmpty &&
-        originalBottleIdRaw != 'null') {
-      _originalBottleId = originalBottleIdRaw;
-    }
+    ownedQuantity = int.tryParse(map['ownedQuantity']?.toString() ?? '') ?? 0;
     if (prefillRaw is! Map) return;
     final prefill = Map<String, dynamic>.from(prefillRaw);
 
@@ -262,32 +257,18 @@ class AddCollectionController extends GetxController {
           ? (imageUrlForCatalog ?? b.image)
           : null;
 
-      if (isEditMode.value &&
-          _originalBottleId != null &&
-          _originalBottleId!.isNotEmpty) {
-        await _collectionRepo.replaceCollectionItem(
-          originalBottleId: _originalBottleId!,
-          bottleId: b.id,
-          quantity: resolvedQty,
-          fill: normalizedFill,
-          pricePaid: price,
-          imageFile: imageFile,
-          image: imageUrl,
-          notes: notesCtrl.text.trim(),
-          dateAcquired: dateAcquiredCtrl.text.trim(),
-        );
-      } else {
-        await _collectionRepo.addToCollection(
-          bottleId: b.id,
-          quantity: resolvedQty,
-          fill: normalizedFill,
-          pricePaid: price,
-          imageFile: imageFile,
-          image: imageUrl,
-          notes: notesCtrl.text.trim(),
-          dateAcquired: dateAcquiredCtrl.text.trim(),
-        );
-      }
+      await _collectionRepo.addToCollection(
+        bottleId: b.id,
+        quantity: resolvedQty,
+        fill: normalizedFill,
+        pricePaid: price,
+        imageFile: imageFile,
+        image: imageUrl,
+        notes: notesCtrl.text.trim(),
+        dateAcquired: dateAcquiredCtrl.text.trim(),
+        // Adds to any bottles already owned; never replaces them.
+        append: true,
+      );
       await AppSnackbar.success('Added to collection.');
 
       // Prevent a visible "flash" of the previous route by preparing the destination

@@ -22,6 +22,7 @@ import '../../../core/widgets/pricing_badge.dart';
 import '../../../data/models/bluebook_model.dart';
 import '../../../data/models/price_sparkline.dart';
 import '../../../routes/app_routes.dart';
+import '../../session/plan_access_controller.dart';
 import '../../wishlist/widgets/wishlist_bookmark.dart';
 import '../benchmark_detail_controller.dart';
 
@@ -103,7 +104,7 @@ class MarketBottleRow extends StatelessWidget {
                     child: BottleImage(
                       url: AppImageUrl.resolve(bottle.image),
                       bottleId: bottle.id,
-                      cacheWidthPx: 200,
+                      cacheWidthPx: BottleImage.rowCacheWidthPx,
                       padding: const EdgeInsets.all(4),
                     ),
                   ),
@@ -212,10 +213,29 @@ class MarketBottleRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    '${PriceFormatter.format(bottle.low)} – '
-                    '${PriceFormatter.format(bottle.high)}',
-                    style: meta.copyWith(fontSize: 10),
+                  // The low–high range is Premium on the free plan.
+                  Obx(
+                    () => PlanAccessController.to.insightsLocked.value
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.lock_rounded,
+                                size: 10,
+                                color: AppColors.goldBright,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Range',
+                                style: meta.copyWith(fontSize: 10),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            '${PriceFormatter.format(bottle.low)} – '
+                            '${PriceFormatter.format(bottle.high)}',
+                            style: meta.copyWith(fontSize: 10),
+                          ),
                   ),
                 ],
               ],

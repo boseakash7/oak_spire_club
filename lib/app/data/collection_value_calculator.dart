@@ -38,7 +38,7 @@ class CollectionValueCalculator {
   }
 
   /// What the collection is worth today: each row's bluebook average ×
-  /// quantity.
+  /// quantity × fill ([CollectionItemDisplay.marketTotalValue]).
   ///
   /// Rows whose bluebook carries no price contribute nothing, so a partially
   /// priced collection still totals the part we can value. Returns null when
@@ -50,12 +50,10 @@ class CollectionValueCalculator {
     var sum = 0.0;
     var priced = false;
     for (final item in items) {
-      final unit = item.marketAverageValue;
-      if (unit == null) continue;
+      final market = item.marketTotalValue;
+      if (market == null) continue;
       priced = true;
-      final qtyRaw = int.tryParse(item.quantity ?? '');
-      final qty = (qtyRaw == null || qtyRaw <= 0) ? 1 : qtyRaw;
-      sum += unit * qty;
+      sum += market;
     }
     return priced ? sum : null;
   }
@@ -64,9 +62,10 @@ class CollectionValueCalculator {
   ///
   /// The headline is what the collection is worth today: each row at its
   /// bluebook average, or at what was paid when the bottle has no market
-  /// price, so a bottle is never dropped from the total. Gain compares market
-  /// against paid only on rows that have both, so a bottle valued at cost
-  /// cannot pull the percentage toward 0.
+  /// price, so a bottle is never dropped from the total. Either way it is in
+  /// proportion to how full the bottles are, so drinking lowers the value.
+  /// Gain compares market against paid only on rows that have both, so a
+  /// bottle valued at cost cannot pull the percentage toward 0.
   static CollectionValueSummary summarize(Iterable<CollectionItemModel> items) {
     var invested = 0.0;
     var value = 0.0;
@@ -80,7 +79,7 @@ class CollectionValueCalculator {
       final market = item.marketTotalValue;
       invested += paid;
       if (market == null) {
-        value += paid;
+        value += item.currentValue;
         atCost++;
         continue;
       }
@@ -168,7 +167,8 @@ class CollectionValueSummary {
   /// What the user paid in total.
   final double invested;
 
-  /// Today's value: market price where known, price paid elsewhere.
+  /// Today's value: market price where known, price paid elsewhere, each in
+  /// proportion to fill.
   final double value;
 
   /// No bottle has a market price, so [value] is just [invested] and must be

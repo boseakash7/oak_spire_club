@@ -3,6 +3,10 @@ import '../../core/network/api_exception.dart';
 import '../models/bluebook_model.dart';
 import '../models/price_sparkline.dart';
 
+/// A page of bottles. [searchesLeft] is what a free plan has left of today's
+/// searches after this one; null when unlimited, or not a search.
+typedef BluebookPage = ({List<BluebookModel> bottles, int? searchesLeft});
+
 class BluebookRemoteDataSource {
   BluebookRemoteDataSource(this._client);
   final ApiClient _client;
@@ -27,22 +31,32 @@ class BluebookRemoteDataSource {
   /// relevance, typo tolerant); without one it browses in [sort] order
   /// (`name`, `price_desc`, `price_asc`, `gain_30d`, `loss_30d`, `premium`;
   /// the server falls back to `name`). [categoryId] filters either way.
-  Future<List<BluebookModel>> getAll({
+  ///
+  /// A search sends [userId], so a free plan's daily searches are counted:
+  /// past them the server answers `LIMIT_EXCEEDED`, and until then the page
+  /// carries how many are left.
+  Future<BluebookPage> getAll({
     required int page,
     required int limit,
     String? keyword,
     String? categoryId,
     String? sort,
+    String? userId,
   }) async {
     final isSearch = keyword != null && keyword.trim().isNotEmpty;
-    final response = await _client.get(isSearch ? _search : _getAll, query: {
-      'page': page.toString(),
-      'limit': limit.toString(),
-      if (keyword != null && keyword.trim().isNotEmpty) 'keyword': keyword.trim(),
-      if (categoryId != null && categoryId.trim().isNotEmpty)
-        'category_id': categoryId.trim(),
-      if (!isSearch && sort != null) 'sort': sort,
-    });
+    final response = await _client.get(
+      isSearch ? _search : _getAll,
+      query: {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        if (keyword != null && keyword.trim().isNotEmpty)
+          'keyword': keyword.trim(),
+        if (categoryId != null && categoryId.trim().isNotEmpty)
+          'category_id': categoryId.trim(),
+        if (!isSearch && sort != null) 'sort': sort,
+        if (isSearch && userId != null && userId.isNotEmpty) 'user_id': userId,
+      },
+    );
 
     final json = _client.parseEnvelope(response);
 
@@ -51,10 +65,13 @@ class BluebookRemoteDataSource {
     final list = data['data'];
     if (list is! List) throw ApiException('Unexpected server response.');
 
-    return list
-        .whereType<Map>()
-        .map((e) => BluebookModel.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
+    return (
+      bottles: list
+          .whereType<Map>()
+          .map((e) => BluebookModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      searchesLeft: int.tryParse(data['searches_left']?.toString() ?? ''),
+    );
   }
 
   /// One bottle with everything the catalog knows (`details`, `pricing`).

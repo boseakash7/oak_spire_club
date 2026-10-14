@@ -75,7 +75,7 @@ class WishlistRow extends StatelessWidget {
                 child: BottleImage(
                   url: AppImageUrl.resolve(item.bottle.image),
                   bottleId: heroId,
-                  cacheWidthPx: 168,
+                  cacheWidthPx: BottleImage.rowCacheWidthPx,
                   padding: const EdgeInsets.all(4),
                 ),
               ),

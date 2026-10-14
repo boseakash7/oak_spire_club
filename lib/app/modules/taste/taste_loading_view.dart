@@ -129,7 +129,7 @@ class _RowCard extends StatelessWidget {
   }
 }
 
-/// Image, name, proof, price and add button, positioned like the real row.
+/// Image, name, meta chips and the add label, positioned like the real row.
 class _RowPlaceholders extends StatelessWidget {
   const _RowPlaceholders({required this.nameWidth});
 
@@ -159,15 +159,7 @@ class _RowPlaceholders extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.xs),
-            const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                ShimmerBox(height: 12, width: 54, radius: 4),
-                SizedBox(height: 8),
-                ShimmerBox(height: 28, width: 28, radius: 14),
-              ],
-            ),
+            const ShimmerBox(height: 14, width: 44, radius: 4),
           ],
         ),
       ),

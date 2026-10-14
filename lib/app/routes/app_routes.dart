@@ -16,6 +16,9 @@ class AppRoutes {
   static const String collectionBottles = '/collection/bottles';
   static const String subscription = '/subscription';
   static const String subscriptionSkip = '/subscription-skip';
+
+  /// Review the plan before paying; pops `true` to go ahead.
+  static const String subscriptionConfirm = '/subscription/confirm';
   static const String subscriptionPaymentSuccess = '/subscription/payment-success';
   static const String settingsAccount = '/settings/account';
   static const String settingsNotifications = '/settings/notifications';

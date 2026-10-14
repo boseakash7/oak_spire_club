@@ -14,6 +14,7 @@ class AppNavItem {
     this.asset,
     this.icon,
     this.iconSize = 20,
+    this.showDot = false,
   }) : assert(asset != null || icon != null);
 
   final String label;
@@ -21,6 +22,9 @@ class AppNavItem {
   final IconData? icon;
   final double iconSize;
   final VoidCallback onTap;
+
+  /// A small gold dot on the icon, pointing a new user at this tab.
+  final bool showDot;
 }
 
 /// The shell's bottom bar. A soft gold wash and a gold hairline slide
@@ -186,7 +190,29 @@ class _NavButton extends StatelessWidget {
                 curve: AppMotion.emphasized,
                 child: SizedBox.square(
                   dimension: _iconBox,
-                  child: Center(child: icon),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Center(child: icon),
+                      Positioned(
+                        top: -1,
+                        right: -3,
+                        child: AnimatedScale(
+                          scale: item.showDot ? 1 : 0,
+                          duration: duration,
+                          curve: AppMotion.emphasized,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.goldBright,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

@@ -79,7 +79,7 @@ class CollectionBottleRow extends StatelessWidget {
                 child: BottleImage(
                   urls: item.resolvedImageCandidates,
                   bottleId: heroBottleId,
-                  cacheWidthPx: 200,
+                  cacheWidthPx: BottleImage.rowCacheWidthPx,
                   padding: const EdgeInsets.all(4),
                 ),
               ),
@@ -209,7 +209,7 @@ class _ValueColumn extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            item.paidTotalValue > 0 ? _dollars(item.paidTotalValue) : '—',
+            item.currentValue > 0 ? _dollars(item.currentValue) : '—',
             style: valueStyle,
           ),
           const SizedBox(height: 4),

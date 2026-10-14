@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../core/cache/app_cache.dart';
+import '../../core/storage/app_storage.dart';
 import '../datasources/bluebook_remote_datasource.dart';
 import '../models/bluebook_model.dart';
 import '../models/price_sparkline.dart';
@@ -13,20 +14,23 @@ class BluebookRepository {
   /// Prices move once a night, so a sparkline is good for hours.
   static const Duration _sparklineTtl = Duration(hours: 6);
 
-  Future<List<BluebookModel>> search({
+  /// A page of the catalog: a search with a [keyword], else browsing. A
+  /// search is counted against a free plan's daily searches (see
+  /// [BluebookRemoteDataSource.getAll]).
+  Future<BluebookPage> search({
     required int page,
     required int limit,
     String? keyword,
     String? categoryId,
     String? sort,
-  }) =>
-      _remote.getAll(
-        page: page,
-        limit: limit,
-        keyword: keyword,
-        categoryId: categoryId,
-        sort: sort,
-      );
+  }) => _remote.getAll(
+    page: page,
+    limit: limit,
+    keyword: keyword,
+    categoryId: categoryId,
+    sort: sort,
+    userId: AppStorage.userId,
+  );
 
   Future<BluebookModel> getById(String id) => _remote.getById(id);
 

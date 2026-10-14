@@ -48,51 +48,16 @@ class AddToCollectionLauncher {
       'image': imagePathOrUrl,
     };
 
-    final matches = await _findCollectionMatches(selectedBottleId);
-
-    if (matches.isNotEmpty) {
-      var totalQty = 0;
-      var totalPrice = 0.0;
-      var totalFill = 0.0;
-      var fillCount = 0;
-      String? image;
-      String? notes;
-      String? dateAcquired;
-
-      for (final item in matches) {
-        final q = int.tryParse(item.quantity ?? '');
-        totalQty += (q == null || q <= 0) ? 1 : q;
-        totalPrice += double.tryParse(item.pricePaid ?? '') ?? 0;
-        final fill = int.tryParse(item.fill ?? '');
-        if (fill != null) {
-          totalFill += fill;
-          fillCount += 1;
-        }
-        image ??= item.image;
-        notes ??= item.notes;
-        dateAcquired ??= item.dateAcquired;
-      }
-
-      prefill['quantity'] = totalQty <= 0 ? 1 : totalQty;
-      prefill['average'] = (totalPrice / matches.length).toStringAsFixed(2);
-      if (fillCount > 0) {
-        prefill['fill'] = (totalFill / fillCount).round().clamp(1, 100);
-      }
-      if (image != null && image.isNotEmpty) prefill['image'] = image;
-      if (notes != null && notes.isNotEmpty) prefill['notes'] = notes;
-      if (dateAcquired != null && dateAcquired.isNotEmpty) {
-        prefill['date_acquired'] = dateAcquired;
-      }
-    } else {
-      prefill['quantity'] = 1;
-      prefill['fill'] = 100;
-    }
+    // Always a fresh add: the bottles already owned are left alone and the
+    // new ones join them. Only the count is looked up, to say so on screen.
+    final owned = await _ownedQuantity(selectedBottleId);
+    prefill['quantity'] = 1;
+    prefill['fill'] = 100;
 
     final result = await Get.toNamed(
       AppRoutes.addToCollection,
       arguments: {
-        if (matches.isNotEmpty) 'editMode': true,
-        if (matches.isNotEmpty) 'originalBottleId': selectedBottleId,
+        'ownedQuantity': owned,
         'navigateToCollectionOnSuccess': navigateToCollectionOnSuccess,
         'popBenchmarkDetailOnSuccess': popBenchmarkDetailOnSuccess,
         'prefill': prefill,
@@ -123,16 +88,18 @@ class AddToCollectionLauncher {
     return result;
   }
 
-  Future<List<CollectionItemModel>> _findCollectionMatches(
-    String bottleId,
-  ) async {
+  Future<int> _ownedQuantity(String bottleId) async {
     try {
       final all = await _collectionRepo.fetchMyCollection(forceRefresh: true);
-      return all
-          .where((item) => _resolveCollectionBottleId(item) == bottleId)
-          .toList();
+      var total = 0;
+      for (final item in all) {
+        if (_resolveCollectionBottleId(item) == bottleId) {
+          total += item.displayQuantity;
+        }
+      }
+      return total;
     } catch (_) {
-      return const [];
+      return 0;
     }
   }
 

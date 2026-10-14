@@ -8,6 +8,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_back_button.dart';
 import '../../core/widgets/app_empty_state.dart';
+import '../../core/widgets/app_search_field.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import 'collection_controller.dart';
@@ -19,8 +20,8 @@ const double _kInset = 23;
 
 /// The collection's bottles, from the Collection tab's "View all bottles"
 /// (every one) or a quick-stat tile (the bottles it counts, see
-/// [CollectionFilter]): the sort menu, the filter chips and one row per
-/// bottle, each opening its quick view. Shares [CollectionController] with the tab, so an
+/// [CollectionFilter]): a search field, the sort menu, the filter chips and
+/// one row per bottle, each opening its quick view. Shares [CollectionController] with the tab, so an
 /// edit here shows there too.
 class CollectionBottlesView extends GetView<CollectionController> {
   const CollectionBottlesView({super.key});
@@ -57,7 +58,18 @@ class CollectionBottlesView extends GetView<CollectionController> {
                   18,
                 ),
                 sliver: SliverToBoxAdapter(
-                  child: CollectionFilterRow(controller: controller),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AppSearchField(
+                        controller: controller.searchCtrl,
+                        onChanged: controller.onSearchChanged,
+                        hintText: 'Search your bottles',
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      CollectionFilterRow(controller: controller),
+                    ],
+                  ),
                 ),
               ),
               Obx(() {
@@ -134,6 +146,7 @@ class _List extends StatelessWidget {
                     rowContext,
                     item: item,
                     controller: controller,
+                    heroBottleId: heroIds[index],
                   ),
                 ),
               ),
@@ -160,6 +173,20 @@ class _EmptyState extends StatelessWidget {
         message: 'Bottles you add show up here.',
         actionLabel: 'Back to collection',
         onAction: () => Get.back<void>(),
+      );
+    }
+
+    final query = controller.query.value;
+    if (query.isNotEmpty) {
+      return AppEmptyState(
+        icon: Icons.search_off_rounded,
+        title: 'No bottles match "$query"',
+        message: controller.filter.value == CollectionFilter.all
+            ? 'Try a name, brand, distillery or type.'
+            : 'Searching within the ${controller.filter.value.chipLabel} '
+                  'filter. Clear the search or the filter to see more.',
+        actionLabel: 'Clear search',
+        onAction: controller.clearSearch,
       );
     }
 

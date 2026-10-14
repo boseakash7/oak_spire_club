@@ -135,31 +135,18 @@ class AppColors {
   /// Skip link, secondary actions — same as [ratingStarMuted].
   static const Color subscriptionSkipLink = ratingStarMuted;
 
-  /// Benefit row gold emphasis.
-  static const Color subscriptionBenefitGold = Color(0xFFCA9F2E);
-
-  /// Benefit row alternate gold — same as [goldBright].
-  static const Color subscriptionBenefitGoldAlt = goldBright;
-
-  /// “No limits” benefit accents.
-  static const Color subscriptionBenefitLimitsPrimary = Color(0xFFC89D2C);
-  static const Color subscriptionBenefitLimitsSecondary = Color(0xFFC89C2C);
-
   /// Plan card border (selected / unselected).
   static const Color subscriptionPlanBorderSelected = Color(0xFFC89D2D);
   static const Color subscriptionPlanBorderUnselected = Color(0xFF422E27);
 
-  /// “Billed every …” on plan cards.
-  static const Color subscriptionBillingSubtitle = Color(0xFF787878);
-
-  /// Trial countdown digits.
-  static const Color subscriptionTrialTime = Color(0xFFD0A934);
-
-  /// Trial progress track.
-  static const Color subscriptionTrialTrack = Color(0xFF201116);
-
   /// Plan price label (Playfair).
   static const Color subscriptionPriceLabel = Color(0xFFCA9F2E);
+
+  /// Checkout: the Premium plan card and the offer banner (a warm gold-brown
+  /// with a deeper gold edge), and the dimmer Free card.
+  static const Color subscriptionOfferSurface = Color(0xFF2A1D10);
+  static const Color subscriptionOfferBorder = Color(0xFF8A6A1E);
+  static const Color subscriptionFreeCard = Color(0xFF1A120E);
 
   /// Skip confirmation dismiss icon (Figma 129:320).
   static const Color subscriptionSkipDismiss = Color(0xFFC89D2C);

@@ -79,6 +79,16 @@ class AddCollectionView extends GetView<AddCollectionController> {
                     ),
                   ],
                 ),
+                if (controller.ownedQuantity > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'You have ${controller.ownedQuantity} of this bottle. '
+                    'This adds to them.',
+                    style: AppTextStyles.bodyS().copyWith(
+                      color: AppColors.goldBright,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,

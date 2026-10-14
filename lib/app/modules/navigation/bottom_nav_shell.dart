@@ -9,6 +9,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/exit_app_bottom_sheet.dart';
 import '../collection/collection_view.dart';
+import '../dashboard/dashboard_controller.dart';
 import '../dashboard/dashboard_view.dart';
 import '../market/market_view.dart';
 import '../profile/settings_menu_popup.dart';
@@ -71,6 +72,8 @@ class BottomNavShell extends GetView<BottomNavController> {
                 label: 'Collection',
                 asset: AppAssets.navCollectionActive,
                 iconSize: 19,
+                // A new user's first stop, until the first bottle is in.
+                showDot: Get.find<DashboardController>().welcomeVisible,
                 onTap: () => _selectTab(
                   BottomNavController.collectionTab,
                   'bottom_nav_collection',

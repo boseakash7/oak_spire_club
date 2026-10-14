@@ -26,6 +26,7 @@ import 'data/repositories/user_repository.dart';
 import 'data/repositories/user_token_repository.dart';
 import 'data/repositories/wishlist_repository.dart';
 import 'modules/session/app_config_controller.dart';
+import 'modules/session/plan_access_controller.dart';
 import 'modules/session/user_session_controller.dart';
 import 'modules/wishlist/wishlist_controller.dart';
 
@@ -129,6 +130,11 @@ class AppBinding extends Bindings {
     );
     Get.lazyPut<PackageRepository>(
       () => PackageRepository(Get.find<PackageRemoteDataSource>()),
+      fenix: true,
+    );
+    // What the user's plan unlocks (the free plan's locked insights).
+    Get.lazyPut<PlanAccessController>(
+      () => PlanAccessController(Get.find<PackageRepository>()),
       fenix: true,
     );
 

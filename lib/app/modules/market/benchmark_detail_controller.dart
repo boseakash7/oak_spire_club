@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 
+import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/utils/app_image_url.dart';
 import '../../core/utils/greeting_formatter.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/utils/proof_formatter.dart';
 import '../../core/utils/rating_formatter.dart';
+import '../session/plan_access_controller.dart';
 import '../session/user_session_controller.dart';
 import '../../data/deal_check.dart';
 import '../../data/models/bluebook_model.dart';
@@ -19,6 +21,7 @@ import '../../data/models/collection_item_model.dart';
 import '../../data/repositories/bluebook_price_history_repository.dart';
 import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/collection_repository.dart';
+import '../../routes/app_routes.dart';
 import '../add_collection/add_to_collection_launcher.dart';
 
 /// Payload passed via [Get.toNamed] / route `arguments` for benchmark bottle detail.
@@ -131,6 +134,11 @@ class BenchmarkDetailController extends GetxController {
   final CollectionRepository _collectionRepo;
   final BluebookPriceHistoryRepository _priceHistoryRepo;
   final BluebookRepository _bluebookRepo;
+
+  /// The price range, the price history and the deal check are Premium on
+  /// the free plan ([PlanAccessController.insightsLocked]).
+  RxBool get insightsLocked => PlanAccessController.to.insightsLocked;
+  Worker? _lockWorker;
   late final String? bottleId;
   late final String productName;
   late final String? rawAverage;
@@ -234,13 +242,38 @@ class BenchmarkDetailController extends GetxController {
       unawaited(fetchDetails());
     }
     unawaited(_loadCollectionOwnership());
+    // Unlocked (limits loaded, or back from the subscription screen as a
+    // subscriber): load the chart that was skipped.
+    _lockWorker = ever<bool>(insightsLocked, (locked) {
+      if (!locked && chartPoints.isEmpty) unawaited(fetchPriceChart());
+    });
+    // Cached for an hour, so an admin change reaches an open app that day.
+    unawaited(PlanAccessController.to.refreshLimits());
+  }
+
+  @override
+  void onClose() {
+    _lockWorker?.dispose();
+    super.onClose();
+  }
+
+  /// A locked insight's "Premium" button.
+  void openPremium(String source) {
+    if (Get.isRegistered<AppAnalyticsController>()) {
+      unawaited(
+        AppAnalyticsController.to.logTap('benchmark_insights_premium', {
+          'source': source,
+        }),
+      );
+    }
+    Get.toNamed(AppRoutes.subscription);
   }
 
   /// Pull-to-refresh: re-pull the price chart, the catalog facts and this
   /// user's ownership rows.
   Future<void> reload() async {
     await Future.wait([
-      if (_canLoadPriceChart) fetchPriceChart(),
+      if (_canLoadPriceChart && !insightsLocked.value) fetchPriceChart(),
       if (_canLoadPriceChart) fetchDetails(),
       _loadCollectionOwnership(),
     ]);
@@ -284,6 +317,8 @@ class BenchmarkDetailController extends GetxController {
       var totalQty = 0;
       var totalPaid = 0.0;
       var fillSum = 0.0;
+      // Bottles' worth of whisky left: quantity × fill, summed.
+      var bottlesLeft = 0.0;
       String? movement;
 
       for (final item in matches) {
@@ -293,6 +328,7 @@ class BenchmarkDetailController extends GetxController {
         final unitPaid = double.tryParse(item.pricePaid ?? '') ?? 0;
         totalPaid += unitPaid * qty;
         fillSum += item.fillRatio;
+        bottlesLeft += qty * item.valueFillRatio;
         movement ??= item.priceMovementRaw;
       }
 
@@ -307,7 +343,7 @@ class BenchmarkDetailController extends GetxController {
         (rawAverage ?? '').replaceAll(RegExp(r'[^\d.-]'), ''),
       );
       if (marketUnit != null && totalPaid > 0) {
-        collectionGainDollars.value = (marketUnit * totalQty - totalPaid)
+        collectionGainDollars.value = (marketUnit * bottlesLeft - totalPaid)
             .roundToDouble();
       } else {
         collectionGainDollars.value = null;
@@ -345,13 +381,13 @@ class BenchmarkDetailController extends GetxController {
   }
 
   Future<void> setChartRange(BenchmarkDetailChartRange range) async {
-    if (selectedChartRange.value == range) return;
+    if (selectedChartRange.value == range || insightsLocked.value) return;
     selectedChartRange.value = range;
     await fetchPriceChart();
   }
 
   Future<void> fetchPriceChart() async {
-    if (!_canLoadPriceChart) return;
+    if (!_canLoadPriceChart || insightsLocked.value) return;
     chartLoading.value = true;
     chartError.value = null;
     try {

@@ -54,6 +54,7 @@ class CollectionTopPriced extends StatelessWidget {
                     rowContext,
                     item: item,
                     controller: controller,
+                    heroBottleId: item.bluebookBottleId,
                   ),
                 ),
               ),

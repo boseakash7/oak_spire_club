@@ -1,130 +1,189 @@
 // The three screen bodies (checkout, backend-granted premium, active plan)
-// and the pieces they share: header, benefits, limit banner, skip link.
+// and the pieces they share: headers, limit banner, skip link.
 part of '../subscription_view.dart';
 
 class _CheckoutSubscriptionBody extends StatelessWidget {
   const _CheckoutSubscriptionBody({
     required this.subscription,
-    required this.useAppleStorePrices,
-    required this.applePriceForPlan,
-    required this.isLoadingApplePrices,
-    required this.isTrialOffer,
+    required this.quoteFor,
+    required this.isLoadingStorePrices,
+    required this.trialDaysFor,
     required this.checkoutButtonLabel,
     required this.isCheckoutLoading,
     required this.onCheckout,
+    required this.onOfferEnded,
   });
 
   final SubscriptionController subscription;
-  final bool useAppleStorePrices;
-  final String? Function(SubscriptionPackageModel plan) applePriceForPlan;
-  final bool isLoadingApplePrices;
-  final bool isTrialOffer;
+  final _PlanQuote Function(SubscriptionPackageModel plan) quoteFor;
+  final bool isLoadingStorePrices;
+
+  /// Free days a subscription to this plan starts with; 0 for none.
+  final int Function(SubscriptionPackageModel plan) trialDaysFor;
   final String checkoutButtonLabel;
   final bool isCheckoutLoading;
   final VoidCallback onCheckout;
 
+  /// The offer's countdown reached zero: rebuild without it.
+  final VoidCallback onOfferEnded;
+
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const FadeSlideEntrance(index: 0, child: _SubscriptionHeader()),
-        const SizedBox(height: 34),
-        const FadeSlideEntrance(
-          index: 1,
-          child: _BenefitRow(
-            spans: [
-              TextSpan(text: 'Track '),
-              TextSpan(
-                text: 'unlimited',
-                style: TextStyle(color: AppColors.subscriptionBenefitGold),
+        const FadeSlideEntrance(index: 0, child: _CheckoutHeader()),
+        const SizedBox(height: AppSpacing.lg),
+        Obx(() {
+          if (subscription.isLoadingPackages.value || isLoadingStorePrices) {
+            return const SizedBox.shrink();
+          }
+          // The first plan with a running offer (only the yearly, usually).
+          for (final plan in subscription.packages) {
+            final quote = quoteFor(plan);
+            final offer = quote.offer;
+            if (offer == null) continue;
+            final now = quote.charge.amount;
+            final was = quote.regular?.amount;
+            final off = now != null && was != null && was > 0
+                ? ((1 - now / was) * 100).round()
+                : null;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+              child: FadeSlideEntrance(
+                index: 1,
+                child: _OfferBanner(
+                  key: ValueKey('${plan.id}-${offer.endsAt}'),
+                  offer: offer,
+                  planLabel: plan.isYearly ? 'Yearly plan' : 'Monthly plan',
+                  discountPercent: off != null && off > 0 ? off : null,
+                  onTap: () => subscription.selectPackage(plan.id),
+                  onEnded: onOfferEnded,
+                ),
               ),
-              TextSpan(text: ' collection value overtime.'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        const FadeSlideEntrance(
+            );
+          }
+          return const SizedBox.shrink();
+        }),
+        FadeSlideEntrance(
           index: 2,
-          child: _BenefitRow(
-            spans: [
-              TextSpan(text: 'Access to the '),
-              TextSpan(
-                text: '10000+ bottles ',
-                style: TextStyle(color: AppColors.subscriptionBenefitGold),
-              ),
-              TextSpan(text: 'database.'),
-            ],
-          ),
+          child: Obx(() {
+            final rows = subscription.limits.value.comparisonRows();
+            if (rows.isEmpty) return const SizedBox.shrink();
+            return _PlanCards(rows: rows);
+          }),
         ),
-        const SizedBox(height: 18),
-        const FadeSlideEntrance(
+        const SizedBox(height: AppSpacing.xl),
+        FadeSlideEntrance(
           index: 3,
-          child: _BenefitRow(
-            spans: [
-              TextSpan(
-                text: 'Full access',
-                style: TextStyle(color: AppColors.subscriptionBenefitGoldAlt),
-              ),
-              TextSpan(text: ' to bottle insights and tasting.'),
-            ],
-          ),
+          child: _PlanSwitch(subscription: subscription, quoteFor: quoteFor),
         ),
-        const SizedBox(height: 18),
-        const FadeSlideEntrance(
+        const SizedBox(height: AppSpacing.lg),
+        FadeSlideEntrance(
           index: 4,
-          child: _BenefitRow(
-            spans: [
-              TextSpan(
-                text: 'No',
-                style: TextStyle(
-                  color: AppColors.subscriptionBenefitLimitsPrimary,
-                ),
-              ),
-              TextSpan(text: ' daily '),
-              TextSpan(
-                text: 'limits',
-                style: TextStyle(
-                  color: AppColors.subscriptionBenefitLimitsSecondary,
-                ),
-              ),
-              TextSpan(text: '.'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 22),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSubscriptionTheme.planBlockInset,
-          ),
-          child: _PackagePlanList(
+          child: _SelectedPlanPrice(
             subscription: subscription,
-            useAppleStorePrices: useAppleStorePrices,
-            applePriceForPlan: applePriceForPlan,
-            isLoadingApplePrices: isLoadingApplePrices,
+            quoteFor: quoteFor,
+            isLoadingStorePrices: isLoadingStorePrices,
           ),
         ),
-        if (isTrialOffer) ...[
-          const SizedBox(height: 36),
-          const Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSubscriptionTheme.planBlockInset,
-            ),
-            child: _TrialUrgencySection(),
-          ),
-          const SizedBox(height: 16),
-        ] else
-          const SizedBox(height: 36),
+        const SizedBox(height: AppSpacing.xl),
         CommonPrimaryButton(
           label: checkoutButtonLabel,
           isLoading: isCheckoutLoading,
           onPressed: onCheckout,
-          textStyle: GoogleFonts.roboto(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            height: 1,
-            color: AppColors.black,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Obx(() {
+          final plan = subscription.selectedPackage;
+          if (plan == null || isLoadingStorePrices) {
+            return const SizedBox.shrink();
+          }
+          final quote = quoteFor(plan);
+          final price =
+              '${quote.charge.label}/${plan.isYearly ? 'year' : 'month'}';
+          final days = trialDaysFor(plan);
+          final String line;
+          if (days > 0) {
+            line =
+                '$days-day free trial, then $price. Cancel anytime.';
+          } else {
+            line = '$price. Renews until you cancel.';
+          }
+          return Text(
+            line,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodyS().copyWith(
+              fontSize: 12,
+              color: AppColors.textMuted,
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+/// Above the checkout: × on the left, and "Restore" on the right when
+/// [onRestore] is set (iOS, for App Store purchases).
+class _CheckoutTopBar extends StatelessWidget {
+  const _CheckoutTopBar({required this.onClose, this.onRestore});
+
+  final VoidCallback onClose;
+  final VoidCallback? onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: onClose,
+          tooltip: 'Close',
+          icon: const Icon(
+            Icons.close_rounded,
+            size: 22,
+            color: AppColors.textMuted,
           ),
+        ),
+        const Spacer(),
+        if (onRestore != null)
+          TextButton(
+            onPressed: onRestore,
+            child: Text(
+              'Restore',
+              style: AppTextStyles.bodyS().copyWith(
+                color: AppColors.subscriptionSkipLink,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Checkout heading: "Unlock your whiskey wisdom", the second half in gold.
+class _CheckoutHeader extends StatelessWidget {
+  const _CheckoutHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final heading = AppTextStyles.heading32Bold().copyWith(
+      fontSize: 28,
+      height: 1.25,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Unlock your', style: heading.copyWith(color: AppColors.white)),
+        GradientText(
+          'whiskey wisdom',
+          style: heading,
+          gradient: AppColors.goldGradient,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'See what Premium adds to your club.',
+          style: AppTextStyles.bodyS().copyWith(color: AppColors.textMuted),
         ),
       ],
     );
@@ -425,63 +484,6 @@ class _SubscriptionHeader extends StatelessWidget {
   }
 }
 
-class _BenefitRow extends StatelessWidget {
-  const _BenefitRow({required this.spans});
-
-  final List<InlineSpan> spans;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(top: 5),
-          child: _BenefitCheckIcon(),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text.rich(
-            TextSpan(
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                height: 1.5,
-                color: AppColors.white,
-              ),
-              children: spans,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Benefit list tick (Figma 29px) — exported check vector in 29×29 frame.
-class _BenefitCheckIcon extends StatelessWidget {
-  const _BenefitCheckIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 28,
-      height: 28,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(5, 7, 3.5, 7.5),
-        child: SvgPicture.asset(
-          AppAssets.subscriptionBenefitCheck,
-          width: 19.53,
-          height: 13.5,
-          fit: BoxFit.fill,
-        ),
-      ),
-    );
-  }
-}
-
-/// Selected plan only: gold circle + tick from Figma.
-
 class _SkipThisForNowLink extends StatelessWidget {
   const _SkipThisForNowLink();
 
@@ -514,5 +516,3 @@ class _SkipThisForNowLink extends StatelessWidget {
     );
   }
 }
-
-/// Benefit list tick (Figma 29px) — exported check vector in 29×29 frame.

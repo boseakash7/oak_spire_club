@@ -19,21 +19,26 @@ import '../../core/network/limit_exceeded_exception.dart';
 import '../../core/services/app_store_launcher.dart';
 import '../../core/services/apple_in_app_purchase_service.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/platform/app_platform.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_subscription_theme.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_snackbar.dart';
 import '../../core/widgets/app_pressable.dart';
 import '../../core/animations/staggered_entrance.dart';
 import '../../core/widgets/app_back_button.dart';
+import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_confirm_dialog.dart';
 import '../../core/widgets/common_primary_button.dart';
 import '../../core/widgets/gradient_text.dart';
 import '../../data/models/package_transaction_model.dart';
+import '../../data/models/plan_limits.dart';
 import '../../data/models/razorpay_payment_create_model.dart';
 import '../../data/models/subscription_package_model.dart';
 import '../../data/models/subscription_payment_receipt.dart';
 import '../../data/models/user_model.dart';
+import '../../data/plan_pricing.dart';
 import '../../data/repositories/package_repository.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../routes/app_routes.dart';
@@ -46,6 +51,7 @@ import 'subscription_controller.dart';
 import 'subscription_loading_view.dart';
 
 part 'widgets/subscription_bodies.dart';
+part 'widgets/subscription_confirm.dart';
 part 'widgets/subscription_history.dart';
 part 'widgets/subscription_plans.dart';
 
@@ -66,7 +72,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
   var _isVerifyingPayment = false;
   var _isLoadingApplePrices = false;
   RazorpayPaymentCreateModel? _pendingPayment;
-  final _appleLocalizedPrices = <String, String>{};
+  final _appleProducts = <String, ProductDetails>{};
 
   bool get _isIosCheckout => Platform.isIOS;
 
@@ -75,13 +81,31 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     return args is Map && args[AuthNavigation.postAuthSubscriptionArg] == true;
   }
 
+  bool get _hasUsedTrial =>
+      Get.find<UserSessionController>().user.value?.hasUsedTrial == true;
+
+  /// Free days a new subscription to [plan] starts with: none once the
+  /// user has had a trial.
+  int _trialDaysFor(SubscriptionPackageModel plan) =>
+      _hasUsedTrial ? 0 : plan.trialDays;
+
   bool get _isTrialOffer {
-    final user = Get.find<UserSessionController>().user.value;
-    return user?.hasUsedTrial != true;
+    final plan = _subscription.selectedPackage;
+    return plan != null && _trialDaysFor(plan) > 0;
   }
 
   String get _checkoutButtonLabel =>
-      _isTrialOffer ? 'Continue Free trial before expires' : 'Subscribe';
+      _isTrialOffer ? 'Start free trial' : 'Subscribe';
+
+  /// The checkout's ×: back to where the user came from. Right after sign-in
+  /// the screen can't pop, so it asks to skip instead.
+  void _closeCheckout() {
+    if (_isPostAuth) {
+      _openSkipConfirmation();
+      return;
+    }
+    Get.back<void>();
+  }
 
   void _openSkipConfirmation() {
     Get.toNamed(
@@ -130,7 +154,12 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     final service = _iapService;
     if (service == null) return;
     final productIds = _subscription.packages
-        .map((plan) => plan.appleProductId)
+        .expand(
+          (plan) => [
+            plan.appleProductId,
+            if (plan.offer?.appleStoreId != null) plan.offer!.appleStoreId!,
+          ],
+        )
         .toSet();
     if (!mounted) return;
     setState(() => _isLoadingApplePrices = true);
@@ -138,17 +167,55 @@ class _SubscriptionViewState extends State<SubscriptionView> {
       await service.loadProducts(productIds);
       if (!mounted) return;
       setState(() {
-        _appleLocalizedPrices
+        _appleProducts
           ..clear()
-          ..addAll({for (final p in service.products) p.id: p.price});
+          ..addAll({for (final p in service.products) p.id: p});
       });
     } finally {
       if (mounted) setState(() => _isLoadingApplePrices = false);
     }
   }
 
-  String? _applePriceForPlan(SubscriptionPackageModel plan) =>
-      _appleLocalizedPrices[plan.appleProductId];
+  /// What [plan] costs if bought now. While its offer runs, the offer is
+  /// charged and the plan's own price is shown crossed out. On iOS both come
+  /// from the App Store, and an offer without its own App Store product isn't
+  /// shown there at all.
+  _PlanQuote _quoteFor(SubscriptionPackageModel plan) {
+    final offer = plan.offerAt(DateTime.now());
+    if (_isIosCheckout) {
+      final base = _appleProducts[plan.appleProductId];
+      final regular = base == null ? _usd(plan.price) : _store(base);
+      final offerProduct = offer?.appleStoreId == null
+          ? null
+          : _appleProducts[offer!.appleStoreId];
+      if (offerProduct == null) return _PlanQuote(charge: regular);
+      return _PlanQuote(
+        charge: _store(offerProduct),
+        regular: regular,
+        offer: offer,
+      );
+    }
+    final regular = _usd(plan.price);
+    if (offer == null) return _PlanQuote(charge: regular);
+    return _PlanQuote(charge: _usd(offer.price), regular: regular, offer: offer);
+  }
+
+  static _PlanPrice _store(ProductDetails product) => _PlanPrice(
+    label: product.price,
+    amount: product.rawPrice,
+    symbol: product.currencySymbol,
+  );
+
+  static _PlanPrice _usd(String price) {
+    final amount = double.tryParse(price);
+    return _PlanPrice(
+      label: amount == null ? '\$$price' : '\$${PlanPricing.amount(amount)}',
+      amount: amount,
+    );
+  }
+
+  /// What the last checkout charges, for the App Store receipt.
+  double? _pendingChargeAmount;
 
   void _onApplePurchaseUpdated(PurchaseDetails purchase) {
     switch (purchase.status) {
@@ -207,7 +274,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
         receipt: SubscriptionPaymentReceipt(
           merchantName: AppConstants.appName,
           planTitle: plan.displayTitle,
-          amount: double.tryParse(plan.price) ?? 0,
+          amount: _pendingChargeAmount ?? double.tryParse(plan.price) ?? 0,
           currency: PaymentCurrency.usd,
           status: 'paid',
           paidAt: DateTime.now(),
@@ -227,7 +294,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     }
   }
 
-  Future<void> _startAppleCheckout(SubscriptionPackageModel plan) async {
+  Future<void> _startAppleCheckout(String productId) async {
     final service = _iapService;
     if (service == null) return;
 
@@ -236,10 +303,10 @@ class _SubscriptionViewState extends State<SubscriptionView> {
       return;
     }
 
-    final product = service.productForAppleId(plan.appleProductId);
+    final product = service.productForAppleId(productId);
     if (product == null) {
       await _loadAppleProducts();
-      final retryProduct = service.productForAppleId(plan.appleProductId);
+      final retryProduct = service.productForAppleId(productId);
       if (retryProduct == null) {
         await AppSnackbar.error(
           'This plan is not available on the App Store yet.',
@@ -453,8 +520,26 @@ class _SubscriptionViewState extends State<SubscriptionView> {
       return;
     }
 
+    // Review first: due today, trial end, first charge, renewal.
+    final quote = _quoteFor(plan);
+    // Untyped: GetX builds GetPageRoute<dynamic>, so toNamed<bool> throws.
+    final confirmed = await Get.toNamed(
+      AppRoutes.subscriptionConfirm,
+      arguments: SubscriptionConfirmArgs._(
+        plan: plan,
+        quote: quote,
+        trialDays: _trialDaysFor(plan),
+        included: [
+          for (final row in _subscription.limits.value.comparisonRows())
+            if (!row.premiumLocked) row.premium,
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    _pendingChargeAmount = quote.charge.amount;
+
     if (_isIosCheckout) {
-      await _startAppleCheckout(plan);
+      await _startAppleCheckout(quote.offer?.appleStoreId ?? plan.appleProductId);
       return;
     }
 
@@ -463,7 +548,7 @@ class _SubscriptionViewState extends State<SubscriptionView> {
       final payment = await Get.find<PackageRepository>().createPayment(
         userId: userId,
         planType: plan.planTypeForPayment,
-        amount: plan.price,
+        amount: quote.offer?.price ?? plan.price,
         packageId: plan.id,
         currency: PaymentCurrency.usd,
       );
@@ -610,6 +695,21 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                         ),
                       ),
                     ],
+                    if (showCheckout)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSubscriptionTheme.horizontalPadding - 12,
+                          4,
+                          AppSubscriptionTheme.horizontalPadding - 8,
+                          0,
+                        ),
+                        child: _CheckoutTopBar(
+                          onClose: _closeCheckout,
+                          onRestore: _isIosCheckout && !_isVerifyingPayment
+                              ? () => unawaited(_restoreApplePurchases())
+                              : null,
+                        ),
+                      ),
                     if (limitMessage != null &&
                         limitMessage.isNotEmpty &&
                         showCheckout) ...[
@@ -633,6 +733,8 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                                     limitMessage.isNotEmpty &&
                                     showCheckout
                               ? AppSubscriptionTheme.scrollTopPaddingWithBanner
+                              : showCheckout
+                              ? AppSpacing.xs
                               : AppSubscriptionTheme.scrollTopPaddingDefault,
                           AppSubscriptionTheme.horizontalPadding,
                           24,
@@ -647,10 +749,11 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                               )
                             : _CheckoutSubscriptionBody(
                                 subscription: _subscription,
-                                useAppleStorePrices: _isIosCheckout,
-                                applePriceForPlan: _applePriceForPlan,
-                                isLoadingApplePrices: _isLoadingApplePrices,
-                                isTrialOffer: _isTrialOffer,
+                                quoteFor: _quoteFor,
+                                isLoadingStorePrices:
+                                    _isIosCheckout && _isLoadingApplePrices,
+                                trialDaysFor: _trialDaysFor,
+                                onOfferEnded: () => setState(() {}),
                                 checkoutButtonLabel: _checkoutButtonLabel,
                                 isCheckoutLoading:
                                     _isCreatingPayment || _isVerifyingPayment,
@@ -660,27 +763,6 @@ class _SubscriptionViewState extends State<SubscriptionView> {
                     ),
                     if (showCheckout &&
                         !_subscription.isBootstrapping.value) ...[
-                      if (_isIosCheckout)
-                        Center(
-                          child: GestureDetector(
-                            onTap: _isVerifyingPayment
-                                ? null
-                                : () => unawaited(_restoreApplePurchases()),
-                            behavior: HitTestBehavior.opaque,
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                'Restore purchases',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.roboto(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.subscriptionSkipLink,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
                       GestureDetector(
                         onTap: _openSkipConfirmation,
                         behavior: HitTestBehavior.opaque,

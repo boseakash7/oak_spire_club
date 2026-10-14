@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
+import '../../core/network/limit_exceeded_exception.dart';
+import '../../core/storage/app_storage.dart';
 import '../../core/utils/app_snackbar.dart';
 import '../../core/utils/dispose_after_detach.dart';
 import '../../data/models/bluebook_model.dart';
 import '../../data/models/category_model.dart';
 import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/categories_repository.dart';
+import '../session/user_session_controller.dart';
 
 /// Paged bottle search with category chips, shared by the Benchmark tab and
 /// the "add a bottle" browser (taste).
@@ -17,6 +20,11 @@ import '../../data/repositories/categories_repository.dart';
 /// typo tolerant); without one it browses. Either way [selectedCategoryId]
 /// filters. Each reset bumps a generation, and a response for an older one is
 /// dropped, so a slow earlier query never overwrites a newer one's results.
+///
+/// A search spends one of a free plan's daily searches. When the server says
+/// they are used up (`LIMIT_EXCEEDED`, which opens the subscription screen
+/// once), [searchLimitReached] is set and the rest of the day's searches stop
+/// here instead of asking again. Browsing and the chips still work.
 mixin PagedBottleSearch on GetxController {
   BluebookRepository get bluebookRepo;
   CategoriesRepository get categoriesRepo;
@@ -48,6 +56,14 @@ mixin PagedBottleSearch on GetxController {
   final hasMore = true.obs;
   final keyword = ''.obs;
   final selectedCategoryId = ''.obs;
+
+  /// Today's free searches are used up and a keyword is typed: the list
+  /// shows the upgrade prompt instead of results.
+  final searchLimitReached = false.obs;
+
+  /// What the free plan has left of today's searches, from the last search;
+  /// null when unlimited or not searching.
+  final searchesLeft = RxnInt();
 
   /// Owned here so clearing the query from an empty state clears the field.
   final searchCtrl = TextEditingController();
@@ -81,8 +97,15 @@ mixin PagedBottleSearch on GetxController {
       _page += 1;
     }
 
+    final query = keyword.value.trim();
     try {
-      final query = keyword.value.trim();
+      if (query.isEmpty) {
+        searchLimitReached.value = false;
+        searchesLeft.value = null;
+      } else if (_searchLimitedToday) {
+        _showSearchLimit();
+        return;
+      }
       final category = selectedCategoryId.value.trim();
       final res = await bluebookRepo.search(
         page: _page,
@@ -92,14 +115,24 @@ mixin PagedBottleSearch on GetxController {
         sort: sortParam,
       );
       if (generation != _generation) return;
+      final page = res.bottles;
       if (reset) {
         loadFailed.value = false;
-        bottles.assignAll(res);
+        bottles.assignAll(page);
       } else {
-        bottles.addAll(res);
+        bottles.addAll(page);
       }
-      hasMore.value = res.length >= pageSize;
-      onBottlesLoaded(res, reset: reset);
+      if (query.isNotEmpty) {
+        searchLimitReached.value = false;
+        searchesLeft.value = res.searchesLeft;
+      }
+      hasMore.value = page.length >= pageSize;
+      onBottlesLoaded(page, reset: reset);
+    } on LimitExceededException {
+      if (generation != _generation) return;
+      final userId = AppStorage.userId;
+      if (userId != null) unawaited(AppStorage.setSearchLimitReachedToday(userId));
+      _showSearchLimit();
     } catch (e) {
       if (generation != _generation) return;
       if (reset) {
@@ -115,6 +148,22 @@ mixin PagedBottleSearch on GetxController {
         isLoadingMore.value = false;
       }
     }
+  }
+
+  /// Today's searches are used up, as this device last heard, and the user
+  /// is still on the free plan (an upgrade lifts it at once).
+  bool get _searchLimitedToday {
+    if (!AppStorage.isSearchLimitReachedToday(AppStorage.userId)) return false;
+    if (!Get.isRegistered<UserSessionController>()) return true;
+    return Get.find<UserSessionController>().user.value?.hasPremium != true;
+  }
+
+  void _showSearchLimit() {
+    searchLimitReached.value = true;
+    searchesLeft.value = 0;
+    hasMore.value = false;
+    loadFailed.value = false;
+    bottles.clear();
   }
 
   /// Called with each page as it lands; [reset] is true for a first page.

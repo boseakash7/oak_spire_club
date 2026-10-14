@@ -1,20 +1,26 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:get/get.dart';
 
 import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/storage/app_storage.dart';
 import '../../data/models/bluebook_model.dart';
 import '../../data/models/collection_item_display.dart';
 import '../../data/models/collection_item_model.dart';
 import '../../data/models/market_models.dart';
 import '../../data/models/price_sparkline.dart';
+import '../../data/models/subscription_package_model.dart';
 import '../../data/repositories/bluebook_repository.dart';
 import '../../data/repositories/market_repository.dart';
+import '../../data/repositories/package_repository.dart';
 import '../../routes/app_routes.dart';
 import '../home/home_controller.dart';
 import '../navigation/bottom_nav_controller.dart';
 import '../collection/collection_controller.dart';
+import '../session/user_session_controller.dart';
 import '../wishlist/wishlist_controller.dart';
+import 'widgets/dashboard_premium_card.dart';
 
 /// The Home tab: the market at a glance (headline index, breadth, the
 /// biggest movers), the user's collection against it, what other collectors
@@ -30,11 +36,14 @@ class DashboardController extends GetxController {
   DashboardController({
     required MarketRepository marketRepo,
     required BluebookRepository bluebookRepo,
+    required PackageRepository packageRepo,
   }) : _marketRepo = marketRepo,
-       _bluebookRepo = bluebookRepo;
+       _bluebookRepo = bluebookRepo,
+       _packageRepo = packageRepo;
 
   final MarketRepository _marketRepo;
   final BluebookRepository _bluebookRepo;
+  final PackageRepository _packageRepo;
 
   final overview = Rxn<MarketOverview>();
   final highlights = MarketHighlights.empty.obs;
@@ -61,9 +70,38 @@ class DashboardController extends GetxController {
 
   HomeController get _home => Get.find<HomeController>();
 
+  /// Set at sign-up (`AppStorage.setWelcomePending`) for the new user.
+  final welcomePending = false.obs;
+
+  /// The welcome card shows, in place of the Premium card and the empty
+  /// collection card, until the first bottle is in or the user closes it.
+  bool get welcomeVisible =>
+      welcomePending.value && !_home.hasCollection.value;
+
+  /// True while the welcome card is lifted, with the rest of Home blurred
+  /// behind it, until the user taps anywhere else. Plays once per user.
+  final welcomeSpotlight = false.obs;
+
+  /// Whether the welcome card should lift when it first shows.
+  bool get welcomeSpotlightDue =>
+      welcomeVisible &&
+      !AppStorage.isWelcomeSpotlightSeenFor(AppStorage.userId);
+
+  /// The offer the Premium card shows instead of its trial button, while a
+  /// package's offer runs. Null when none does.
+  final premiumOffer = Rxn<({PackageOffer offer, int? percentOff})>();
+
   @override
   void onInit() {
     super.onInit();
+    welcomePending.value = AppStorage.isWelcomePendingFor(AppStorage.userId);
+    if (welcomePending.value && Get.isRegistered<AppAnalyticsController>()) {
+      unawaited(AppAnalyticsController.to.logScreenView('home_welcome'));
+    }
+    // The first bottle finishes the welcome for good.
+    ever<bool>(_home.hasCollection, (has) {
+      if (has && welcomePending.value) unawaited(_endWelcome());
+    });
     // The collection loads on its own schedule (HomeController); its rows'
     // price lines follow whenever it changes.
     ever<List<CollectionItemModel>>(
@@ -72,6 +110,7 @@ class DashboardController extends GetxController {
     );
     _loadCollectionSparklines();
     unawaited(load());
+    unawaited(_loadOffer());
   }
 
   /// Overview and highlights in parallel; each failure leaves its sections
@@ -88,6 +127,41 @@ class DashboardController extends GetxController {
     isLoading.value = false;
     _loadMarketSparklines(forceRefresh: forceRefresh);
   }
+
+  /// The running offer for the Premium card: the yearly plan's first, as
+  /// yearly is the checkout's default. On iOS an offer needs its own App
+  /// Store product, as on the checkout. Skipped for a user the card doesn't
+  /// show for; a failure just leaves the trial button.
+  Future<void> _loadOffer() async {
+    if (!DashboardPremiumCard.showFor(Get.find<UserSessionController>())) {
+      premiumOffer.value = null;
+      return;
+    }
+    try {
+      final packages = await _packageRepo.getAll();
+      final now = DateTime.now();
+      final ordered = [
+        ...packages.where((p) => p.isYearly),
+        ...packages.where((p) => !p.isYearly),
+      ];
+      for (final plan in ordered) {
+        final offer = plan.offerAt(now);
+        if (offer == null) continue;
+        if (Platform.isIOS && offer.appleStoreId == null) continue;
+        premiumOffer.value = (
+          offer: offer,
+          percentOff: plan.offerPercentOffAt(now),
+        );
+        return;
+      }
+      premiumOffer.value = null;
+    } catch (_) {
+      // No offer to show: the card keeps its trial button.
+    }
+  }
+
+  /// The Premium card's countdown reached zero.
+  void endOffer() => premiumOffer.value = null;
 
   /// The [windowDays] movers, or the [fallbackDays] ones when the longer
   /// window has none. The section's subtitle names whichever it got.
@@ -187,6 +261,7 @@ class DashboardController extends GetxController {
     _logTap('home_pull_refresh');
     await Future.wait([
       load(forceRefresh: true),
+      _loadOffer(),
       if (Get.isRegistered<HomeController>()) _home.forceReload(),
       if (Get.isRegistered<WishlistController>())
         WishlistController.to.forceReload(),
@@ -214,6 +289,12 @@ class DashboardController extends GetxController {
     Get.find<BottomNavController>().setIndex(BottomNavController.collectionTab);
   }
 
+  /// The Premium card's button: the subscription screen.
+  void openPremium() {
+    _logTap('home_premium_card', {'offer': premiumOffer.value != null});
+    Get.toNamed(AppRoutes.subscription);
+  }
+
   void openCollection() {
     _logTap('home_collection_open');
     Get.find<BottomNavController>().setIndex(BottomNavController.collectionTab);
@@ -227,6 +308,36 @@ class DashboardController extends GetxController {
     if (res == true && Get.isRegistered<HomeController>()) {
       await _home.forceReload();
     }
+  }
+
+  /// The welcome card's button: the add-a-bottle flow.
+  Future<void> addFromWelcome() async {
+    _logTap('home_welcome_add');
+    endWelcomeSpotlight();
+    await addFirstBottle();
+  }
+
+  void dismissWelcome() {
+    _logTap('home_welcome_dismiss');
+    endWelcomeSpotlight();
+    unawaited(_endWelcome());
+  }
+
+  /// Lifts the welcome card, once it is on screen, if it hasn't been yet for
+  /// this user.
+  void startWelcomeSpotlight() {
+    final userId = AppStorage.userId;
+    if (!welcomeSpotlightDue || userId == null) return;
+    welcomeSpotlight.value = true;
+    unawaited(AppStorage.setWelcomeSpotlightSeen(userId));
+  }
+
+  /// A tap anywhere but the welcome card: it settles and the page clears.
+  void endWelcomeSpotlight() => welcomeSpotlight.value = false;
+
+  Future<void> _endWelcome() async {
+    welcomePending.value = false;
+    await AppStorage.clearWelcomePending();
   }
 
   void logMoversToggle(bool rising) => _logTap('home_movers_toggle', {

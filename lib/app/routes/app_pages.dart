@@ -130,6 +130,11 @@ class AppPages {
       page: () => const SubscriptionView(),
       binding: SubscriptionBinding(),
     ),
+    // No binding: it reads SubscriptionConfirmArgs and pops true to pay.
+    GetPage(
+      name: AppRoutes.subscriptionConfirm,
+      page: () => const SubscriptionConfirmView(),
+    ),
     GetPage(
       name: AppRoutes.subscriptionSkip,
       page: () => const SubscriptionSkipView(),

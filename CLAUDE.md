@@ -128,7 +128,8 @@ else is a full push.
 | `/benchmark-detail` | `modules/market` | market row (`market_bottle_row`), collection quick-view sheet, every Home bottle row |
 | `/market-index` | `modules/market_index` | Market index cards (`MarketIndexCard`), args `{slug, name}` |
 | `/collection/bottles` | `modules/collection` | Collection tab "View all bottles" (no binding: shares the shell's `CollectionController`) |
-| `/subscription` | `modules/subscription` | settings menu, `SubscriptionLimitNavigation`, post-auth offer |
+| `/subscription` | `modules/subscription` | Home's Premium card, settings menu, `SubscriptionLimitNavigation` |
+| `/subscription/confirm` | `modules/subscription` | checkout button (`SubscriptionConfirmArgs`, pops `true` to pay) |
 | `/subscription-skip` | `modules/subscription` | subscription screen "skip" |
 | `/subscription/payment-success` | `modules/subscription` | after Razorpay verify / Apple IAP subscribe |
 | `/settings/account` | `modules/settings/account` | settings popup |
@@ -151,6 +152,26 @@ to exit.
 `DashboardController`), top to bottom. Every section is a vertical list (no side scrolling),
 movement covers `DashboardController.windowDays` (90), and each section is left out when it has
 nothing to show.
+- **Welcome** (`DashboardWelcomeCard`): first, only for a user who has just registered.
+  `SignUpController` sets `AppStorage.setWelcomePending(userId)` (per user, survives the OTP step and
+  restarts). "Welcome to the club, {first name}", three steps, and "Add your first bottle"
+  (`DashboardController.addFromWelcome`, the taste flow). `DashboardController.welcomeVisible` =
+  pending and `!HomeController.hasCollection`. The first bottle or the × clears the flag for good.
+  While it shows, the Premium card and the empty collection card are left out, and the Collection
+  nav item has a gold dot (`AppNavItem.showDot`).
+  On the user's first Home it is **spotlit** once (`DashboardWelcomeSpotlight`, flag
+  `AppStorage.isWelcomeSpotlightSeenFor`): after the entrance it lifts to 1.04× with a gold glow and
+  one sheen sweep, and every other section blurs, dims and stops taking taps
+  (`DashboardSpotlightBackdrop`). A tap anywhere outside the card (`TapRegion.onTapOutside`), its
+  button or its × ends it (`DashboardController.welcomeSpotlight`). Reduced motion keeps only the blur.
+- **Go Premium** (`DashboardPremiumCard`): first, only for a user on the free plan (no active
+  subscription and not `isFreeUser`, the header badge's rule), and not while the welcome shows.
+  A short card: the four subscription benefits in a 2×2 grid and "Start free trial" (until
+  `hasUsedTrial`, then "Go Premium"), which opens `/subscription` (`DashboardController.openPremium`).
+  While a package's offer runs (`DashboardController.premiumOffer`, from `package/get-all`, yearly
+  first, and on iOS only with its own App Store product), the button gives way to an offer row: the
+  label and "N% off" over a live "Ends in" countdown (`PackageOffer.countdownAt`), and a compact
+  "Claim offer" button beside them. No price or trial shows. At zero the card returns to its button.
 - **The market** (`DashboardMarketPulse`): one card, the headline `MarketIndexCard` with
   `title: 'The market'` and a `footer` holding the breadth (rising / falling bottles,
   `market/highlights?days=90`) and "Prices updated".
@@ -185,7 +206,7 @@ young price history has no 90-day movers or breadth. `_loadOverview` / `_loadHig
 fall back to 30 days, and the subtitles show the window they got.
 
 **Opened / sealed counts** are bottles, not rows. A row whose fill is under 100% counts all its
-quantity as opened. `_groupCollectionItems` stores the merged sum in
+quantity as opened. `CollectionRepository.groupItems` stores the merged sum in
 `CollectionItemModel.openedQuantity`, because the merged fill is an average.
 `CollectionItemDisplay.openedBottleCount` / `sealedBottleCount` read it, and `HomeController`
 totals them as `totalBottleCount` / `openedBottleCount` / `sealedBottleCount`.
@@ -259,7 +280,9 @@ bottom, all built by `CollectionInsights`
 - **Top priced bottles** (`CollectionTopPriced`): the 5 highest by one bottle's price
   (`PortfolioBreakdown.topPriced`), as `CollectionBottleRow`s, then a "View all bottles (N)" button.
 - **All bottles** ([collection_bottles_view.dart](lib/app/modules/collection/collection_bottles_view.dart),
-  `/collection/bottles`): the sort menu, a chip bar of the quick-stat filters (All, Drunk, Rated,
+  `/collection/bottles`): a search field (`CollectionController.searchCtrl` / `query`: every word
+  must appear in the name, brand, distillery, type or region; applied on top of the filter, cleared
+  by `openBottles`), the sort menu, a chip bar of the quick-stat filters (All, Drunk, Rated,
   Rare, Duplicates, Doubled, Gaining, Losing: `CollectionFilter.chipLabel`), and the list. The tile
   that opened it starts its chip selected; "View all bottles" starts on All. The title is the
   filter's label and count.
@@ -293,12 +316,47 @@ The old two-column grid and `CollectionBottleCard` are gone.
   Below them: fill bar + %, `×qty`, and "Paid $X".
 - Right side: today's value (`marketTotalValue`), gain $ and % against paid, the 90-day
   sparkline, and `Last ±N%` (`price_movement`). A bottle with no market price shows its paid
-  value marked "Valued at cost".
+  value (by fill) marked "Valued at cost".
 - Each row's `Obx` always reads `controller.sparklines[bottleId ?? '']`, because an `Obx` that
   reads no observable throws.
-- Tapping a row still opens `showCollectionQuickView`. That file now owns
-  `kCollectionCardRadius`, `kCollectionBottleImage` and `CollectionCardDetails`. Its card is
-  240 tall (Figma 226) to fit today's value + gain % and a "Paid" line.
+- Tapping a row opens `showCollectionQuickView`, a compact card (screen width minus the gutters, up
+  to 400, scrolling only on a very small screen) with everything the row shows: a title row (44px
+  art, name, one line of maker / type / age / ABV / Rare / rating, close button), today's value
+  with the gain beside it and the price-basis dot, a strip of up to four figures (Qty, Paid,
+  Market, Last move; a column with no data is dropped), the **average fill** of all its bottles
+  with "N sealed · N opened" under it, and the 90-day line. Then the quantity stepper and "View
+  details", then **Your bottles**; the whole card scrolls as one column. Value, gain and paid follow
+  the stepper.
+  - **Your bottles** (`CollectionBottleList`): every bottle (`CollectionItemModel.bottles`, one
+    `OwnedBottle` per server row) grouped by the day it was bought (`OwnedBottle.purchasedOn`:
+    `date_acquired`, else the local day of `created_at`; newest day first, "Sep 21, 2026"), each row with its number, price paid, fill bar, a Sealed / Opened tag
+    and %. Bottles are numbered oldest first so a number stays put when more are added. Tapping a
+    row opens it. A **sealed** bottle (fill 100) has only **Hold 2s to open**. An **opened** bottle
+    (under 100) has a fill slider (2-99), Half / Last pour picks, and **Hold 2s to seal** (back to
+    100). Opening sets 99 (`CollectionController.openedFill`), because the app counts any fill under
+    100 as opened. The slider saves when let go.
+  - Every expanded row starts with "Bought {date}" and **Edit**, which opens
+    `showBottleEditSheet` ([collection_bottle_edit_sheet.dart](lib/app/modules/collection/widgets/collection_bottle_edit_sheet.dart)):
+    that one bottle's price paid and purchase date (no future dates); fill stays with the slider
+    and the hold. Only the fields that changed are sent (`collection/update-bottle`), so an untouched price keeps
+    its cents; `CollectionController.editBottle` then reloads and the card takes the fresh item.
+  - `HoldToToggleButton` is the press-and-hold: a 2 s sweep, the cap twisting off or on, and a
+    rumble in step with the row's shake. Both come from `intensityAt(progress)`: the shake
+    (`shakeOffset`) widens and the rumble (`rumblePattern`, one pulse per 100 ms through
+    `AppHaptics.rumble`, the `vibration` package) gets longer and stronger, then a thump when done.
+    Letting go early cancels and stops the rumble. A phone without shaped vibration
+    (`AppHaptics.canRumble`, probed once) ticks every 0.25 s instead. Reduced motion keeps the 2 s
+    and the rumble but drops the twist and the shake. A double tap (assistive tech) completes it at once.
+  - The card keeps its own copy of the item and bottles (`_item`, `_bottles`) so a fill moves on
+    screen at once and the average follows; the stepper reloads the collection and takes the fresh
+    item (`CollectionController.itemFor`). "+" adds one sealed 100% bottle, "-" removes the newest.
+  It is a transparent `PageRouteBuilder`, not a dialog, because only page routes take part in a Hero
+  flight: callers pass the row's `heroBottleId`, so the art flies from the row into the title row
+  and back. Keep the route's transition fade-only, since the Hero measures where it lands, and keep
+  the art's `cacheWidthPx` at `BottleImage.rowCacheWidthPx` (200, like every row) so the flight lands
+  on decoded art. "View
+  details" pushes from the card, so the art flies on from it and Back returns to the card. The file
+  owns `kCollectionCardRadius`.
 - The sort menu is Name / Price / Gain / Fill Rate / Added Time. Price sorts by current unit
   value (falling back to paid). Gain sorts by `gainPercent`.
 
@@ -311,7 +369,7 @@ rest read `Get.arguments` directly. `/verify-otp` and `/reset-password` take `{e
 `proof`, `description`, `rating`, `price_movement`), built by
 `CollectionItemDisplay.benchmarkDetailArguments` or inline in `market_bottle_row`.
 `/add-to-collection` takes
-`{prefill, editMode?, originalBottleId?, navigateToCollectionOnSuccess, popBenchmarkDetailOnSuccess}`.
+`{prefill, ownedQuantity?, navigateToCollectionOnSuccess, popBenchmarkDetailOnSuccess}`.
 Home's empty state passes `{autoCloseOnAdded: true}` to `/taste-bottles`, but nothing reads it,
 because taste always pops after an add.
 
@@ -320,8 +378,12 @@ switches to the Collection tab, reloads collection and home, then `Get.back(resu
 callers that push taste (home chart footer, home and collection empty states) `await
 Get.toNamed(...)` and call `forceReload()` when the result is `true`. Keep that contract when
 adding a new entry point. `AddToCollectionLauncher.open` handles its own follow-up instead:
-it switches tabs, refreshes home and collection, and optionally pops benchmark detail. It also
-merges existing collection rows for the same bottle into an edit-mode prefill.
+it switches tabs, refreshes home and collection, and optionally pops benchmark detail. Adding a
+bottle already owned is **always an add**: the form opens at quantity 1, fill 100 and the market
+price, says "You have N of this bottle. This adds to them." (`ownedQuantity`), and submits with
+`append`, so the bottles owned are left alone. There is no edit mode: benchmark detail always shows
+"Add" (never "Edit collection"), and taste's confirm sheet always says "Add to collection".
+"Add a bottle" (taste) shows no prices, in its rows, its confirm sheet or its skeleton.
 
 The Market category chips filter the bluebook list in place; there is no category detail screen
 (the old unreachable `category_detail` module was removed).
@@ -348,10 +410,13 @@ comes from `AppStorage` at the repository layer.
 | `config/all` | GET | `getAll` | `AppConfigController` at splash |
 | `collection/all` | GET | `all` | home, collection, `AddToCollectionLauncher` duplicate check, benchmark detail |
 | `collection/chart-data` | GET | `chartData` | home chart, collection chart (`look_back` days) |
-| `collection/add` | POST multipart | `add` | add-to-collection (image upload), collection quantity/fill edits |
+| `collection/add` | POST multipart | `add` | add-to-collection (image upload), the quick view's "+". `append=1` adds `quantity` bottles to the ones owned; without it the bottle's rows are replaced (the server deletes them all and re-creates `quantity` with one shared fill) |
+| `collection/update-fill` | POST | `updateFill` | quick view: one bottle's fill (`id` = row id, 1-100; owner checked) |
+| `collection/update-bottle` | POST | `updateBottle` | quick view's Edit sheet: one bottle's `price_paid` and/or `date_acquired` (`yyyy-MM-dd`, not future; owner checked; clears the chart cache) |
+| `collection/remove` | POST | `removeOne` | quick view "-": removes one bottle (`id` = row id; owner checked; clears the chart cache) |
 | `collection/delete-by-user-bottle` | POST | `deleteByUserBottle` | collection remove / edit-replace |
 | `bluebook/get-all-bluebooks` | GET | `getAll` (no keyword) | market / taste browsing + pagination; `sort` (`MarketSort.apiValue`) from Market, rows carry `market` stats |
-| `bluebook/search` | GET | `getAll` (with keyword) | market / taste search: hybrid lexical + semantic, same envelope, `category_id` honoured, SQL fallback server-side |
+| `bluebook/search` | GET | `getAll` (with keyword) | market / taste search: hybrid lexical + semantic, same envelope, `category_id` honoured, SQL fallback server-side. Sends `user_id`: a free plan spends a daily search and gets `searches_left`, or `LIMIT_EXCEEDED` |
 | `bluebook/get-by-id` | GET | `getById` | benchmark detail: the catalog facts (`details`: distillery, type, age, ABV, cask…) the list rows don't carry, whichever screen opened it |
 | `bluebook/create` | POST | `create` | add-to-collection when the bottle is not in the bluebook |
 | `bluebook/get-last-update` | GET | `getLastUpdatedReadable` | market "last updated" label |
@@ -363,6 +428,7 @@ comes from `AppStorage` at the repository layer.
 | `market/highlights` | GET | `highlights` (`days`, breadth window only) | Home: breadth (90, falling back to 30), plus hot / new / most-collected / top-rated bottle lists, each row with a `community` object |
 | `categories/list` | POST + query | `list` | market category chips, taste category chips |
 | `package/get-all` | GET | `getAll` | subscription plan list |
+| `package/limits` | GET | `limits` | subscription checkout's Free vs Premium table (`PlanLimits`; the repository never throws, falling back to `PlanLimits.fallback`) |
 | `package/payment-create` | POST | `createPayment` | subscription checkout (Razorpay) |
 | `package/payment-verify` | POST | `verifyPayment` | Razorpay success/failure handler |
 | `package/subscribe` | POST | `subscribeApple` | Apple IAP purchase completion |
@@ -380,7 +446,7 @@ target and note) and `wishlist/remove` (POST), via `WishlistRemoteDataSource` /
 **Cached reads** (24h TTL, cleared on app-version change) are `collection:all:$userId`,
 `collection:chart:$userId:$lookBackDays`, `wishlist:all:$userId` (cleared on every wishlist change),
 `categories:list:$page:$limit`, and `bluebook:last-updated`; `market:overview:$days`, `market:indexes` and
-`market:index:$slug:$days` and `market:highlights:$days` for 1 hour (raw `data` maps, parsed on read); plus `bluebook:spark:$id:$days` (6h, one entry per bottle, read
+`market:index:$slug:$days`, `market:highlights:$days` and `package:limits` for 1 hour (raw `data` maps, parsed on read); plus `bluebook:spark:$id:$days` (6h, one entry per bottle, read
 and written through `AppCache.peek` / `put` so a batch only requests the misses). `bluebook/get-all-bluebooks`, `bluebook/search`,
 `config/all`, `user/get-by-id`, and everything under `package/` and `auth/` are uncached.
 
@@ -412,10 +478,15 @@ prefixes** — see `CollectionRepository.addToCollection`, which clears both
 (sparklines), use `cache.peek(cacheKey:, ttl:, decode:)` to find the misses and `cache.put(key, json)`
 to store each result; `getOrFetch` is single-key.
 
-**Grouping `collection/all`.** `CollectionRepository._groupCollectionItems` merges rows of the same
+**Grouping `collection/all`.** `CollectionRepository.groupItems` merges rows of the same
 bluebook bottle into one: quantities add up, `pricePaid` is the **quantity-weighted** unit price
-(Σ unit × qty / Σ qty), and `priceMovement` is kept from the first row. Every value and gain figure
-depends on this, so don't go back to a plain average of the rows.
+(Σ unit × qty / Σ qty), `fill` is the quantity-weighted average of every bottle's fill, and
+`priceMovement` is kept from the first row. Every value and gain figure depends on this, so don't go
+back to a plain average of the rows. The server stores **one row per physical bottle**, each with its
+own `fill`, `price_paid` and `created_at`; the merge keeps them as `CollectionItemModel.bottles`
+(`OwnedBottle`: id, fill, price, added time) so one bottle can be shown, opened, sealed or have its
+fill set. A fill of 1 or less reads as a fraction (the `fillRatio` rule), which is why the slider
+starts at 2.
 
 **Two persistence stores, deliberately.** `AppStorage` writes the login session to *both*
 Hive (`oakspire_session_v1`, durable on iOS) and GetStorage (legacy), with a one-way
@@ -429,8 +500,9 @@ whatever was last persisted, so never assume these are non-null.
 
 **Navigation flow helpers** live in `routes/` rather than in controllers:
 - `AuthNavigation.afterAuth` — unverified email → OTP screen; otherwise `completeSession`,
-  which shows the post-auth subscription offer when `user.needsSubscriptionOffer` and the
-  user has not dismissed it, else the shell.
+  which always opens the shell. There is no post-auth subscription offer any more: Home's Premium
+  card, Settings and `LIMIT_EXCEEDED` lead to `/subscription`. The `postAuth` route argument is
+  still read by the subscription, skip and payment-success screens, but nothing sets it.
 - `SplashController` holds a ~3.6s minimum splash, resolves the stored session (clearing any
   **unverified** session so it cannot survive a restart), refreshes config, and runs the
   forced/optional update check before routing.
@@ -440,10 +512,48 @@ whatever was last persisted, so never assume these are non-null.
 
 **Subscription state** is derived from `UserModel` getters, not stored separately:
 `isFreeUser` (`is_free == 1`, backend-granted premium), `hasActiveSubscription`,
-`hasUsedTrial`, `needsSubscriptionOffer`, `resolvedPaymentGateway` (`razorpay` | `apple_in_app`).
+`hasUsedTrial`, `resolvedPaymentGateway` (`razorpay` | `apple_in_app`).
 `SubscriptionController` picks one of three `SubscriptionScreenMode`s (`checkout`, `freeUser`,
 `activeSubscription`) from these. The live user is `UserSessionController.user` (an `Rxn<UserModel>` loaded
 from `AppStorage`). After a refresh, update it with `setUser` so views rebuild.
+
+**The checkout** (`_CheckoutSubscriptionBody`), top to bottom:
+- × and (on iOS) Restore, then "Unlock your whiskey wisdom".
+- The offer banner (`_OfferBanner`), while a package's offer runs.
+- The Free / Premium plan cards (`_PlanCards`, from `PlanLimits.comparisonRows()` via
+  `package/limits`; a feature both plans share is left out).
+- The Monthly / Yearly switch. Yearly is the default.
+- The price (`_SelectedPlanPrice`), the button, and a renewal line.
+
+The button opens **`/subscription/confirm`** (`SubscriptionConfirmView`, args `SubscriptionConfirmArgs`): due
+today, trial end, first charge, what renews after, what's included, and the payment method. It pops
+`true`, and only then does `_startCheckout` open Razorpay or the App Store. Call it with an untyped
+`Get.toNamed`: GetX builds `GetPageRoute<dynamic>`, so `toNamed<bool>` throws.
+
+**Offers.**
+- `package/get-all` rows carry `offer` (only while it runs) and `trial_days`, parsed into
+  `PackageOffer` / `SubscriptionPackageModel.trialDays`; the trial falls back to 7 on an older server.
+- An offer is locked in: the subscriber is charged the offer price at every renewal.
+- `_quoteFor(plan)` gives the charged price and the package's own price, crossed out during an offer.
+- `offer.endsAt` comes from `ends_in` against this device's clock.
+- When the banner's countdown reaches zero, the screen rebuilds without the offer.
+- On iOS an offer shows only when it has its own App Store product (`offer.appleStoreId`).
+
+**Plan limits** are all enforced now.
+- The bottle cap: `collection/add` (server).
+- Searches a day: `bluebook/search` (server, see the backend's plan limits). `PagedBottleSearch` reads
+  `searches_left` into `searchesLeft` (`SearchesLeftCaption` under the Market and Taste search fields).
+  On `LIMIT_EXCEEDED` (which opens `/subscription` once) it sets `searchLimitReached`, stores
+  `AppStorage.setSearchLimitReachedToday`, and stops asking the server for the rest of the day, so
+  typing on doesn't reopen the paywall; the list shows `SearchLimitReachedState`. Browsing and the
+  chips stay free. Premium (`UserModel.hasPremium`) ignores the stored flag.
+- Locked insights: `PlanAccessController.insightsLocked` (put in `AppBinding`, lazy `fenix`; free plan's
+  `insights_locked` from `package/limits` and not `hasPremium`, locked until the limits answer). The
+  bottle page then swaps the chart for `BenchmarkLockedChart`, the deal check for
+  `BenchmarkLockedDealCheck` and the range for a `PremiumLockPill`, skips the price-history call, and
+  the wishlist sheet gets no market low. Market rows show "Range" with a lock. It follows
+  `UserSessionController.user`, so an upgrade unlocks at once. This lock is client-side only; the
+  history endpoint and `low` / `high` in payloads are not gated by the server.
 
 **Bottom nav indices** are `BottomNavController.homeTab` (0), `marketTab` (1) and `collectionTab` (2); call
 sites use those constants, not literals. Keep the shell's `_pages`, `_settingsSlot`
@@ -559,6 +669,13 @@ Confirmations use `showAppConfirmDialog`. Other dialogs and sheets use `showAppA
 skips both when the image is already in memory; a hand-rolled fade flashed the placeholder on every
 new copy of the art. Its Hero flies the source's art on push (rows and the detail ask for
 different `memCacheWidth`s, so the detail's isn't decoded yet).
+- Every row with a Hero decodes at `BottleImage.rowCacheWidthPx` (200), and benchmark detail passes
+  it as `previewCacheWidthPx`: the row's copy shows until the full-size art decodes, so the art
+  never drops to the placeholder when the Hero lands.
+- `_FallbackNetworkImage` remembers which candidate URL worked for a URL list, so a new copy (the
+  Hero shuttle, the quick view, a revisit) starts there instead of failing through the others.
+- `CollectionItemDisplay.resolvedImageCandidates` starts with `AppImageUrl.resolve`, so collection
+  art and the bottle page load the same URL (one cache entry).
 
 A bottle `image` is either a full URL or a bare upload file name.
 `AppImageUrl.resolve` turns it into a URL, using `upload_url` first and then the API host.
@@ -571,8 +688,18 @@ first point in the window is 100 (so collection value and BSMI compare on one ax
 headline: today's value (bluebook average × qty, or price paid for a bottle with no market
 price), invested, and gain / gain % over only the rows that have both prices. Collection's
 badge is that gain against paid, not the chart's 90-day move. `CollectionItemDisplay` has the
-per-row versions: `marketTotalValue`, `paidTotalValue`, `gainValue`, `gainPercent`, plus `pricing`
-and `ratingRaw`.
+per-row versions: `marketTotalValue`, `currentValue` (market, else paid), `paidTotalValue`,
+`gainValue`, `gainPercent`, plus `pricing` and `ratingRaw`.
+
+**Value follows fill.** A bottle is worth its price × how full it is: `marketTotalValue` and
+`currentValue` multiply by `valueFillRatio` (the merged fill, so quantity × it is the sum of every
+bottle's fill; no fill on record counts as full, unlike `fillRatio`'s 65% bar). Paid is not scaled,
+so drinking shows as a loss against paid. The quick view does the same with its live average fill,
+and benchmark detail's ownership gain too. The server matches: `collection/chart-data`'s series,
+trend and first/last values weight each bottle by fill (`Collection::bottleWeights(..., true)`,
+chart cache `v3`), and `collection/update-fill` clears the chart cache, as
+`CollectionRepository.updateBottleFill` clears the app's. Sort by Price and "Top priced bottles"
+stay at one full bottle's price.
 
 **Sparklines** come from `BluebookRepository.sparklines(ids, {days = 90, forceRefresh})`
 (model `PriceSparkline`: `prices`, `changePct`).
@@ -687,8 +814,10 @@ key with the literal string `/v2`. Consequences worth knowing:
 
 - Only `v2` exists. An unknown `/v3/...` throws `RequestError("Unknown version in the url")`.
 - The prefix is hardcoded `/v2`, not the matched `$prefix` — a future `v3` would still mount at `/v2`.
-- **Only two routes are actually overridden in v2** (`Versions/v2.php`):
-  `/v2/api/collection/chart-data` and `/v2/api/collection/add` → `Api\V2\Collection`.
+- **Only five collection routes are overridden in v2** (`Versions/v2.php`, plus `bluebook/search`):
+  `/v2/api/collection/chart-data`, `/v2/api/collection/add`, `/v2/api/collection/update-fill`,
+  `/v2/api/collection/update-bottle` and `/v2/api/collection/remove` → `Api\V2\Collection`.
+  `add` stores `date_acquired` (`yyyy-MM-dd`) when sent.
   Every other `/v2/api/...` call this app makes is served by the **v1** controller in
   `Application/Controllers/Api/`. When tracing an endpoint, check `Api/V2/` first, then `Api/`.
 
@@ -721,7 +850,30 @@ Api::ApiResponse('NOT_OK', [
 ])
 ```
 
-That is the `data.flag == 'LIMIT_EXCEEDED'` the app intercepts globally. It is raised in
+That is the `data.flag == 'LIMIT_EXCEEDED'` the app intercepts globally.
+
+**Plan limits** (`database/2026-10-11_plan_limits.sql`) live in `collection_limits`, one active row per
+`user_type` (free / premium): `max_bottles` (0 = unlimited, the cap above), `daily_searches` (NULL =
+unlimited) and `insights_locked`. They are edited on admin > Members > Plan limits
+(`/packages/limits`, `Packages::limits`) and served by `package/limits` (`Api\Package::limits`,
+`CollectionLimit::limitsFor`): `{free: {max_bottles, daily_searches, insights_locked}, premium: {…}}`,
+null = unlimited. `max_bottles` is enforced by `collection/add`; `daily_searches` by `bluebook/search`
+(`Api\V2\BlueBook::search` → `CollectionLimit::spendSearch`, only with a `user_id` on the free plan,
+`CollectionLimit::isFreePlan`). The count is in Redis per user per day (`searchQuota#<userId>#<Y-m-d>`).
+A query already run today, or one that extends the last counted one within 2 minutes (the app searches
+as the user types), is not a new search. Past the limit: `LIMIT_EXCEEDED` with `reason: daily_searches`;
+otherwise the page carries `searches_left`. A Redis failure lets the search through. `insights_locked`
+is enforced by the app only.
+
+**Package offers** (`database/2026-10-11_package_offers.sql`): `packages.offer_price`, `offer_label`,
+`offer_starts_at`, `offer_ends_at` and `offer_apple_store_id`.
+- Edited on admin > Packages > the tag button (`/package/offer/N`, `Packages::offer`). It's kept off
+  the package edit form, which creates a Stripe price on every save.
+- `Package::activeOffer` holds the rule: a price below `price`, inside the window.
+- `package/get-all` adds `offer` (`price`, `label`, `ends_at`, `ends_in`, `apple_store_id`; null when
+  none is running) and `trial_days` (`razorpay_trial_days`) to each row.
+- `package/payment-create` charges `Package::chargePrice`, and the Razorpay plan is created at it, so
+  the offer is locked in for renewals. A request at an expired offer price gets `OFFER_ENDED`. It is raised in
 `Api\Collection::add` **and** `Api\V2\Collection::add`, gated on
 `is_free == 0 && subscription_status != 'subscribed'`, with the cap read from the
 `collection_limits` row for user type `free`.
@@ -871,7 +1023,7 @@ All paths are under `Application/Controllers/`:
 | `auth/*`, `user/get-by-id` | `Api/Auth.php`, `Api/User.php` (OTP via `email_otp`, mail through PHPMailer/Gmail SMTP) |
 | `config/all` | `Api/Config.php` — reads `Configs/Website.php` plus the `app_config` version row written by `/app/updater` |
 | `collection/all`, `collection/delete-by-user-bottle` | `Api/Collection.php` |
-| `collection/chart-data`, `collection/add` | `Api/V2/Collection.php` (**v2 override**) |
+| `collection/chart-data`, `collection/add`, `collection/update-fill`, `collection/update-bottle`, `collection/remove` | `Api/V2/Collection.php` (**v2 override**) |
 | `bluebook/*` | `Api/BlueBook.php` (`getAdminBottles` is the paginated, category-filtered market list; `sparklines` serves `bluebook/sparklines`) |
 | `bluebook-price-history/chart-data-dashboard` | `Api/BluebookPriceHistory.php` |
 | `market/overview`, `market/indexes`, `market/index-detail`, `market/highlights` | `Api/Market.php` (models `MarketStats`, `MarketIndex`, `Collection`; cached in Redis under `market#`) |
@@ -933,6 +1085,13 @@ The app's `ChartIndexComparison` rebases on top of that.
   `COMMUNITY_MIN_RECENT_ADDERS` (2) for hot, so no row shows one user's shelf. With few users
   these lists are empty, and Home hides them.
 - Each part is wrapped in `_safe`, so a missing table gives an empty part, not an error.
+
+**Priced bottles only.** `bluebook/get-all-bluebooks`, `bluebook/search` (v2 and the v1
+`search-bluebook`) list only bottles with `average > 0`, and their totals count the same rows. The
+model methods (`getAdminBottles`, `countAdminBottles`, `filterActiveAdminIds`, `getAdminTotal`) take
+a trailing `$pricedOnly` flag, off by default because the admin panel lists every bottle. Only the
+API controllers pass `true`. That means "Add a bottle" can't find unpriced bottles either; it falls
+back to "add your own".
 
 ## Other surfaces, for orientation
 

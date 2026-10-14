@@ -20,11 +20,13 @@ class AppStorage {
   static const String _keyCurrentRegistrationTopic =
       'current_registration_topic';
   static const String _keyCurrentTierTopic = 'current_tier_topic';
-  static const String _keyTrialCountdownEndsAt = 'trial_countdown_ends_at';
   static const String _keyRecentBottleSearches = 'recent_bottle_searches';
   static const int _maxRecentBottleSearches = 6;
-  static const String _keySubscriptionOfferDismissedForUserId =
-      'subscription_offer_dismissed_for_user_id';
+  static const String _keyWelcomePendingForUserId =
+      'welcome_pending_for_user_id';
+  static const String _keyWelcomeSpotlightSeenForUserId =
+      'welcome_spotlight_seen_for_user_id';
+  static const String _keySearchLimitReachedOn = 'search_limit_reached_on';
 
   static late final GetStorage _box;
   static late final Box<dynamic> _sessionBox;
@@ -145,7 +147,6 @@ class AppStorage {
     await _box.remove(_keyNotificationPrefs);
     await _box.remove(_keyCurrentRegistrationTopic);
     await _box.remove(_keyCurrentTierTopic);
-    await _box.remove(_keySubscriptionOfferDismissedForUserId);
     await _box.save();
   }
 
@@ -249,20 +250,6 @@ class AppStorage {
     }
   }
 
-  /// Epoch millis when the 4-hour free-trial countdown ends.
-  static int? get trialCountdownEndsAtMillis {
-    if (!_ready) return null;
-    final value = _box.read(_keyTrialCountdownEndsAt);
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    return int.tryParse(value?.toString() ?? '');
-  }
-
-  static Future<void> setTrialCountdownEndsAtMillis(int value) async {
-    await ensureReady();
-    await _box.write(_keyTrialCountdownEndsAt, value);
-  }
-
   /// Latest "Add a bottle" queries, newest first.
   static List<String> get recentBottleSearches {
     if (!_ready) return const [];
@@ -287,17 +274,56 @@ class AppStorage {
     await _box.remove(_keyRecentBottleSearches);
   }
 
-  /// Whether this user chose limited access instead of the post-auth subscription offer.
-  static bool hasDismissedSubscriptionOfferFor(String userId) {
-    if (!_ready || userId.trim().isEmpty) return false;
-    final stored = _box.read<String>(_keySubscriptionOfferDismissedForUserId);
-    return stored == userId;
+  /// The user who just registered, until Home's welcome card is done with:
+  /// their first bottle is added or they close it. Per user, so someone
+  /// else signing in on this device never sees it.
+  static bool isWelcomePendingFor(String? userId) {
+    if (!_ready || userId == null || userId.trim().isEmpty) return false;
+    return _box.read<String>(_keyWelcomePendingForUserId) == userId;
   }
 
-  static Future<void> markSubscriptionOfferDismissed() async {
+  static Future<void> setWelcomePending(String userId) async {
     await ensureReady();
-    final id = userId;
-    if (id == null || id.isEmpty) return;
-    await _box.write(_keySubscriptionOfferDismissedForUserId, id);
+    await _box.write(_keyWelcomePendingForUserId, userId);
+  }
+
+  static Future<void> clearWelcomePending() async {
+    await ensureReady();
+    await _box.remove(_keyWelcomePendingForUserId);
+  }
+
+  /// Whether [userId] has already had Home's welcome spotlight (the welcome
+  /// card lifted over the blurred page), which plays once per user.
+  static bool isWelcomeSpotlightSeenFor(String? userId) {
+    if (!_ready || userId == null || userId.trim().isEmpty) return false;
+    return _box.read<String>(_keyWelcomeSpotlightSeenForUserId) == userId;
+  }
+
+  static Future<void> setWelcomeSpotlightSeen(String userId) async {
+    await ensureReady();
+    await _box.write(_keyWelcomeSpotlightSeenForUserId, userId);
+  }
+
+  /// `userId|yyyy-mm-dd` for today, the day the free plan's searches ran out.
+  static String _searchLimitStamp(String userId) {
+    final now = DateTime.now();
+    final day =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    return '$userId|$day';
+  }
+
+  /// Whether [userId] has used up today's free searches on this device
+  /// (the server said `LIMIT_EXCEEDED`). Searches then stop asking the
+  /// server, which would open the subscription screen on every keystroke.
+  static bool isSearchLimitReachedToday(String? userId) {
+    if (!_ready || userId == null || userId.trim().isEmpty) return false;
+    return _box.read<String>(_keySearchLimitReachedOn) ==
+        _searchLimitStamp(userId);
+  }
+
+  static Future<void> setSearchLimitReachedToday(String userId) async {
+    await ensureReady();
+    await _box.write(_keySearchLimitReachedOn, _searchLimitStamp(userId));
   }
 }

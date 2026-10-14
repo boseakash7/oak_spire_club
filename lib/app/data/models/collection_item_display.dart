@@ -1,5 +1,6 @@
 import '../../core/constants/app_constants.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/utils/app_image_url.dart';
 import '../../core/utils/price_formatter.dart';
 import '../../core/utils/proof_formatter.dart';
 import 'bottle_details.dart';
@@ -67,7 +68,10 @@ extension CollectionItemDisplay on CollectionItemModel {
       ];
     }
 
+    // AppImageUrl's pick first (upload_url), so the row loads the same URL
+    // as the bottle page and its Hero lands on art already in memory.
     final candidates = <String>{
+      ?AppImageUrl.resolve(raw),
       cmsRoot.resolve(raw).toString(),
       origin.resolve(raw).toString(),
       // Also try under /v2/ explicitly.
@@ -133,19 +137,26 @@ extension CollectionItemDisplay on CollectionItemModel {
     return double.tryParse(raw.replaceAll(RegExp(r'[^0-9.\-]'), ''));
   }
 
-  /// What this row is worth today: market average × quantity, or null when
-  /// the bluebook has no price.
+  /// What this row is worth today: market average × quantity × how full the
+  /// bottles are ([valueFillRatio]), so a half-drunk bottle is worth half a
+  /// sealed one. Null when the bluebook has no price.
   double? get marketTotalValue {
     final unit = marketAverageValue;
     if (unit == null || unit <= 0) return null;
-    return unit * displayQuantity;
+    return unit * displayQuantity * valueFillRatio;
   }
+
+  /// What this row counts for in the collection's value: [marketTotalValue],
+  /// else what was paid, scaled by fill the same way ("valued at cost").
+  double get currentValue =>
+      marketTotalValue ?? paidTotalValue * valueFillRatio;
 
   /// What was paid for this row: unit `price_paid` × quantity.
   double get paidTotalValue =>
       (double.tryParse(pricePaid ?? '') ?? 0) * displayQuantity;
 
-  /// Market minus paid; null when either side is unknown.
+  /// Market (by fill) minus paid; null when either side is unknown. An opened
+  /// bottle loses value as it is drunk.
   double? get gainValue {
     final market = marketTotalValue;
     final paid = paidTotalValue;
@@ -197,6 +208,18 @@ extension CollectionItemDisplay on CollectionItemModel {
 
   /// Price line for cards: total paid plus count, e.g. `$408 (2)`.
   String get priceLabelWithQuantity => '$priceLabel ($displayQuantity)';
+
+  /// How much is left across the row's bottles (0–1), for valuing them.
+  /// The merged fill is the quantity-weighted average of every bottle's, so
+  /// quantity × this is the sum of their fills. A row with no fill on record
+  /// counts as full, unlike [fillRatio]'s bar.
+  double get valueFillRatio {
+    final v = double.tryParse(fill ?? '');
+    if (v == null) return 1.0;
+    if (v <= 1) return v.clamp(0.0, 1.0);
+    if (v <= 100) return v / 100;
+    return 1.0;
+  }
 
   /// How full the bottle is for the gold bar (0–1).
   double get fillRatio {

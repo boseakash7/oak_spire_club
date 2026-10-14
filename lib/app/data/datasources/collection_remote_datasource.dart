@@ -14,6 +14,9 @@ class CollectionRemoteDataSource {
   static const String _chartData = 'collection/chart-data';
   static const String _add = 'collection/add';
   static const String _deleteByUserBottle = 'collection/delete-by-user-bottle';
+  static const String _updateFill = 'collection/update-fill';
+  static const String _updateBottle = 'collection/update-bottle';
+  static const String _remove = 'collection/remove';
 
   /// The server's collection type. The wishlist has its own endpoints
   /// ([WishlistRemoteDataSource]), so `normal` is the only one.
@@ -29,6 +32,7 @@ class CollectionRemoteDataSource {
     String? dateAcquired,
     File? imageFile,
     String? image,
+    bool append = false,
   }) async {
     final fields = <String, String>{
       'bottle_id': bottleId,
@@ -37,6 +41,8 @@ class CollectionRemoteDataSource {
       'quantity': quantity.toString(),
       'fill': fill.toString(),
       'price_paid': pricePaid.toString(),
+      // Add to the bottles already owned instead of replacing them.
+      if (append) 'append': '1',
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
       if (dateAcquired != null && dateAcquired.trim().isNotEmpty)
         'date_acquired': dateAcquired.trim(),
@@ -93,6 +99,43 @@ class CollectionRemoteDataSource {
     return 'image/jpeg';
   }
 
+  /// Sets the fill of one bottle (one `collection/all` row).
+  Future<void> updateFill({
+    required String rowId,
+    required String userId,
+    required int fill,
+  }) async {
+    await _client.postJson(_updateFill, {
+      'id': rowId,
+      'user_id': userId,
+      'fill': fill.toString(),
+    });
+  }
+
+  /// Edits one bottle (one `collection/all` row): its price paid and/or
+  /// purchase date (`yyyy-MM-dd`). A null field is left as it is.
+  Future<void> updateBottle({
+    required String rowId,
+    required String userId,
+    double? pricePaid,
+    String? dateAcquired,
+  }) async {
+    await _client.postJson(_updateBottle, {
+      'id': rowId,
+      'user_id': userId,
+      if (pricePaid != null) 'price_paid': pricePaid.toStringAsFixed(2),
+      'date_acquired': ?dateAcquired,
+    });
+  }
+
+  /// Removes one bottle (one `collection/all` row).
+  Future<void> removeOne({
+    required String rowId,
+    required String userId,
+  }) async {
+    await _client.postJson(_remove, {'id': rowId, 'user_id': userId});
+  }
+
   Future<void> deleteByUserBottle({
     required String bottleId,
     required String userId,
@@ -106,9 +149,7 @@ class CollectionRemoteDataSource {
     if (data == null) return;
   }
 
-  Future<List<CollectionItemModel>> all({
-    required String userId,
-  }) async {
+  Future<List<CollectionItemModel>> all({required String userId}) async {
     final response = await _client.get(
       _all,
       query: {'user_id': userId, 'type': _type},

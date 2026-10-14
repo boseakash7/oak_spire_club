@@ -81,6 +81,10 @@ class UserModel {
     return raw == 'subscribed' || raw == 'active' || raw == 'paid';
   }
 
+  /// On Premium, paid or backend-granted: the plan badge's rule. Everyone
+  /// else is on the free plan and its limits.
+  bool get hasPremium => hasActiveSubscription || isFreeUser;
+
   String get activePlanLabel {
     final name = packageName?.trim();
     if (name != null && name.isNotEmpty && name != 'null') return name;
@@ -89,18 +93,6 @@ class UserModel {
       return type[0].toUpperCase() + type.substring(1);
     }
     return 'Premium';
-  }
-
-  /// No paid package — show subscription offer after auth.
-  bool get needsSubscriptionOffer {
-    if (isFreeUser) return false;
-    final pkg = packageId?.trim();
-    if (pkg != null && pkg.isNotEmpty && pkg != 'null') return false;
-    final sub = subscriptionStatus?.trim().toLowerCase();
-    if (sub == 'active' || sub == 'subscribed' || sub == 'paid') {
-      return false;
-    }
-    return true;
   }
 
   factory UserModel.fromJson(Map<String, dynamic> json) {

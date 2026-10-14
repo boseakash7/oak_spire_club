@@ -7,6 +7,7 @@ import '../../core/animations/staggered_entrance.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/greeting_formatter.dart';
 import '../../core/utils/rating_formatter.dart';
 import '../../core/widgets/app_header.dart';
 import '../../data/models/collection_item_display.dart';
@@ -19,7 +20,11 @@ import 'widgets/dashboard_collection_card.dart';
 import 'widgets/dashboard_collection_movers.dart';
 import 'widgets/dashboard_market_pulse.dart';
 import 'widgets/dashboard_movers.dart';
+import 'widgets/dashboard_premium_card.dart';
+import 'widgets/dashboard_welcome_card.dart';
+import 'widgets/dashboard_welcome_spotlight.dart';
 import 'widgets/dashboard_wishlist.dart';
+import '../session/user_session_controller.dart';
 import '../wishlist/wishlist_controller.dart';
 
 const double _kInset = AppSpacing.gutter;
@@ -108,18 +113,47 @@ class _DashboardContent extends GetView<DashboardController> {
               Set<String> listHeroes(List<HighlightBottle> items) =>
                   claim([for (final i in items) i.bottle.id]);
 
+              final session = Get.find<UserSessionController>();
+              // A new user's welcome stands in for the Premium card and the
+              // empty collection card until the first bottle is in.
+              final welcome = controller.welcomeVisible;
+              final spotlight = welcome && controller.welcomeSpotlight.value;
+              final offer = controller.premiumOffer.value;
+
               final sections = <Widget>[
+                if (welcome)
+                  DashboardWelcomeSpotlight(
+                    active: spotlight,
+                    due: controller.welcomeSpotlightDue,
+                    onStart: controller.startWelcomeSpotlight,
+                    onEnd: controller.endWelcomeSpotlight,
+                    child: DashboardWelcomeCard(
+                      firstName: GreetingFormatter.firstNameFrom(
+                        session.user.value?.name,
+                      ),
+                      onAdd: controller.addFromWelcome,
+                      onDismiss: controller.dismissWelcome,
+                    ),
+                  )
+                else if (DashboardPremiumCard.showFor(session))
+                  DashboardPremiumCard(
+                    onUpgrade: controller.openPremium,
+                    offer: offer?.offer,
+                    percentOff: offer?.percentOff,
+                    onOfferEnded: controller.endOffer,
+                  ),
                 if (overview?.index != null || h.hasBreadth)
                   DashboardMarketPulse(
                     index: overview?.index,
                     highlights: h,
                     lastUpdated: overview?.lastUpdated,
                   ),
-                DashboardCollectionCard(
-                  index: overview?.index,
-                  onOpen: controller.openCollection,
-                  onAddFirst: controller.addFirstBottle,
-                ),
+                if (!welcome)
+                  DashboardCollectionCard(
+                    index: overview?.index,
+                    onOpen: controller.openCollection,
+                    onAddFirst: controller.addFirstBottle,
+                  ),
                 if (mine.isNotEmpty)
                   DashboardCollectionMovers(
                     movers: mine,
@@ -200,7 +234,7 @@ class _DashboardContent extends GetView<DashboardController> {
               return StaggeredColumn(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final s in sections)
+                  for (final (i, s) in sections.indexed)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
                         _kInset,
@@ -208,7 +242,14 @@ class _DashboardContent extends GetView<DashboardController> {
                         _kInset,
                         AppSpacing.xl,
                       ),
-                      child: s,
+                      // The welcome card is always first; while it is lifted
+                      // every other section blurs behind it.
+                      child: welcome && i > 0
+                          ? DashboardSpotlightBackdrop(
+                              active: spotlight,
+                              child: s,
+                            )
+                          : s,
                     ),
                 ],
               );

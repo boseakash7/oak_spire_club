@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
 
-import '../core/storage/app_storage.dart';
 import '../data/models/user_model.dart';
 import 'app_routes.dart';
 
@@ -28,15 +27,10 @@ class AuthNavigation {
     completeSession(user);
   }
 
+  /// Every signed-in user lands on Home. The subscription screen is offered
+  /// from Home's Premium card, Settings and a `LIMIT_EXCEEDED` response,
+  /// not after sign-in.
   static void completeSession(UserModel user) {
-    if (user.needsSubscriptionOffer &&
-        !AppStorage.hasDismissedSubscriptionOfferFor(user.id)) {
-      Get.offAllNamed(
-        AppRoutes.subscription,
-        arguments: const {postAuthSubscriptionArg: true},
-      );
-    } else {
-      Get.offAllNamed(AppRoutes.shell);
-    }
+    Get.offAllNamed(AppRoutes.shell);
   }
 }

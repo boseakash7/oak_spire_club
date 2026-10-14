@@ -19,6 +19,7 @@ import 'benchmark_detail_controller.dart';
 import 'widgets/benchmark_deal_check.dart';
 import 'widgets/benchmark_facts.dart';
 import 'widgets/benchmark_ownership_card.dart';
+import 'widgets/benchmark_premium_lock.dart';
 import 'widgets/benchmark_price_chart.dart';
 import 'widgets/benchmark_top_summary.dart';
 
@@ -84,6 +85,8 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                   url: controller.imageUrl,
                   bottleId: controller.bottleId,
                   glow: false,
+                  // The row's copy until the full-size art decodes.
+                  previewCacheWidthPx: BottleImage.rowCacheWidthPx,
                 ),
               ),
             ),
@@ -94,8 +97,18 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
-            const SliverToBoxAdapter(
-              child: FadeSlideEntrance(index: 2, child: BenchmarkPriceChart()),
+            SliverToBoxAdapter(
+              child: FadeSlideEntrance(
+                index: 2,
+                child: Obx(
+                  () => controller.insightsLocked.value
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: _kInset),
+                          child: BenchmarkLockedChart(),
+                        )
+                      : const BenchmarkPriceChart(),
+                ),
+              ),
             ),
             SliverPadding(
               // Clear Android's navigation bar (the app draws edge to edge).
@@ -111,37 +124,48 @@ class BenchmarkDetailView extends GetView<BenchmarkDetailController> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const BenchmarkChartLegend(),
-                      const SizedBox(height: 16),
+                      // A locked chart has no legend or range to pick.
+                      Obx(
+                        () => controller.insightsLocked.value
+                            ? const SizedBox.shrink()
+                            : const Padding(
+                                padding: EdgeInsets.only(bottom: 16),
+                                child: BenchmarkChartLegend(),
+                              ),
+                      ),
                       Row(
                         children: [
                           Obx(
-                            () => AppSegmentedRange<BenchmarkDetailChartRange>(
-                              values: BenchmarkDetailChartRange.values,
-                              selected: controller.selectedChartRange.value,
-                              labelOf: (r) => r.label,
-                              onChanged: (r) =>
-                                  unawaited(controller.setChartRange(r)),
-                            ),
+                            () => controller.insightsLocked.value
+                                ? const SizedBox.shrink()
+                                : AppSegmentedRange<BenchmarkDetailChartRange>(
+                                    values: BenchmarkDetailChartRange.values,
+                                    selected:
+                                        controller.selectedChartRange.value,
+                                    labelOf: (r) => r.label,
+                                    onChanged: (r) =>
+                                        unawaited(controller.setChartRange(r)),
+                                  ),
                           ),
                           const Spacer(),
-                          Obx(() {
-                            final owned = controller.hasInCollection.value;
-                            return AppAddPill(
-                              label: owned ? 'Edit collection' : 'Add',
-                              icon: owned
-                                  ? Icons.edit_outlined
-                                  : Icons.add_rounded,
-                              onTap: () async {
-                                _logTap('benchmark_detail_add_to_collection');
-                                await controller.openAddToCollection();
-                              },
-                            );
-                          }),
+                          // Always an add, owned or not: the form adds to
+                          // the bottles already held.
+                          AppAddPill(
+                            label: 'Add',
+                            icon: Icons.add_rounded,
+                            onTap: () async {
+                              _logTap('benchmark_detail_add_to_collection');
+                              await controller.openAddToCollection();
+                            },
+                          ),
                         ],
                       ),
                       const SizedBox(height: 24),
-                      const BenchmarkDealCheck(),
+                      Obx(
+                        () => controller.insightsLocked.value
+                            ? const BenchmarkLockedDealCheck()
+                            : const BenchmarkDealCheck(),
+                      ),
                       const BenchmarkFacts(),
                       const BenchmarkOwnershipCard(),
                     ],
@@ -287,7 +311,8 @@ class _WantButton extends StatelessWidget {
             bottleId: controller.bottleId!,
             name: controller.productName,
             average: controller.averageValue,
-            low: controller.lowValue,
+            // The market low is part of the Premium range.
+            low: controller.insightsLocked.value ? null : controller.lowValue,
           );
         },
         haptic: PressHaptic.tap,

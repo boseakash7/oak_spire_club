@@ -20,6 +20,18 @@ class PackageRemoteDataSource {
   static const String _transactionHistory = 'package/transaction-history';
   static const String _cancelSubscription = 'package/cancel-subscription';
   static const String _subscribe = 'package/subscribe';
+  static const String _limits = 'package/limits';
+
+  /// GET `package/limits`: `{free: {...}, premium: {...}}`.
+  Future<Map<String, dynamic>> limits() async {
+    final response = await _client.get(_limits);
+    final json = _client.parseEnvelope(response);
+    final data = json['data'];
+    if (data is! Map) {
+      throw ApiException('Unexpected server response.');
+    }
+    return Map<String, dynamic>.from(data);
+  }
 
   /// Bourboneur `PackageApi.all()` → GET `package/get-all`.
   Future<List<SubscriptionPackageModel>> getAll() async {

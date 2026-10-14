@@ -7,6 +7,7 @@ import '../../core/network/limit_exceeded_exception.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/utils/app_snackbar.dart';
 import '../../data/models/package_transaction_model.dart';
+import '../../data/models/plan_limits.dart';
 import '../../data/models/subscription_package_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/package_repository.dart';
@@ -29,6 +30,9 @@ class SubscriptionController extends GetxController {
   final selectedPackageId = RxnString();
   final isLoadingPackages = true.obs;
   final loadError = RxnString();
+
+  /// What each plan allows, from `package/limits` (admin > Plan limits).
+  final limits = Rx<PlanLimits>(PlanLimits.fallback);
 
   final screenMode = SubscriptionScreenMode.checkout.obs;
   final transactionHistory = <PackageTransactionModel>[].obs;
@@ -109,6 +113,8 @@ class SubscriptionController extends GetxController {
   Future<void> loadPackages() async {
     isLoadingPackages.value = true;
     loadError.value = null;
+    // The comparison table; never throws, falls back to defaults.
+    unawaited(_repo.limits().then((v) => limits.value = v));
     try {
       final list = await _repo.getAll();
       list.sort((a, b) {
@@ -122,9 +128,9 @@ class SubscriptionController extends GetxController {
         selectedPackageId.value = null;
       } else if (selectedPackageId.value == null ||
           !list.any((p) => p.id == selectedPackageId.value)) {
-        final monthly = list.where((p) => !p.isYearly).toList();
-        selectedPackageId.value = monthly.isNotEmpty
-            ? monthly.first.id
+        final yearly = list.where((p) => p.isYearly).toList();
+        selectedPackageId.value = yearly.isNotEmpty
+            ? yearly.first.id
             : list.first.id;
       }
     } on LimitExceededException {

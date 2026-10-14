@@ -1,5 +1,22 @@
 # Plan: ratings out of 10, true collection value, richer collection rows, sparklines, header
 
+## Status (checked against the code on 2026-10-13)
+
+| # | Item | Status |
+| --- | --- | --- |
+| 1 | Ratings out of 10 | ✅ Done |
+| 2 | Collection value and gain, grouping fixes | ✅ Done (the header widget was later replaced, see §2) |
+| 3 | Collection list rows | ✅ Done (rows now live on All bottles, see §3) |
+| 4 | Sparklines, backend + app | ✅ Done (the server samples evenly instead of sending change points, see §4) |
+| 5 | Header badge + today's move | ✅ Done, then changed: the move line moved to Home's collection card (see §5) |
+| — | Manual verification | ⏳ Mostly not done: only `flutter analyze` and the unit tests are confirmed (see Verification) |
+
+Everything in §1–§5 shipped in commit `dd8453f` ("Collection rows, sparklines, ratings out of 10,
+header badge"). Later commits (`f85cc94` market-centric Home, `d9afdd3` collection insights) reshaped
+some of it; the notes under each section say where the code differs from this plan.
+
+Work done after this plan, outside it, is listed in [Later work](#later-work-not-in-this-plan) at the end.
+
 ## Context
 
 Six requests from the product owner:
@@ -19,6 +36,10 @@ Two existing bugs make #2 and #3 worse, so they get fixed here as well. Both are
 
 ## 1. Ratings out of 10
 
+> **Status: ✅ Done.** `RatingFormatter` (`outOfTen`, `label`, `labelOutOfTen`) is used by the Market row
+> (no star when unrated), benchmark detail, the collection average (now on the Collection tab's quick
+> stats, `/10`), the collection rows, the quick view and Home's top-rated list.
+
 **New** `lib/app/core/utils/rating_formatter.dart`:
 - `double? RatingFormatter.outOfTen(Object? raw)`: parse the value, return null when it is missing, `'null'` or `<= 0` (0 means "not rated"), otherwise return `value / 10` clamped to 0–10. Always divide: the backend scale is defined as /100.
 - `String label(raw)`: one decimal, with a trailing `.0` dropped (`9.2`, `9`); `'—'` when null.
@@ -31,6 +52,17 @@ Apply it at:
 - The new collection rows (§3) use `RatingFormatter.label(bluebook['rating'])`.
 
 ## 2. Collection value and gain (one source of truth)
+
+> **Status: ✅ Done.** `CollectionValueCalculator.summarize` / `CollectionValueSummary` feed both Home and
+> Collection. The grouping fixes are in: the weighted `pricePaid` and the kept `priceMovement`, now in
+> `CollectionRepository.groupItems`. The 90-day `fetchChartData` call is gone from
+> `CollectionController`, and Gain is in the sort menu.
+> Differences from the plan:
+> - `collection_value_header.dart` no longer exists. Its job is done by `CollectionValueCard`: "Collection
+>   value" / "Total invested" heading, the `valueCaption` line ("Invested $X · +$Y · N at cost") and a
+>   colored gain badge.
+> - The caption is one `valueCaption` observable, not separate `investedText` / `gainAmount` ones.
+> - Value now also follows each bottle's fill (`valueFillRatio`), which this plan did not cover.
 
 **[collection_value_calculator.dart](lib/app/data/collection_value_calculator.dart)**: add a `CollectionValueSummary` value class and `CollectionValueCalculator.summarize(items)`:
 - `invested` = Σ unit `pricePaid` × qty (unchanged meaning).
@@ -58,6 +90,14 @@ Apply it at:
 
 ## 3. Collection list rows
 
+> **Status: ✅ Done.** `CollectionBottleRow` has everything listed below: chips, fill bar, `×N`, paid,
+> value, gain, `PricingBadge`, the 64×22 sparkline, the last move and "Valued at cost". The skeleton uses
+> `ShimmerCardLayers`. `CollectionBottleCard` and the grid are deleted.
+> Differences from the plan:
+> - The Collection tab no longer lists every row. It shows `CollectionInsights` and the top 5 priced
+>   bottles; the full `SliverList` is on All bottles (`/collection/bottles`).
+> - The quick view grew into a full card (figures strip, per-bottle list, hold to open / seal).
+
 **New** `lib/app/modules/collection/widgets/collection_bottle_row.dart`, styled like `MarketBottleRow` (`AppPressable` → `AppCard`, radius `AppRadii.md`):
 - **Left:** `BottleImage` 66px (Hero via `heroBottleId`, the same rule as now).
 - **Middle:**
@@ -84,6 +124,15 @@ Apply it at:
 **[collection_loading_view.dart](lib/app/modules/collection/collection_loading_view.dart)**: change the skeleton to row shapes (`ShimmerScope` + `ShimmerBox`, with `AppColors.shimmerOnCardBase/Highlight` on card surfaces, following `TasteLoadingView`).
 
 ## 4. Sparklines (collection rows + Benchmark rows)
+
+> **Status: ✅ Done.** On the backend: `PriceSeriesHelper::sparklines`, `Api\BlueBook::sparklines`, the v1
+> route, a 60-id cap, 3h Redis cache, and the `changes.txt` entry. In the app: the `PriceSparkline` model,
+> the datasource, `AppCache.peek` / `put`, `BluebookRepository.sparklines` (6h per-bottle cache, never
+> throws), `PriceSparklineView`, `onBottlesLoaded` overridden by `MarketController`, and Collection's
+> one-call `_loadSparklines`.
+> Difference from the plan: the server returns 24 **evenly spaced as-of samples** per bottle, not change
+> points downsampled per bucket, so the painter spaces points evenly.
+> The 360dp overflow check is listed under Verification as not confirmed.
 
 ### Backend (`../oakspireweb`, branch off `phase6`)
 
@@ -138,6 +187,11 @@ Apply it at:
 
 ## 5. Header: member badge + today's move
 
+> **Status: ✅ Done, then changed.** The member badge shipped, and the header is now "Hello," over the
+> first name with only the PREMIUM / FREE badge on the right. `HomeController.headerMoveText` /
+> `headerMoveUp` are still computed as planned, but the move line was taken **out of the header** and is
+> shown in Home's "Your collection" card (`DashboardCollectionCard`).
+
 **[app_header.dart](lib/app/core/widgets/app_header.dart)**: `_GreetingText` becomes a right-aligned two-line `Column` that fits in `kShellAppBarHeight` (56).
 - **Line 1:** `Good morning, Akash` plus a member pill.
   - `BottleMetaChip(label: 'PREMIUM', gold: true)` when `user.hasActiveSubscription || user.isFreeUser`.
@@ -176,7 +230,11 @@ Ship the backend before an app build that calls it. The app tolerates the endpoi
 
 ## Verification
 
-- `flutter analyze` clean.
+> **Status:** only the first item is confirmed. The rest need the local docker backend (not running on
+> 2026-10-13) or a hand check, and there is no record of them being done.
+
+- ✅ `flutter analyze` clean, and `flutter test` passes (64 tests on 2026-10-13).
+- ⏳ Not done: every item below.
 - Run `docker compose up -d` in oakspireweb, then `flutter run --dart-define=API_BASE_URL=http://10.0.2.2/v2/api/` on an emulator.
 - **Rating scale:** in phpMyAdmin, run `SELECT MIN(rating), MAX(rating), COUNT(*) FROM bluebook WHERE rating > 0`. It should confirm 0–100 before relying on the plain /10. Then compare one bottle across the Market row, benchmark detail and Home Quick Stats: they should agree (e.g. 92 → `9.2`).
 - **Value/gain:** take a test user with known rows, for example bottle A (paid $100 × 2, market $150) plus bottle B (paid $50, no market price).
@@ -188,3 +246,26 @@ Ship the backend before an app build that calls it. The app tolerates the endpoi
 - **Performance:** scroll Market through 5+ pages with the Flutter DevTools performance overlay. Expect no jank, and exactly one sparklines request per page. Collection should make one request for all its bottles. A second visit within the TTL should make none.
 - **Old server:** point the app at a backend without the route. Rows should show the placeholder baseline and no error toast.
 - **Header:** check a premium and a free account; the pill should flip after a subscription refresh (`setUser`). The move line should appear only with a collection, and it must fit on a 360dp-wide emulator at the largest system font. Use Reduce Motion to confirm the switcher and sparkline fade turn off.
+
+---
+
+## Later work (not in this plan)
+
+Done on 2026-10-13 and **not committed** in either repo:
+
+- ✅ **All bottles search**: a search field above the sort and filter chips. It matches every word
+  against the name, brand, distillery, type and region, inside the chosen filter. Checked on the emulator.
+- ✅ **Edit one bottle**: the quick view's expanded bottle row shows "Bought {date}" and **Edit**. Edit
+  is a sheet for that bottle's price paid and purchase date (fill stays with the slider and the hold).
+  Bottles are grouped by purchase date, falling back to the day added.
+  - ⏳ **Not live yet:** it needs the new backend endpoint `collection/update-bottle`
+    (`Api\V2\Collection::updateBottle`, v2 route) to be deployed. Until then Save fails on production.
+  - ⏳ **Not tested end to end:** the PHP was not linted or run (no docker / PHP on this machine), and Save
+    was never pressed against a server.
+  - `collection/add` (v2) now stores `date_acquired`. Before this the app sent it and the server dropped it,
+    so older bottles have no purchase date and show the day they were added.
+- ✅ **Hold to open / seal rumble**: the phone vibrates in step with the row's shake, and both grow over
+  the 2 s hold. Release stops it; a thump marks completion. Phones without shaped vibration fall back to
+  the old ticks. Adds the `vibration` package (^3.2.1, needs a full rebuild). Checked in the emulator's
+  vibrator log: strength rose from 0.30 to 0.93, then the rumble stopped when released. Not felt on a
+  real phone yet.

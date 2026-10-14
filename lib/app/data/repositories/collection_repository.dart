@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:get/get.dart';
 
 import '../../core/cache/app_cache.dart';
@@ -15,15 +16,40 @@ class CollectionRepository {
   static const Duration _ttl = Duration(hours: 24);
   static const int _defaultLookBackDays = 90;
 
-  String _groupKey(CollectionItemModel item) {
+  static String _groupKey(CollectionItemModel item) {
     final bbId = item.bluebook?['id']?.toString();
     if (bbId != null && bbId.isNotEmpty && bbId != 'null') return bbId;
     return item.id;
   }
 
-  List<CollectionItemModel> _groupCollectionItems(
-    List<CollectionItemModel> raw,
-  ) {
+  /// A fill as a percent. The API sends 1-100; a value of 1 or less is a
+  /// fraction, the same rule [CollectionItemDisplay.fillRatio] applies.
+  static double? _fillPercent(String? raw) {
+    final v = double.tryParse(raw ?? '');
+    if (v == null) return null;
+    return v <= 1 ? v * 100 : v;
+  }
+
+  /// The bottles a row stands for: the ones it already carries, else one for
+  /// the row itself (the server stores one row per bottle).
+  static List<OwnedBottle> _bottlesOf(CollectionItemModel e) {
+    final carried = e.bottles;
+    if (carried != null) return carried;
+    return [
+      OwnedBottle(
+        id: e.id,
+        fill: (_fillPercent(e.fill) ?? 100).round().clamp(1, 100),
+        pricePaid: double.tryParse(e.pricePaid ?? ''),
+        createdAt: int.tryParse(e.createdAt ?? ''),
+        dateAcquired: e.dateAcquired,
+      ),
+    ];
+  }
+
+  /// Merges the rows of one bluebook bottle into a single item, keeping each
+  /// row as an [OwnedBottle].
+  @visibleForTesting
+  static List<CollectionItemModel> groupItems(List<CollectionItemModel> raw) {
     if (raw.isEmpty) return raw;
 
     final byBottle = <String, List<CollectionItemModel>>{};
@@ -35,7 +61,27 @@ class CollectionRepository {
     final grouped = <CollectionItemModel>[];
     for (final entries in byBottle.values) {
       if (entries.length == 1) {
-        grouped.add(entries.first);
+        final only = entries.first;
+        grouped.add(
+          only.bottles != null
+              ? only
+              : CollectionItemModel(
+                  id: only.id,
+                  type: only.type,
+                  createdAt: only.createdAt,
+                  quantity: only.quantity,
+                  fill: only.fill,
+                  image: only.image,
+                  proof: only.proof,
+                  pricePaid: only.pricePaid,
+                  notes: only.notes,
+                  dateAcquired: only.dateAcquired,
+                  bluebook: only.bluebook,
+                  priceMovement: only.priceMovement,
+                  openedQuantity: only.openedQuantity,
+                  bottles: _bottlesOf(only),
+                ),
+        );
         continue;
       }
 
@@ -47,8 +93,10 @@ class CollectionRepository {
       // bottle, not the $150 a plain average of the rows gives.
       double totalPaid = 0;
       int pricedQty = 0;
-      double totalFill = 0;
-      int fillCount = 0;
+      // The fill is weighted the same way, so it is the average of every bottle.
+      double fillSum = 0;
+      int filledQty = 0;
+      final bottles = <OwnedBottle>[];
       String? createdAt = base.createdAt;
       String? image = base.image;
       String? notes = base.notes;
@@ -60,6 +108,7 @@ class CollectionRepository {
         final qty = (q == null || q <= 0) ? 1 : q;
         totalQty += qty;
         openedQty += e.openedBottleCount;
+        bottles.addAll(_bottlesOf(e));
 
         final p = double.tryParse(e.pricePaid ?? '');
         if (p != null) {
@@ -67,10 +116,10 @@ class CollectionRepository {
           pricedQty += qty;
         }
 
-        final f = double.tryParse(e.fill ?? '');
+        final f = _fillPercent(e.fill);
         if (f != null) {
-          totalFill += f;
-          fillCount += 1;
+          fillSum += f * qty;
+          filledQty += qty;
         }
 
         if ((proof == null || proof.isEmpty) &&
@@ -102,9 +151,9 @@ class CollectionRepository {
           type: base.type,
           createdAt: createdAt,
           quantity: totalQty.toString(),
-          fill: fillCount == 0
+          fill: filledQty == 0
               ? base.fill
-              : (totalFill / fillCount).round().toString(),
+              : (fillSum / filledQty).round().toString(),
           image: image,
           proof: proof,
           pricePaid: pricedQty == 0
@@ -115,6 +164,7 @@ class CollectionRepository {
           bluebook: base.bluebook,
           priceMovement: base.priceMovement,
           openedQuantity: openedQty,
+          bottles: bottles,
         ),
       );
     }
@@ -131,6 +181,7 @@ class CollectionRepository {
     String? image,
     String? notes,
     String? dateAcquired,
+    bool append = false,
   }) async {
     final userId = AppStorage.userId;
     if (userId == null || userId.isEmpty) return;
@@ -145,6 +196,7 @@ class CollectionRepository {
       image: image,
       notes: notes,
       dateAcquired: dateAcquired,
+      append: append,
     );
 
     // Invalidate cached home/collection data for this user.
@@ -159,10 +211,7 @@ class CollectionRepository {
     final userId = AppStorage.userId;
     if (userId == null || userId.isEmpty) return;
 
-    await _remote.deleteByUserBottle(
-      bottleId: bottleId,
-      userId: userId,
-    );
+    await _remote.deleteByUserBottle(bottleId: bottleId, userId: userId);
 
     final cache = Get.find<AppCache>();
     await cache.invalidateByPrefix('collection:all:$userId');
@@ -170,43 +219,61 @@ class CollectionRepository {
     cache.invalidate('collection:chart:$userId:$_defaultLookBackDays');
   }
 
-  Future<void> replaceCollectionItem({
-    required String originalBottleId,
-    required String bottleId,
-    int quantity = 1,
-    int fill = 100,
-    double pricePaid = 0,
-    File? imageFile,
-    String? image,
-    String? notes,
-    String? dateAcquired,
+  /// Sets one bottle's fill. Value follows fill, so the chart is cleared
+  /// along with the list.
+  Future<void> updateBottleFill({
+    required String rowId,
+    required int fill,
   }) async {
-    final sameBottle = originalBottleId == bottleId;
-    if (sameBottle) {
-      await addToCollection(
-        bottleId: bottleId,
-        quantity: quantity,
-        fill: fill,
-        pricePaid: pricePaid,
-        imageFile: imageFile,
-        image: image,
-        notes: notes,
-        dateAcquired: dateAcquired,
-      );
-      return;
-    }
+    final userId = AppStorage.userId;
+    if (userId == null || userId.isEmpty) return;
 
-    await addToCollection(
-      bottleId: bottleId,
-      quantity: quantity,
-      fill: fill,
-      pricePaid: pricePaid,
-      imageFile: imageFile,
-      image: image,
-      notes: notes,
-      dateAcquired: dateAcquired,
+    await _remote.updateFill(
+      rowId: rowId,
+      userId: userId,
+      fill: fill.clamp(1, 100),
     );
-    await removeFromCollection(bottleId: originalBottleId);
+    final cache = Get.find<AppCache>();
+    await cache.invalidateByPrefix('collection:all:$userId');
+    await cache.invalidateByPrefix('collection:chart:$userId:');
+    cache.invalidate('collection:chart:$userId:$_defaultLookBackDays');
+  }
+
+  /// Edits one bottle's price paid and purchase date; a null one is left as
+  /// it is.
+  Future<void> updateBottle({
+    required String rowId,
+    double? pricePaid,
+    DateTime? purchasedOn,
+  }) async {
+    final userId = AppStorage.userId;
+    if (userId == null || userId.isEmpty) return;
+
+    await _remote.updateBottle(
+      rowId: rowId,
+      userId: userId,
+      pricePaid: pricePaid,
+      dateAcquired: purchasedOn == null
+          ? null
+          : OwnedBottle.formatPurchaseDate(purchasedOn),
+    );
+    final cache = Get.find<AppCache>();
+    await cache.invalidateByPrefix('collection:all:$userId');
+    await cache.invalidateByPrefix('collection:chart:$userId:');
+    cache.invalidate('collection:chart:$userId:$_defaultLookBackDays');
+  }
+
+  /// Removes one bottle, leaving the others of the same kind alone.
+  Future<void> removeBottle({required String rowId}) async {
+    final userId = AppStorage.userId;
+    if (userId == null || userId.isEmpty) return;
+
+    await _remote.removeOne(rowId: rowId, userId: userId);
+
+    final cache = Get.find<AppCache>();
+    await cache.invalidateByPrefix('collection:all:$userId');
+    await cache.invalidateByPrefix('collection:chart:$userId:');
+    cache.invalidate('collection:chart:$userId:$_defaultLookBackDays');
   }
 
   Future<List<CollectionItemModel>> fetchMyCollection({
@@ -221,7 +288,7 @@ class CollectionRepository {
       forceRefresh: forceRefresh,
       fetch: () async {
         final raw = await _remote.all(userId: userId);
-        return _groupCollectionItems(raw);
+        return groupItems(raw);
       },
       encode: (list) => list.map((e) => e.toJson()).toList(),
       decode: (json) {
@@ -232,7 +299,7 @@ class CollectionRepository {
               (e) => CollectionItemModel.fromJson(Map<String, dynamic>.from(e)),
             )
             .toList();
-        return _groupCollectionItems(decoded);
+        return groupItems(decoded);
       },
     );
   }

@@ -10,7 +10,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/app_image_url.dart';
-import '../../core/utils/price_formatter.dart';
 import '../../core/utils/proof_formatter.dart';
 import '../../core/widgets/app_back_button.dart';
 import '../../core/widgets/app_empty_state.dart';
@@ -19,13 +18,13 @@ import '../../core/widgets/app_pressable.dart';
 import '../../core/widgets/app_search_field.dart';
 import '../../core/widgets/bottle_image.dart';
 import '../../core/widgets/bottle_meta_chip.dart';
-import '../../core/widgets/pricing_badge.dart';
 import '../../core/widgets/show_app_dialog.dart';
 import '../../data/models/bluebook_model.dart';
 import '../../routes/app_routes.dart';
 import '../collection/collection_controller.dart';
 import '../home/home_controller.dart';
 import '../navigation/bottom_nav_controller.dart';
+import '../shared/widgets/search_limit_views.dart';
 import 'taste_controller.dart';
 import 'taste_loading_view.dart';
 
@@ -135,6 +134,16 @@ class _TasteList extends GetView<TasteController> {
                         busy: controller.isSearching.value,
                       ),
                     ),
+                    Obx(
+                      () => SearchesLeftCaption(
+                        left:
+                            controller.keyword.value.trim().isEmpty ||
+                                controller.searchLimitReached.value
+                            ? null
+                            : controller.searchesLeft.value,
+                        source: 'taste',
+                      ),
+                    ),
                     const _RecentSearches(),
                     const SizedBox(height: 12),
                     const _CategoryRow(),
@@ -222,6 +231,15 @@ class _TasteList extends GetView<TasteController> {
 
   /// Nothing to list: still loading, failed, or nothing matched.
   Widget _emptyBody() {
+    if (controller.searchLimitReached.value) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: SearchLimitReachedState(
+          onClear: controller.clearSearch,
+          source: 'taste',
+        ),
+      );
+    }
     if (controller.isSearching.value) return const TasteBottleSkeletonList();
     if (controller.loadFailed.value) {
       return Padding(
@@ -375,8 +393,9 @@ class _CategoryRow extends GetView<TasteController> {
   }
 }
 
-/// One bottle: name (2 lines), a meta line of chips, a price or nothing, and
-/// an "Add" label. The whole row is the tap target.
+/// One bottle: name (2 lines), a meta line of chips and an "Add" label. No
+/// price: this screen is for adding, not pricing. The whole row is the tap
+/// target.
 class _BottleRow extends StatelessWidget {
   const _BottleRow({
     required this.bottle,
@@ -390,7 +409,6 @@ class _BottleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasPrice = (double.tryParse(bottle.average ?? '') ?? 0) > 0;
     return AppPressable(
       onTap: onTap,
       haptic: PressHaptic.tap,
@@ -425,30 +443,7 @@ class _BottleRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.xs),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (hasPrice) ...[
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      PricingBadge(pricing: bottle.pricing, compact: true),
-                      const SizedBox(width: 5),
-                      Text(
-                        PriceFormatter.format(bottle.average),
-                        style: AppTextStyles.bodyM().copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textCream,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                ],
-                _RowAction(owned: owned),
-              ],
-            ),
+            _RowAction(owned: owned),
           ],
         ),
       ),
@@ -564,7 +559,6 @@ Future<bool?> _showConfirmSheet(
   required BluebookModel bottle,
   required bool owned,
 }) {
-  final hasPrice = (double.tryParse(bottle.average ?? '') ?? 0) > 0;
   return showAppAnimatedBottomSheet<bool>(
     context: context,
     builder: (ctx) {
@@ -597,25 +591,6 @@ Future<bool?> _showConfirmSheet(
                           ),
                         ),
                         _MetaChips(bottle: bottle),
-                        if (hasPrice) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              PricingBadge(
-                                pricing: bottle.pricing,
-                                compact: true,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                PriceFormatter.format(bottle.average),
-                                style: AppTextStyles.bodyM().copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textCream,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -625,7 +600,7 @@ Future<bool?> _showConfirmSheet(
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'This bottle is already in your collection. Continuing '
-                  'lets you edit it.',
+                  'adds more of it.',
                   style: AppTextStyles.bodyS().copyWith(
                     color: AppColors.textMuted,
                     height: 1.35,
@@ -646,7 +621,7 @@ Future<bool?> _showConfirmSheet(
                   Expanded(
                     flex: 2,
                     child: _SheetButton(
-                      label: owned ? 'Edit in collection' : 'Add to collection',
+                      label: 'Add to collection',
                       onTap: () => Navigator.of(ctx).pop(true),
                     ),
                   ),

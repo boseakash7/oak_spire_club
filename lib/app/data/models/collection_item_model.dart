@@ -1,5 +1,85 @@
 import 'proof_json.dart';
 
+/// One physical bottle: a single `collection/all` row. A [CollectionItemModel]
+/// merges the rows of one bluebook bottle and keeps them here so each can be
+/// shown and changed on its own.
+class OwnedBottle {
+  const OwnedBottle({
+    required this.id,
+    required this.fill,
+    this.pricePaid,
+    this.createdAt,
+    this.dateAcquired,
+  });
+
+  final String id;
+
+  /// 1-100. Under 100 the bottle counts as opened.
+  final int fill;
+  final double? pricePaid;
+
+  /// Unix seconds as the server stores them. Bottles from one add share it.
+  final int? createdAt;
+
+  /// The purchase date the user gave (`yyyy-MM-dd`), or null.
+  final String? dateAcquired;
+
+  bool get isOpened => fill < 100;
+
+  /// The local day the bottle was bought: [dateAcquired] when set, else the
+  /// day it was added.
+  DateTime? get purchasedOn {
+    final raw = dateAcquired?.trim();
+    if (raw != null && raw.isNotEmpty && raw != 'null') {
+      final parsed = DateTime.tryParse(raw);
+      if (parsed != null) {
+        return DateTime(parsed.year, parsed.month, parsed.day);
+      }
+    }
+    final at = createdAt;
+    if (at == null) return null;
+    final t = DateTime.fromMillisecondsSinceEpoch(at * 1000);
+    return DateTime(t.year, t.month, t.day);
+  }
+
+  /// [day] as the server stores [dateAcquired].
+  static String formatPurchaseDate(DateTime day) =>
+      '${day.year.toString().padLeft(4, '0')}-'
+      '${day.month.toString().padLeft(2, '0')}-'
+      '${day.day.toString().padLeft(2, '0')}';
+
+  OwnedBottle copyWith({int? fill, double? pricePaid, DateTime? purchasedOn}) =>
+      OwnedBottle(
+        id: id,
+        fill: fill ?? this.fill,
+        pricePaid: pricePaid ?? this.pricePaid,
+        createdAt: createdAt,
+        dateAcquired: purchasedOn == null
+            ? dateAcquired
+            : formatPurchaseDate(purchasedOn),
+      );
+
+  factory OwnedBottle.fromJson(Map<String, dynamic> json) {
+    final fill = double.tryParse(json['fill']?.toString() ?? '');
+    final date = json['date_acquired']?.toString();
+    return OwnedBottle(
+      id: json['id'].toString(),
+      fill: fill == null ? 100 : fill.round().clamp(1, 100),
+      pricePaid: double.tryParse(json['price_paid']?.toString() ?? ''),
+      createdAt: int.tryParse(json['created_at']?.toString() ?? ''),
+      dateAcquired: date == null || date == 'null' ? null : date,
+    );
+  }
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'id': id,
+    'fill': fill,
+    'price_paid': pricePaid,
+    'created_at': createdAt,
+    'date_acquired': dateAcquired,
+  };
+}
+
 class CollectionItemModel {
   CollectionItemModel({
     required this.id,
@@ -15,6 +95,7 @@ class CollectionItemModel {
     this.bluebook,
     this.priceMovement,
     this.openedQuantity,
+    this.bottles,
   });
 
   final String id;
@@ -22,21 +103,28 @@ class CollectionItemModel {
   final String? createdAt;
   final String? quantity;
   final String? fill;
+
   /// Best-effort bottle art URL/path from API or nested `bluebook` (bourboneur CMS).
   final String? image;
+
   /// Proof / ABV from root or nested `bluebook`.
   final String? proof;
   final String? pricePaid;
   final String? notes;
   final String? dateAcquired;
   final Map<String, dynamic>? bluebook;
+
   /// From root or nested `bluebook` (`price_movement`).
   final String? priceMovement;
 
   /// Opened bottles in a row merged from several collection rows (see
-  /// `CollectionRepository._groupCollectionItems`); null on a single row,
+  /// `CollectionRepository.groupItems`); null on a single row,
   /// whose fill says it.
   final int? openedQuantity;
+
+  /// Every bottle behind this item, one per server row, in the order the
+  /// server sent them. Null on an item cached by an older build.
+  final List<OwnedBottle>? bottles;
 
   static const List<String> _imageKeys = [
     'image',
@@ -110,6 +198,12 @@ class CollectionItemModel {
       bluebook: bluebook,
       priceMovement: _coalescePriceMovement(json, bluebook),
       openedQuantity: int.tryParse(json['opened_quantity']?.toString() ?? ''),
+      bottles: json['bottles'] is List
+          ? (json['bottles'] as List)
+                .whereType<Map>()
+                .map((e) => OwnedBottle.fromJson(Map<String, dynamic>.from(e)))
+                .toList()
+          : null,
     );
   }
 
@@ -128,7 +222,7 @@ class CollectionItemModel {
       'bluebook': bluebook,
       'price_movement': priceMovement,
       'opened_quantity': openedQuantity,
+      'bottles': bottles?.map((b) => b.toJson()).toList(),
     };
   }
 }
-

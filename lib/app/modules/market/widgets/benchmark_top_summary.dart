@@ -9,6 +9,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/price_formatter.dart';
 import '../../../core/widgets/pricing_badge.dart';
 import '../benchmark_detail_controller.dart';
+import 'benchmark_premium_lock.dart';
 
 /// Name, price with its movement and what it rests on, the low–high range,
 /// rating and proof.
@@ -74,10 +75,29 @@ class BenchmarkTopSummary extends GetView<BenchmarkDetailController> {
           runSpacing: 6,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text(
-              'Range ${controller.lowFormatted} – ${controller.highFormatted}',
-              style: AppTextStyles.bodyS().copyWith(color: AppColors.textWolf),
-            ),
+            // The low–high range is Premium on the free plan.
+            Obx(() {
+              final style = AppTextStyles.bodyS().copyWith(
+                color: AppColors.textWolf,
+              );
+              if (!controller.insightsLocked.value) {
+                return Text(
+                  'Range ${controller.lowFormatted} – '
+                  '${controller.highFormatted}',
+                  style: style,
+                );
+              }
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Range', style: style),
+                  const SizedBox(width: 6),
+                  PremiumLockPill(
+                    onTap: () => controller.openPremium('range'),
+                  ),
+                ],
+              );
+            }),
             _RatingChip(label: controller.ratingDisplay ?? '—'),
             if (controller.proofText?.trim().isNotEmpty == true)
               Text(

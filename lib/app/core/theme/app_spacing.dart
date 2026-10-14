@@ -57,6 +57,16 @@ abstract final class AppShadows {
     BoxShadow(color: AppColors.goldGlow, blurRadius: 18, spreadRadius: -2),
   ];
 
+  /// A card lifted above a blurred page (Home's welcome spotlight).
+  static const List<BoxShadow> spotlight = [
+    BoxShadow(color: AppColors.goldGlow, blurRadius: 28, spreadRadius: 1),
+    BoxShadow(
+      color: AppColors.shadowBlack32,
+      blurRadius: 20,
+      offset: Offset(0, 10),
+    ),
+  ];
+
   /// Floating action button.
   static const List<BoxShadow> fab = [
     BoxShadow(color: AppColors.goldGlow, blurRadius: 22, offset: Offset(0, 6)),

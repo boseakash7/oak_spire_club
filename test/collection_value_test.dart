@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oakspire_club/app/core/utils/rating_formatter.dart';
 import 'package:oakspire_club/app/data/collection_value_calculator.dart';
+import 'package:oakspire_club/app/data/models/collection_item_display.dart';
 import 'package:oakspire_club/app/data/models/collection_item_model.dart';
 import 'package:oakspire_club/app/data/models/price_sparkline.dart';
 import 'package:oakspire_club/app/modules/collection/collection_controller.dart';
@@ -9,10 +10,12 @@ CollectionItemModel _row({
   required String paid,
   required String qty,
   String? average,
+  String? fill,
 }) => CollectionItemModel.fromJson({
   'id': '1',
   'quantity': qty,
   'price_paid': paid,
+  'fill': ?fill,
   'bluebook': {'id': '9', 'average': average ?? 'null'},
 });
 
@@ -48,19 +51,74 @@ void main() {
     expect(count(CollectionFilter.losing), c.losing);
   });
 
-  group('CollectionValueCalculator.summarize', () {
-    test('values priced rows at market, the rest at cost; gain on priced only', () {
-      final s = CollectionValueCalculator.summarize([
-        _row(paid: '100', qty: '2', average: '150'), // paid 200, worth 300
-        _row(paid: '50', qty: '1'), // no market price: counted at 50
-      ]);
-      expect(s.value, 350);
-      expect(s.invested, 250);
-      expect(s.valuedAtCostCount, 1);
-      expect(s.showingInvestedAsValue, isFalse);
-      expect(s.gain, 100);
-      expect(s.gainPercent, closeTo(50, 1e-9));
+  group('value follows fill', () {
+    test('a row is worth market × quantity × fill', () {
+      expect(
+        _row(
+          paid: '100',
+          qty: '1',
+          average: '200',
+          fill: '50',
+        ).marketTotalValue,
+        100,
+      );
+      // Two bottles averaging 75% full: one and a half bottles left.
+      expect(
+        _row(
+          paid: '100',
+          qty: '2',
+          average: '200',
+          fill: '75',
+        ).marketTotalValue,
+        300,
+      );
+      // A fill of 1 or less is a fraction.
+      expect(
+        _row(
+          paid: '100',
+          qty: '1',
+          average: '200',
+          fill: '0.25',
+        ).marketTotalValue,
+        50,
+      );
+      // No fill on record counts as full.
+      expect(_row(paid: '100', qty: '1', average: '200').marketTotalValue, 200);
     });
+
+    test('drinking lowers the gain against what was paid', () {
+      final r = _row(paid: '100', qty: '1', average: '150', fill: '40');
+      expect(r.gainValue, -40);
+      expect(r.gainPercent, -40);
+    });
+
+    test('summarize scales market and at-cost rows by fill', () {
+      final s = CollectionValueCalculator.summarize([
+        _row(paid: '100', qty: '2', average: '150', fill: '50'), // worth 150
+        _row(paid: '80', qty: '1', fill: '25'), // at cost: 20
+      ]);
+      expect(s.value, 170);
+      expect(s.invested, 280);
+      expect(s.gain, -50);
+    });
+  });
+
+  group('CollectionValueCalculator.summarize', () {
+    test(
+      'values priced rows at market, the rest at cost; gain on priced only',
+      () {
+        final s = CollectionValueCalculator.summarize([
+          _row(paid: '100', qty: '2', average: '150'), // paid 200, worth 300
+          _row(paid: '50', qty: '1'), // no market price: counted at 50
+        ]);
+        expect(s.value, 350);
+        expect(s.invested, 250);
+        expect(s.valuedAtCostCount, 1);
+        expect(s.showingInvestedAsValue, isFalse);
+        expect(s.gain, 100);
+        expect(s.gainPercent, closeTo(50, 1e-9));
+      },
+    );
 
     test('no market price anywhere: headline is invested, no gain', () {
       final s = CollectionValueCalculator.summarize([

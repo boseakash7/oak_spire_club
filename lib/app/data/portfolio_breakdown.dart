@@ -105,9 +105,8 @@ class PortfolioBreakdown {
     ];
   }
 
-  /// What a row counts for: market value, else what was paid.
-  static double valueOf(CollectionItemModel item) =>
-      item.marketTotalValue ?? item.paidTotalValue;
+  /// What a row counts for: market value, else what was paid, by fill.
+  static double valueOf(CollectionItemModel item) => item.currentValue;
 
   /// One bottle's price: its market average, else what was paid for one.
   static double unitValueOf(CollectionItemModel item) =>

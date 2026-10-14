@@ -13,6 +13,7 @@ import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/app_filter_chip.dart';
 import '../../core/widgets/app_header.dart';
 import '../../core/widgets/app_search_field.dart';
+import '../shared/widgets/search_limit_views.dart';
 import 'market_controller.dart';
 import 'market_loading_view.dart';
 import 'widgets/market_bottle_row.dart';
@@ -92,8 +93,18 @@ class _MarketList extends GetView<MarketController> {
                       () => AppSearchField(
                         controller: controller.searchCtrl,
                         onChanged: controller.onSearchChanged,
-                        hintText: 'Search 250,000+ bottles',
+                        hintText: 'Search name, distillery, or age',
                         busy: controller.isSearching.value,
+                      ),
+                    ),
+                    Obx(
+                      () => SearchesLeftCaption(
+                        left:
+                            controller.keyword.value.trim().isEmpty ||
+                                controller.searchLimitReached.value
+                            ? null
+                            : controller.searchesLeft.value,
+                        source: 'market',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -136,7 +147,12 @@ class _MarketList extends GetView<MarketController> {
                   return SliverToBoxAdapter(
                     child: AppStateSwitcher(
                       stateKey: listKey,
-                      child: controller.isSearching.value
+                      child: controller.searchLimitReached.value
+                          ? SearchLimitReachedState(
+                              onClear: controller.clearSearch,
+                              source: 'market',
+                            )
+                          : controller.isSearching.value
                           ? const MarketBottleSkeletonList()
                           : const _NoBottlesFound(),
                     ),

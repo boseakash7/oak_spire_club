@@ -82,7 +82,7 @@ class DashboardBottleRow extends StatelessWidget {
                 child: BottleImage(
                   urls: imageUrls,
                   bottleId: heroId,
-                  cacheWidthPx: 132,
+                  cacheWidthPx: BottleImage.rowCacheWidthPx,
                   padding: const EdgeInsets.all(3),
                 ),
               ),

@@ -152,24 +152,39 @@ class _OtpBoxState extends State<_OtpBox> with SingleTickerProviderStateMixin {
               widget.onBackspace();
             }
           },
-          child: TextField(
-            controller: widget.controller,
-            focusNode: widget.focusNode,
-            textAlign: TextAlign.center,
-            maxLength: 1,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            style: AppTextStyles.heading32Bold().copyWith(
-              fontSize: 24,
-              color: hasValue ? AppColors.white : AppColors.border,
+          child: Center(
+            child: TextField(
+              controller: widget.controller,
+              focusNode: widget.focusNode,
+              textAlign: TextAlign.center,
+              textAlignVertical: TextAlignVertical.center,
+              maxLength: 1,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              style: AppTextStyles.heading32Bold().copyWith(
+                fontSize: 26,
+                height: 1.2,
+                color: hasValue ? AppColors.white : AppColors.border,
+              ),
+              cursorColor: AppColors.goldAccent,
+              cursorHeight: 26,
+              // The box above is the field. Every theme border and fill is
+              // cleared here, or the app's input theme draws a second,
+              // half-height field inside it.
+              decoration: const InputDecoration(
+                counterText: '',
+                isCollapsed: true,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              onChanged: widget.onChanged,
             ),
-            cursorColor: AppColors.goldAccent,
-            decoration: const InputDecoration(
-              counterText: '',
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
-            ),
-            onChanged: widget.onChanged,
           ),
         ),
       ),

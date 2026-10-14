@@ -23,8 +23,13 @@ class BottleImage extends StatelessWidget {
     this.fit = BoxFit.contain,
     this.glow = true,
     this.cacheWidthPx,
+    this.previewCacheWidthPx,
     this.padding = EdgeInsets.zero,
   });
+
+  /// The decode width every list row and the collection card use, so a Hero
+  /// leaving one lands on art that is already in memory.
+  static const int rowCacheWidthPx = 200;
 
   final String? url;
   final List<String>? urls;
@@ -35,6 +40,12 @@ class BottleImage extends StatelessWidget {
   final BoxFit fit;
   final bool glow;
   final int? cacheWidthPx;
+
+  /// A big image (the bottle page) shows the art at this decode width while
+  /// its own decode runs. Pass [rowCacheWidthPx]: the row the user came from
+  /// already holds that copy, so the art never drops back to the placeholder
+  /// when the Hero lands.
+  final int? previewCacheWidthPx;
   final EdgeInsetsGeometry padding;
 
   List<String> get _candidates {
@@ -67,6 +78,7 @@ class BottleImage extends StatelessWidget {
                   fit: fit,
                   placeholder: placeholder,
                   cacheWidthPx: cacheWidthPx,
+                  previewCacheWidthPx: previewCacheWidthPx,
                 ),
         ),
       ],
@@ -80,7 +92,8 @@ class BottleImage extends StatelessWidget {
       // Fly the art that is already decoded: the row's on the way in, the
       // row's again on the way back. The detail asks for a bigger image (a
       // different cache entry), so flying it would flash the placeholder
-      // until it decodes.
+      // until it decodes; it shows the row's copy meanwhile
+      // ([previewCacheWidthPx]).
       flightShuttleBuilder: (context, animation, direction, from, to) =>
           direction == HeroFlightDirection.push ? from.widget : to.widget,
       child: art,
@@ -97,25 +110,37 @@ class _FallbackNetworkImage extends StatefulWidget {
     required this.fit,
     required this.placeholder,
     this.cacheWidthPx,
+    this.previewCacheWidthPx,
   });
 
   final List<String> urls;
   final BoxFit fit;
   final Widget placeholder;
   final int? cacheWidthPx;
+  final int? previewCacheWidthPx;
 
   @override
   State<_FallbackNetworkImage> createState() => _FallbackNetworkImageState();
 }
 
 class _FallbackNetworkImageState extends State<_FallbackNetworkImage> {
-  int _index = 0;
+  /// How far each URL list got before a URL loaded, so a new copy of the
+  /// same art (a Hero's shuttle, the card, the bottle page) starts at the
+  /// URL that works instead of failing through the others again.
+  static final Map<String, int> _workingIndex = {};
+
+  late int _index = _startIndex;
   bool _advanceScheduled = false;
+
+  String get _key => widget.urls.join('|');
+
+  int get _startIndex =>
+      (_workingIndex[_key] ?? 0).clamp(0, widget.urls.length - 1);
 
   @override
   void didUpdateWidget(_FallbackNetworkImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!listEquals(oldWidget.urls, widget.urls)) _index = 0;
+    if (!listEquals(oldWidget.urls, widget.urls)) _index = _startIndex;
   }
 
   // Runs from inside the error builder, so the state change waits for the
@@ -127,26 +152,46 @@ class _FallbackNetworkImageState extends State<_FallbackNetworkImage> {
       if (!mounted) return;
       setState(() {
         _index += 1;
+        _workingIndex[_key] = _index;
         _advanceScheduled = false;
       });
     });
   }
 
+  static int? _width(int? px) => px != null && px > 0 ? px : null;
+
   @override
   Widget build(BuildContext context) {
     final url = widget.urls[_index];
     final fade = AppMotion.of(context, AppMotion.fast);
-    final cacheWidth = widget.cacheWidthPx;
+    final preview = _width(widget.previewCacheWidthPx);
+
+    // The smaller copy, shown at once when it is in memory, while this one
+    // decodes.
+    final placeholder = preview == null
+        ? widget.placeholder
+        : CachedNetworkImage(
+            imageUrl: url,
+            cacheManager: AppCacheManager.images,
+            memCacheWidth: preview,
+            fit: widget.fit,
+            filterQuality: FilterQuality.medium,
+            placeholder: (context, _) => widget.placeholder,
+            placeholderFadeInDuration: Duration.zero,
+            fadeInDuration: Duration.zero,
+            fadeOutDuration: Duration.zero,
+            errorWidget: (context, error, stackTrace) => widget.placeholder,
+          );
 
     // CachedNetworkImage (OctoImage) skips the placeholder and the fade
     // when the image resolves synchronously from the memory cache.
     return CachedNetworkImage(
       imageUrl: url,
       cacheManager: AppCacheManager.images,
-      memCacheWidth: cacheWidth != null && cacheWidth > 0 ? cacheWidth : null,
+      memCacheWidth: _width(widget.cacheWidthPx),
       fit: widget.fit,
       filterQuality: FilterQuality.medium,
-      placeholder: (context, _) => widget.placeholder,
+      placeholder: (context, _) => placeholder,
       placeholderFadeInDuration: Duration.zero,
       fadeInDuration: fade,
       fadeInCurve: AppMotion.enter,
