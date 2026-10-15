@@ -20,6 +20,8 @@ abstract final class AnalyticsScreens {
     switch (routeName) {
       case AppRoutes.splash:
         return 'splash';
+      case AppRoutes.updateRequired:
+        return 'update_required';
       case AppRoutes.shell:
         return 'main_home';
       case AppRoutes.getStarted:

@@ -9,6 +9,9 @@ class AppRoutes {
   static const String verifyOtp = '/verify-otp';
   static const String shell = '/shell';
   static const String splash = '/splash';
+
+  /// This build is below the server's minimum; reached with `offAllNamed`.
+  static const String updateRequired = '/update-required';
   static const String addToCollection = '/add-to-collection';
   static const String tasteBottles = '/taste-bottles';
   static const String benchmarkDetail = '/benchmark-detail';

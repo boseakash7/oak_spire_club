@@ -20,6 +20,7 @@ import '../modules/navigation/bottom_nav_binding.dart';
 import '../modules/navigation/bottom_nav_shell.dart';
 import '../modules/splash/splash_binding.dart';
 import '../modules/splash/splash_view.dart';
+import '../modules/update_required/update_required_view.dart';
 import '../modules/taste/taste_binding.dart';
 import '../modules/taste/taste_view.dart';
 import '../modules/market/benchmark_detail_binding.dart';
@@ -65,6 +66,10 @@ class AppPages {
       name: AppRoutes.splash,
       page: () => const SplashView(),
       binding: SplashBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.updateRequired,
+      page: () => const UpdateRequiredView(),
     ),
     GetPage(
       name: AppRoutes.shell,

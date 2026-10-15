@@ -7,15 +7,15 @@ import '../theme/app_text_styles.dart';
 import 'show_app_dialog.dart';
 import '../theme/app_spacing.dart';
 
-/// Shows an app-update dialog styled like other Oak Spire popups.
+/// The optional update: version, "What's new" and Later / Update now. A
+/// forced update is the `/update-required` screen instead.
 ///
-/// Returns `true` when the user may continue into the app (optional update +
-/// "Later"). Returns `false` when the user must update (forced) or chose
-/// "Update" (they stay on splash until they install a new build).
+/// Returns `true` for "Update now". "Later" and Back return `false`, and the
+/// app goes on; it asks again at the next launch.
 Future<bool> showAppUpdateDialog(
   BuildContext context, {
-  required bool isForced,
-  required VoidCallback onUpdate,
+  String? versionName,
+  List<String> notes = const [],
 }) {
   return showAppAnimatedDialog<bool>(
     context: context,
@@ -23,36 +23,38 @@ Future<bool> showAppUpdateDialog(
     barrierColor: Colors.black.withValues(alpha: 0.78),
     transitionDuration: AppMotion.dialog,
     builder: (ctx) => _AppUpdateDialogBody(
-      isForced: isForced,
-      onUpdate: onUpdate,
-      onLater: isForced
-          ? null
-          : () {
-              Navigator.of(ctx).pop(true);
-            },
+      versionName: versionName,
+      notes: notes,
+      onUpdate: () => Navigator.of(ctx).pop(true),
+      onLater: () => Navigator.of(ctx).pop(false),
     ),
   ).then((value) => value ?? false);
 }
 
+/// At most this many notes show; the rest are in the store listing.
+const int _kMaxNotes = 5;
+
 class _AppUpdateDialogBody extends StatelessWidget {
   const _AppUpdateDialogBody({
-    required this.isForced,
+    required this.versionName,
+    required this.notes,
     required this.onUpdate,
-    this.onLater,
+    required this.onLater,
   });
 
-  final bool isForced;
+  final String? versionName;
+  final List<String> notes;
   final VoidCallback onUpdate;
-  final VoidCallback? onLater;
+  final VoidCallback onLater;
 
   @override
   Widget build(BuildContext context) {
-    final title = isForced ? 'Update required' : 'Update available';
-    final message = isForced
-        ? 'A new version of ${AppConstants.appName} is required to continue. '
-              'Please update from the store to keep using the app.'
-        : 'A new version of ${AppConstants.appName} is available with '
-              'improvements and fixes.';
+    final shown = notes.take(_kMaxNotes).toList();
+    final noteStyle = AppTextStyles.body16().copyWith(
+      color: AppColors.textMuted,
+      height: 1.35,
+      fontSize: 14,
+    );
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -75,7 +77,8 @@ class _AppUpdateDialogBody extends StatelessWidget {
                 ),
               ],
             ),
-            child: Padding(
+            // Scrolls only when long notes meet a short screen.
+            child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -96,7 +99,7 @@ class _AppUpdateDialogBody extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    title,
+                    'Update available',
                     textAlign: TextAlign.center,
                     style: AppTextStyles.heading32Bold().copyWith(
                       fontSize: 22,
@@ -104,41 +107,96 @@ class _AppUpdateDialogBody extends StatelessWidget {
                       color: AppColors.textCream,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.body16().copyWith(
-                      color: AppColors.textMuted,
-                      height: 1.35,
-                      fontSize: 15,
+                  if (versionName != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Version $versionName',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.bodyS().copyWith(
+                        fontSize: 13,
+                        color: AppColors.goldBright,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 26),
-                  if (onLater != null) ...[
-                    SizedBox(
+                  ],
+                  const SizedBox(height: 12),
+                  if (shown.isEmpty)
+                    Text(
+                      'A new version of ${AppConstants.appName} is out with '
+                      'improvements and fixes.',
+                      textAlign: TextAlign.center,
+                      style: noteStyle.copyWith(fontSize: 15),
+                    )
+                  else
+                    Container(
                       width: double.infinity,
-                      height: AppButtonSize.regular,
-                      child: OutlinedButton(
-                        onPressed: onLater,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textCream,
-                          side: const BorderSide(color: AppColors.border),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.black.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(AppRadii.card),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "WHAT'S NEW",
+                            style: AppTextStyles.bodyS().copyWith(
+                              fontSize: 10.5,
+                              letterSpacing: 1,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textWolf,
+                            ),
                           ),
+                          for (final note in shown)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 7,
+                                      right: 8,
+                                    ),
+                                    child: Container(
+                                      width: 4,
+                                      height: 4,
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.gold2,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(child: Text(note, style: noteStyle)),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    height: AppButtonSize.regular,
+                    child: OutlinedButton(
+                      onPressed: onLater,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textCream,
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(
-                          'Later',
-                          style: AppTextStyles.body16().copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textCream,
-                          ),
+                      ),
+                      child: Text(
+                        'Later',
+                        style: AppTextStyles.body16().copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textCream,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                  ],
+                  ),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     height: AppButtonSize.regular,

@@ -21,7 +21,8 @@ const int _kMaxOpenedFill = 99;
 /// Every bottle of one kind, grouped by the day it was bought (the day it was
 /// added when no purchase date is set), each with its price paid and fill. A
 /// row opens to change that bottle: a slider once it is opened, a two-second
-/// hold to open it or seal it again, and Edit for its price and purchase date.
+/// hold to open it or seal it again, Edit for its price and purchase date, and
+/// Remove.
 class CollectionBottleList extends StatefulWidget {
   const CollectionBottleList({
     super.key,
@@ -30,6 +31,7 @@ class CollectionBottleList extends StatefulWidget {
     required this.onFillCommitted,
     required this.onToggle,
     this.onEdit,
+    this.onRemove,
     this.busy = false,
   });
 
@@ -47,6 +49,9 @@ class CollectionBottleList extends StatefulWidget {
 
   /// Edit: open the sheet for [bottle], shown as bottle [number].
   final void Function(OwnedBottle bottle, int number)? onEdit;
+
+  /// Remove: confirm and remove [bottle], shown as bottle [number].
+  final void Function(OwnedBottle bottle, int number)? onRemove;
 
   final bool busy;
 
@@ -110,6 +115,9 @@ class _CollectionBottleListState extends State<CollectionBottleList> {
                 onEdit: widget.onEdit == null
                     ? null
                     : () => widget.onEdit!(b, number[b.id]!),
+                onRemove: widget.onRemove == null
+                    ? null
+                    : () => widget.onRemove!(b, number[b.id]!),
               ),
           ],
         ],
@@ -176,6 +184,7 @@ class _BottleRow extends StatefulWidget {
     required this.onFillCommitted,
     required this.onToggle,
     this.onEdit,
+    this.onRemove,
   });
 
   final OwnedBottle bottle;
@@ -187,6 +196,7 @@ class _BottleRow extends StatefulWidget {
   final ValueChanged<int> onFillCommitted;
   final Future<void> Function(bool opening) onToggle;
   final VoidCallback? onEdit;
+  final VoidCallback? onRemove;
 
   @override
   State<_BottleRow> createState() => _BottleRowState();
@@ -324,6 +334,7 @@ class _BottleRowState extends State<_BottleRow> {
                             bottle: b,
                             busy: widget.busy,
                             onEdit: widget.onEdit,
+                            onRemove: widget.onRemove,
                           ),
                           const SizedBox(height: 10),
                           opened
@@ -382,17 +393,19 @@ class _StateTag extends StatelessWidget {
 }
 
 /// When the bottle was bought (the row above already shows what was paid),
-/// with Edit for its price and date.
+/// with Edit for its price and date, and Remove.
 class _EditStrip extends StatelessWidget {
   const _EditStrip({
     required this.bottle,
     required this.busy,
     required this.onEdit,
+    required this.onRemove,
   });
 
   final OwnedBottle bottle;
   final bool busy;
   final VoidCallback? onEdit;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -412,39 +425,74 @@ class _EditStrip extends StatelessWidget {
           ),
         ),
         if (onEdit != null)
-          AppPressable(
-            onTap: busy ? null : onEdit,
-            haptic: PressHaptic.selection,
-            scale: 0.94,
+          _StripChip(
+            icon: Icons.edit_rounded,
+            label: 'Edit',
             semanticLabel: 'Edit price and purchase date',
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceChip,
-                borderRadius: BorderRadius.circular(AppRadii.chip),
-                border: Border.all(color: AppColors.tagGoldBorder),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.edit_rounded,
-                    size: 13,
-                    color: AppColors.goldBright,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Edit',
-                    style: AppTextStyles.bodyS().copyWith(
-                      fontSize: 12,
-                      color: AppColors.goldBright,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            color: AppColors.goldBright,
+            border: AppColors.tagGoldBorder,
+            onTap: busy ? null : onEdit,
           ),
+        if (onRemove != null) ...[
+          const SizedBox(width: 6),
+          _StripChip(
+            icon: Icons.delete_outline_rounded,
+            label: 'Remove',
+            semanticLabel: 'Remove this bottle',
+            color: AppColors.errorLight,
+            border: AppColors.destructiveDeep,
+            onTap: busy ? null : onRemove,
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// A small outlined action on the strip.
+class _StripChip extends StatelessWidget {
+  const _StripChip({
+    required this.icon,
+    required this.label,
+    required this.semanticLabel,
+    required this.color,
+    required this.border,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String semanticLabel;
+  final Color color;
+  final Color border;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPressable(
+      onTap: onTap,
+      haptic: PressHaptic.selection,
+      scale: 0.94,
+      semanticLabel: semanticLabel,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceChip,
+          borderRadius: BorderRadius.circular(AppRadii.chip),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: AppTextStyles.bodyS().copyWith(fontSize: 12, color: color),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

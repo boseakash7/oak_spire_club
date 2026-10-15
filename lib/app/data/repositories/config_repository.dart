@@ -23,8 +23,9 @@ class ConfigRepository {
 
   static Future<void> _saveCurrentVersion(dynamic raw) async {
     if (raw is! Map) return;
+    // Saved even when every build is empty, so a rule lowered to "none" on
+    // the server stops blocking here too.
     final version = AppCurrentVersion.fromJson(Map<String, dynamic>.from(raw));
-    if (version.android == null && version.ios == null) return;
     await AppStorage.setCurrentVersion(version.toJson());
   }
 

@@ -366,6 +366,23 @@ class CollectionController extends GetxController {
     if (reloadList) await forceReload();
   }
 
+  /// Removes one chosen bottle of [item], or the whole item when it is the
+  /// last one, then reloads.
+  Future<void> removeBottle(
+    CollectionItemModel item,
+    OwnedBottle bottle,
+  ) async {
+    final others = (item.bottles ?? const <OwnedBottle>[]).where(
+      (b) => b.id != bottle.id,
+    );
+    if (others.isEmpty) {
+      await _repo.removeFromCollection(bottleId: resolveBottleId(item));
+    } else {
+      await _repo.removeBottle(rowId: bottle.id);
+    }
+    await forceReload();
+  }
+
   static OwnedBottle? _newestBottle(CollectionItemModel item) {
     OwnedBottle? newest;
     for (final b in item.bottles ?? const <OwnedBottle>[]) {

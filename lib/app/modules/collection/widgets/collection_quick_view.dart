@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
+import '../../../core/analytics/app_analytics_controller.dart';
 import '../../../core/animations/app_motion.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
@@ -17,6 +20,7 @@ import '../../../core/utils/price_formatter.dart';
 import '../../../core/utils/proof_formatter.dart';
 import '../../../core/utils/rating_formatter.dart';
 import '../../../core/widgets/animated_fill_bar.dart';
+import '../../../core/widgets/app_confirm_dialog.dart';
 import '../../../core/widgets/app_pressable.dart';
 import '../../../core/widgets/bottle_image.dart';
 import '../../../core/widgets/price_sparkline.dart';
@@ -192,6 +196,57 @@ class _QuickViewState extends State<_QuickView> {
     _refresh();
   }
 
+  /// Removes one bottle after a confirm that names it by date, price and
+  /// fill. The last one takes the whole bottle out of the collection and
+  /// closes the card.
+  Future<void> _remove(OwnedBottle bottle, int number) async {
+    if (_busy) return;
+    final last = _bottles.length <= 1;
+    final on = bottle.purchasedOn;
+    final facts = [
+      if (on != null) 'Bought ${_kRemoveDate.format(on)}',
+      if (bottle.pricePaid != null) _money(bottle.pricePaid!),
+      bottle.isOpened ? '${bottle.fill}% full' : 'Sealed',
+    ].join(' · ');
+
+    final confirmed = await showAppConfirmDialog(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: last ? 'Remove ${_item.lineTitle}?' : 'Remove bottle $number?',
+      message: last
+          ? "$facts\nIt's your last one, so it leaves your collection. "
+                "This can't be undone."
+          : "$facts\nThis can't be undone.",
+      confirmLabel: 'Remove',
+      confirmIsDestructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+
+    if (Get.isRegistered<AppAnalyticsController>()) {
+      unawaited(
+        AppAnalyticsController.to.logTap('collection_bottle_remove', {
+          'last': last ? 1 : 0,
+        }),
+      );
+    }
+
+    setState(() => _busy = true);
+    try {
+      await widget.controller.removeBottle(_item, bottle);
+      _changed = true;
+      unawaited(
+        AppSnackbar.success(
+          last ? 'Removed from your collection' : 'Bottle $number removed',
+        ),
+      );
+      if (mounted) _refresh();
+    } on ApiException catch (e) {
+      await AppSnackbar.error(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   void _close() => Navigator.of(context).pop(_changed);
 
   Future<void> _inc() async {
@@ -331,6 +386,7 @@ class _QuickViewState extends State<_QuickView> {
                                     onFillCommitted: _commitFill,
                                     onToggle: _toggle,
                                     onEdit: _edit,
+                                    onRemove: _remove,
                                   ),
                                 ],
                               ),
@@ -351,6 +407,8 @@ class _QuickViewState extends State<_QuickView> {
 }
 
 String _money(double v) => PriceFormatter.format(v.toStringAsFixed(2));
+
+final DateFormat _kRemoveDate = DateFormat('MMM d, y');
 
 final TextStyle _kStrongValue = AppTextStyles.bodyL().copyWith(
   fontSize: 15,

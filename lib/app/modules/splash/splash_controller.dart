@@ -3,13 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
-import '../../core/analytics/app_analytics_controller.dart';
 import '../../core/firebase/firebase_notification_topics.dart';
 import '../../core/firebase/fcm_token_sync_service.dart';
-import '../../core/services/app_store_launcher.dart';
-import '../../core/services/app_update_checker.dart';
+import '../../core/services/app_update_service.dart';
 import '../../core/storage/app_storage.dart';
-import '../../core/widgets/app_update_dialog.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../modules/session/user_session_controller.dart';
@@ -54,36 +51,9 @@ class SplashController extends GetxController {
     }
   }
 
-  Future<bool> _checkAppUpdate() async {
-    final config = Get.find<AppConfigController>();
-    final result = await AppUpdateChecker.evaluate(config.currentVersion.value);
-    if (!result.needsUpdate) return true;
-
-    final context = Get.context;
-    if (context == null || !context.mounted) return true;
-
-    if (Get.isRegistered<AppAnalyticsController>()) {
-      AppAnalyticsController.to.logTap('app_update_prompt');
-    }
-
-    return showAppUpdateDialog(
-      context,
-      isForced: result.isForced,
-      onUpdate: () {
-        if (Get.isRegistered<AppAnalyticsController>()) {
-          AppAnalyticsController.to.logTap('app_update_confirm');
-        }
-        AppStoreLauncher.openStoreListing();
-      },
-    ).then((continueApp) {
-      if (continueApp) {
-        if (Get.isRegistered<AppAnalyticsController>()) {
-          AppAnalyticsController.to.logTap('app_update_later');
-        }
-      }
-      return continueApp;
-    });
-  }
+  /// Forced: off to `/update-required` (returns false). Optional: the dialog,
+  /// then on either way.
+  Future<bool> _checkAppUpdate() => AppUpdateService.checkAtLaunch();
 
   Future<UserModel?> _resolveUser() async {
     await AppStorage.ensureReady();

@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import 'core/analytics/app_analytics_controller.dart';
 import 'core/network/api_client.dart';
+import 'core/services/app_update_service.dart';
 import 'data/datasources/auth_remote_datasource.dart';
 import 'data/datasources/bluebook_price_history_remote_datasource.dart';
 import 'data/datasources/bluebook_remote_datasource.dart';
@@ -157,6 +158,7 @@ class AppBinding extends Bindings {
     );
 
     FcmTokenSyncService.start();
+    AppUpdateService.start();
   }
 }
 

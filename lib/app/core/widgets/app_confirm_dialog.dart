@@ -15,6 +15,7 @@ Future<bool?> showAppConfirmDialog(
   String cancelLabel = 'Cancel',
   bool confirmIsDestructive = false,
   bool barrierDismissible = true,
+  IconData? icon,
 }) {
   return showAppAnimatedDialog<bool>(
     context: context,
@@ -27,6 +28,7 @@ Future<bool?> showAppConfirmDialog(
       confirmLabel: confirmLabel,
       cancelLabel: cancelLabel,
       confirmIsDestructive: confirmIsDestructive,
+      icon: icon,
     ),
   );
 }
@@ -38,6 +40,7 @@ class _AppConfirmDialogBody extends StatelessWidget {
     required this.confirmLabel,
     required this.cancelLabel,
     required this.confirmIsDestructive,
+    this.icon,
   });
 
   final String title;
@@ -45,6 +48,9 @@ class _AppConfirmDialogBody extends StatelessWidget {
   final String confirmLabel;
   final String cancelLabel;
   final bool confirmIsDestructive;
+
+  /// Optional icon in a ring above the title, red when destructive.
+  final IconData? icon;
 
   static const Color _cardTop = AppColors.cardSurfaceTop;
   static const Color _cardBottom = AppColors.surfaceInk;
@@ -84,6 +90,31 @@ class _AppConfirmDialogBody extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (icon != null) ...[
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: confirmIsDestructive
+                            ? AppColors.destructiveSurface
+                            : AppColors.surfaceChip,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: confirmIsDestructive
+                              ? AppColors.destructiveDeep
+                              : AppColors.tagGoldBorder,
+                        ),
+                      ),
+                      child: Icon(
+                        icon,
+                        size: 26,
+                        color: confirmIsDestructive
+                            ? AppColors.errorLight
+                            : AppColors.gold2,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   Text(
                     title,
                     textAlign: TextAlign.center,
