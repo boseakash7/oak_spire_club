@@ -145,9 +145,10 @@ class DashboardController extends GetxController {
         ...packages.where((p) => !p.isYearly),
       ];
       for (final plan in ordered) {
-        final offer = plan.offerAt(now);
+        final offer = Platform.isIOS
+            ? plan.appleOfferAt(now)
+            : plan.offerAt(now);
         if (offer == null) continue;
-        if (Platform.isIOS && offer.appleStoreId == null) continue;
         premiumOffer.value = (
           offer: offer,
           percentOff: plan.offerPercentOffAt(now),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
+import '../../core/analytics/meta_app_events.dart';
 import '../../core/network/limit_exceeded_exception.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/utils/app_snackbar.dart';
@@ -72,6 +73,9 @@ mixin PagedBottleSearch on GetxController {
   int _generation = 0;
   Timer? _debounce;
 
+  /// The last query sent to Meta as a Search, lowercased.
+  String? _lastMetaSearch;
+
   List<BluebookModel> get visibleBottles => bottles.toList(growable: false);
 
   /// Call from [onClose]. The field may still be on screen during the pop
@@ -125,6 +129,12 @@ mixin PagedBottleSearch on GetxController {
       if (query.isNotEmpty) {
         searchLimitReached.value = false;
         searchesLeft.value = res.searchesLeft;
+        // Once per query: a chip or a refresh over the same words is not a
+        // new search.
+        if (reset && query.toLowerCase() != _lastMetaSearch) {
+          _lastMetaSearch = query.toLowerCase();
+          MetaAppEvents.searched(query: query, found: page.isNotEmpty);
+        }
       }
       hasMore.value = page.length >= pageSize;
       onBottlesLoaded(page, reset: reset);

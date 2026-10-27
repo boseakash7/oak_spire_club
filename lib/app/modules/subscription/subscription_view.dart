@@ -9,6 +9,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:intl/intl.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
+import '../../core/analytics/meta_app_events.dart';
 import '../../core/animations/app_motion.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/widgets/app_backdrop_image.dart';
@@ -156,8 +157,8 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     final productIds = _subscription.packages
         .expand(
           (plan) => [
-            plan.appleProductId,
-            if (plan.offer?.appleStoreId != null) plan.offer!.appleStoreId!,
+            ?plan.appleStoreId,
+            ?plan.offer?.appleStoreId,
           ],
         )
         .toSet();
@@ -179,22 +180,27 @@ class _SubscriptionViewState extends State<SubscriptionView> {
   /// What [plan] costs if bought now. While its offer runs, the offer is
   /// charged and the plan's own price is shown crossed out. On iOS both come
   /// from the App Store, and an offer without its own App Store product isn't
-  /// shown there at all.
+  /// shown there at all. Nor is one whose App Store product isn't cheaper.
   _PlanQuote _quoteFor(SubscriptionPackageModel plan) {
-    final offer = plan.offerAt(DateTime.now());
+    final now = DateTime.now();
     if (_isIosCheckout) {
-      final base = _appleProducts[plan.appleProductId];
+      final offer = plan.appleOfferAt(now);
+      final base = _appleProducts[plan.appleStoreId];
       final regular = base == null ? _usd(plan.price) : _store(base);
-      final offerProduct = offer?.appleStoreId == null
+      final offerProduct = offer == null
           ? null
-          : _appleProducts[offer!.appleStoreId];
-      if (offerProduct == null) return _PlanQuote(charge: regular);
+          : _appleProducts[offer.appleStoreId];
+      if (offerProduct == null ||
+          (regular.amount != null && offerProduct.rawPrice >= regular.amount!)) {
+        return _PlanQuote(charge: regular);
+      }
       return _PlanQuote(
         charge: _store(offerProduct),
         regular: regular,
         offer: offer,
       );
     }
+    final offer = plan.offerAt(now);
     final regular = _usd(plan.price);
     if (offer == null) return _PlanQuote(charge: regular);
     return _PlanQuote(charge: _usd(offer.price), regular: regular, offer: offer);
@@ -216,6 +222,18 @@ class _SubscriptionViewState extends State<SubscriptionView> {
 
   /// What the last checkout charges, for the App Store receipt.
   double? _pendingChargeAmount;
+
+  /// Free days the last checkout started with, read before the payment
+  /// (a refreshed user has used the trial), so Meta gets StartTrial.
+  int _pendingTrialDays = 0;
+
+  /// The App Store product's currency, else US dollars.
+  String _storeCurrency(String? productId) {
+    final code = productId == null
+        ? null
+        : _iapService?.productForAppleId(productId)?.currencyCode.trim();
+    return code == null || code.isEmpty ? PaymentCurrency.usd : code;
+  }
 
   void _onApplePurchaseUpdated(PurchaseDetails purchase) {
     switch (purchase.status) {
@@ -263,6 +281,15 @@ class _SubscriptionViewState extends State<SubscriptionView> {
         packageId: plan.id,
         uniqueId: purchaseId,
       );
+      // A restore re-confirms an old purchase; only a new one is a sale.
+      if (purchase.status == PurchaseStatus.purchased) {
+        MetaAppEvents.subscribed(
+          trial: _pendingTrialDays > 0,
+          orderId: purchaseId,
+          price: _pendingChargeAmount ?? double.tryParse(plan.price),
+          currency: _storeCurrency(purchase.productID),
+        );
+      }
       await Get.find<UserRepository>().refreshUserById(userId);
       await _subscription.reload();
 
@@ -294,9 +321,15 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     }
   }
 
-  Future<void> _startAppleCheckout(String productId) async {
+  Future<void> _startAppleCheckout(String? productId) async {
     final service = _iapService;
     if (service == null) return;
+
+    // The plan has no App Store product set in admin > Packages.
+    if (productId == null) {
+      await AppSnackbar.error('This plan is not available on the App Store yet.');
+      return;
+    }
 
     if (!service.isAvailable) {
       await AppSnackbar.error('In-app purchases are not available.');
@@ -424,6 +457,18 @@ class _SubscriptionViewState extends State<SubscriptionView> {
         message: appMessage,
       );
       _pendingPayment = null;
+      if (isPaid) {
+        MetaAppEvents.subscribed(
+          trial: _pendingTrialDays > 0,
+          orderId: verified.localOrderId.trim().isNotEmpty
+              ? verified.localOrderId
+              : pending.localOrderId,
+          price: pending.amount,
+          currency: pending.currency.trim().isNotEmpty
+              ? pending.currency
+              : PaymentCurrency.usd,
+        );
+      }
       if (!mounted) return;
 
       final defaultMessage = isPaid
@@ -537,9 +582,18 @@ class _SubscriptionViewState extends State<SubscriptionView> {
     );
     if (confirmed != true || !mounted) return;
     _pendingChargeAmount = quote.charge.amount;
+    _pendingTrialDays = _trialDaysFor(plan);
+    final appleProductId = quote.offer?.appleStoreId ?? plan.appleStoreId;
+    MetaAppEvents.initiatedCheckout(
+      planId: plan.id,
+      price: quote.charge.amount,
+      currency: _isIosCheckout
+          ? _storeCurrency(appleProductId)
+          : PaymentCurrency.usd,
+    );
 
     if (_isIosCheckout) {
-      await _startAppleCheckout(quote.offer?.appleStoreId ?? plan.appleProductId);
+      await _startAppleCheckout(appleProductId);
       return;
     }
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 
 import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/analytics/meta_app_events.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/utils/app_snackbar.dart';
@@ -201,7 +202,13 @@ class WishlistController extends GetxController {
         'source': source,
         'has_target': targetPrice != null ? 1 : 0,
       });
-      if (isNew) unawaited(_loadSparklines());
+      if (isNew) {
+        MetaAppEvents.addedToWishlist(
+          bottleId: bottleId,
+          price: saved.currentPrice ?? saved.addedPrice,
+        );
+        unawaited(_loadSparklines());
+      }
       return saved;
     } on ApiException catch (e) {
       await AppSnackbar.error(e.message);

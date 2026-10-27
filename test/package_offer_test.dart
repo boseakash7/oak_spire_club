@@ -63,6 +63,25 @@ void main() {
       expect(plan.appleProductIdAt(later), 'yearly_plan');
     });
 
+    test('App Store id only from the server', () {
+      for (final blank in [null, '', '  ', 'null']) {
+        final plan = SubscriptionPackageModel.fromJson(
+          row()..['apple_store_id'] = blank,
+        );
+        expect(plan.appleStoreId, isNull);
+        expect(plan.appleProductIdAt(DateTime.now()), isNull);
+      }
+    });
+
+    test('an offer on the package\'s own App Store product is no iOS offer', () {
+      final plan = SubscriptionPackageModel.fromJson(
+        row(offer: {'price': '18.00', 'ends_in': 60, 'apple_store_id': 'yearly_plan'}),
+      );
+      final now = DateTime.now();
+      expect(plan.offerAt(now), isNotNull);
+      expect(plan.appleOfferAt(now), isNull);
+    });
+
     test('trial days, with the server default when missing', () {
       expect(SubscriptionPackageModel.fromJson(row(trialDays: 3)).trialDays, 3);
       expect(SubscriptionPackageModel.fromJson(row(trialDays: '0')).trialDays, 0);

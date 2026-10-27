@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/analytics/meta_app_events.dart';
 import '../../../core/firebase/firebase_notification_topics.dart';
 import '../../../core/storage/app_storage.dart';
 import '../../../core/network/api_exception.dart';
@@ -55,6 +56,7 @@ class SignUpController extends GetxController {
         email: email,
         password: passwordController.text,
       );
+      MetaAppEvents.completedRegistration();
       await FirebaseNotificationTopics.syncNewRegistrationTopic();
       // Home opens on a welcome card that guides them to a first bottle.
       await AppStorage.setWelcomePending(user.id);

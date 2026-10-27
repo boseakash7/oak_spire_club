@@ -1,5 +1,3 @@
-import '../../core/constants/app_constants.dart';
-
 /// `package/get-all` row (bourboneur `Package`).
 class SubscriptionPackageModel {
   const SubscriptionPackageModel({
@@ -22,7 +20,7 @@ class SubscriptionPackageModel {
       name: json['name']?.toString() ?? '',
       price: json['price']?.toString() ?? '',
       packageType: json['package_type']?.toString().toLowerCase() ?? '',
-      appleStoreId: json['apple_store_id']?.toString(),
+      appleStoreId: _appleId(json['apple_store_id']),
       offer: PackageOffer.fromJson(json['offer']),
       trialDays:
           int.tryParse(json['trial_days']?.toString() ?? '') ??
@@ -35,6 +33,9 @@ class SubscriptionPackageModel {
   final String price;
   /// `monthly` | `yearly` — sent as `plan_type` to `package/payment-create`.
   final String packageType;
+
+  /// The App Store product (`apple_store_id`, admin > Packages). It only comes
+  /// from the server; null means the plan can't be bought on iOS.
   final String? appleStoreId;
 
   /// The offer running when the list was fetched, if any. Check
@@ -52,10 +53,19 @@ class SubscriptionPackageModel {
   /// it runs (locked in for every renewal), else [price].
   String chargePriceAt(DateTime now) => offerAt(now)?.price ?? price;
 
+  /// [offerAt] for the App Store: only when the offer has its own product,
+  /// not the package's. The same product would show one price twice.
+  PackageOffer? appleOfferAt(DateTime now) {
+    final offer = offerAt(now);
+    final id = offer?.appleStoreId;
+    if (id == null || id == appleStoreId) return null;
+    return offer;
+  }
+
   /// The App Store product bought at [now]: the offer's while it runs and has
-  /// one, else [appleProductId].
-  String appleProductIdAt(DateTime now) =>
-      offerAt(now)?.appleStoreId ?? appleProductId;
+  /// one, else [appleStoreId].
+  String? appleProductIdAt(DateTime now) =>
+      appleOfferAt(now)?.appleStoreId ?? appleStoreId;
 
   /// How much [offer] takes off [price] at [now], as a whole percent. Null
   /// when no offer runs or either price is missing.
@@ -95,19 +105,13 @@ class SubscriptionPackageModel {
   String get planTypeForPayment =>
       packageType.isNotEmpty ? packageType : (isYearly ? 'yearly' : 'monthly');
 
-  /// App Store product id from `apple_store_id` on `package/get-all`.
-  /// Falls back to [AppConstants] when the API omits it.
-  String get appleProductId {
-    final fromApi = appleStoreId?.trim();
-    if (fromApi != null &&
-        fromApi.isNotEmpty &&
-        fromApi.toLowerCase() != 'null') {
-      return fromApi;
-    }
-    return isYearly
-        ? AppConstants.appleYearlyProductId
-        : AppConstants.appleMonthlyProductId;
-  }
+}
+
+/// An App Store product id as the server sends it; blank or `null` is none.
+String? _appleId(Object? raw) {
+  final id = raw?.toString().trim();
+  if (id == null || id.isEmpty || id.toLowerCase() == 'null') return null;
+  return id;
 }
 
 /// A package's time-limited, locked-in price (admin > Packages > Offer). The
@@ -128,7 +132,6 @@ class PackageOffer {
     if (price == null || price <= 0 || endsIn == null || endsIn <= 0) {
       return null;
     }
-    final apple = json['apple_store_id']?.toString().trim();
     final label = json['label']?.toString().trim();
     return PackageOffer(
       price: json['price'].toString(),
@@ -136,9 +139,7 @@ class PackageOffer {
           ? 'Limited offer'
           : label,
       endsAt: (receivedAt ?? DateTime.now()).add(Duration(seconds: endsIn)),
-      appleStoreId: apple == null || apple.isEmpty || apple == 'null'
-          ? null
-          : apple,
+      appleStoreId: _appleId(json['apple_store_id']),
     );
   }
 

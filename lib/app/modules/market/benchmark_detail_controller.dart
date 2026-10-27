@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 
 import '../../core/analytics/app_analytics_controller.dart';
+import '../../core/analytics/meta_app_events.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/utils/app_image_url.dart';
 import '../../core/utils/greeting_formatter.dart';
@@ -237,6 +238,10 @@ class BenchmarkDetailController extends GetxController {
         ? null
         : RatingFormatter.labelOutOfTen(args.rating);
     priceMovementRaw = _nullableRouteString(args.priceMovement);
+    final viewedId = bottleId?.trim();
+    if (viewedId != null && viewedId.isNotEmpty) {
+      MetaAppEvents.viewedContent(bottleId: viewedId, price: averageValue);
+    }
     if (_canLoadPriceChart) {
       unawaited(fetchPriceChart());
       unawaited(fetchDetails());

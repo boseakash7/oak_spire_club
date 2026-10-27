@@ -116,6 +116,7 @@ else is a full push.
 | Route | Module | Reached from |
 | --- | --- | --- |
 | `/splash` | `modules/splash` | app entry (`initialRoute`) |
+| `/update-required` | `modules/update_required` | `AppUpdateService` (`offAllNamed`) when this build is below the minimum; arg `AppUpdateCheckResult` (no binding) |
 | `/get-started` | `modules/get_started` | `AuthNavigation.openWelcome` when no session |
 | `/sign-in` | `modules/auth/sign_in` | get-started, sign-up footer |
 | `/sign-up` | `modules/auth/sign_up` | get-started, sign-in footer |
@@ -335,7 +336,10 @@ The old two-column grid and `CollectionBottleCard` are gone.
     (under 100) has a fill slider (2-99), Half / Last pour picks, and **Hold 2s to seal** (back to
     100). Opening sets 99 (`CollectionController.openedFill`), because the app counts any fill under
     100 as opened. The slider saves when let go.
-  - Every expanded row starts with "Bought {date}" and **Edit**, which opens
+  - Every expanded row starts with "Bought {date}", **Edit** and **Remove**. Remove asks first
+    (`showAppConfirmDialog` naming the bottle's date, price and fill) and then
+    `CollectionController.removeBottle` takes out that one row (`collection/remove`), or the whole
+    bottle when it is the last (the card then closes). **Edit** opens
     `showBottleEditSheet` ([collection_bottle_edit_sheet.dart](lib/app/modules/collection/widgets/collection_bottle_edit_sheet.dart)):
     that one bottle's price paid and purchase date (no future dates); fill stays with the slider
     and the hold. Only the fields that changed are sent (`collection/update-bottle`), so an untouched price keeps
@@ -413,7 +417,7 @@ comes from `AppStorage` at the repository layer.
 | `collection/add` | POST multipart | `add` | add-to-collection (image upload), the quick view's "+". `append=1` adds `quantity` bottles to the ones owned; without it the bottle's rows are replaced (the server deletes them all and re-creates `quantity` with one shared fill) |
 | `collection/update-fill` | POST | `updateFill` | quick view: one bottle's fill (`id` = row id, 1-100; owner checked) |
 | `collection/update-bottle` | POST | `updateBottle` | quick view's Edit sheet: one bottle's `price_paid` and/or `date_acquired` (`yyyy-MM-dd`, not future; owner checked; clears the chart cache) |
-| `collection/remove` | POST | `removeOne` | quick view "-": removes one bottle (`id` = row id; owner checked; clears the chart cache) |
+| `collection/remove` | POST | `removeOne` | quick view "-" (the newest) and a bottle's Remove: removes one bottle (`id` = row id; owner checked; clears the chart cache) |
 | `collection/delete-by-user-bottle` | POST | `deleteByUserBottle` | collection remove / edit-replace |
 | `bluebook/get-all-bluebooks` | GET | `getAll` (no keyword) | market / taste browsing + pagination; `sort` (`MarketSort.apiValue`) from Market, rows carry `market` stats |
 | `bluebook/search` | GET | `getAll` (with keyword) | market / taste search: hybrid lexical + semantic, same envelope, `category_id` honoured, SQL fallback server-side. Sends `user_id`: a free plan spends a daily search and gets `searches_left`, or `LIMIT_EXCEEDED` |
@@ -505,7 +509,19 @@ whatever was last persisted, so never assume these are non-null.
   still read by the subscription, skip and payment-success screens, but nothing sets it.
 - `SplashController` holds a ~3.6s minimum splash, resolves the stored session (clearing any
   **unverified** session so it cannot survive a restart), refreshes config, and runs the
-  forced/optional update check before routing.
+  update check (`AppUpdateService.checkAtLaunch`) before routing.
+
+**App updates** come from `config/all` → `current_version`, set on admin > Application > Updater
+(`App::updater`): per platform a `*_latest` and a `*_min` build, plus `version_name` and `notes`
+(one item per line). `AppUpdateChecker` compares the build number (`1.8.0+42` → 42):
+- Below the minimum: **forced**. `Get.offAllNamed('/update-required')`, a full screen with only
+  "Update now"; Back leaves the app. Checked at launch and again when the app resumes (at most every
+  6 h, `AppUpdateService.start` in `AppBinding`). The screen re-checks on resume and goes on through
+  splash if the minimum was lowered.
+- Below the latest: **optional**. `showAppUpdateDialog` (version, "What's new", Later / Update now)
+  once per launch. Later is not stored, so it asks again at the next launch.
+- The server still writes the legacy `android` / `ios` / `is_forced` keys for builds before this;
+  `AppCurrentVersion.fromJson` reads either shape. Raise a build only once it is live in the store.
 - `SubscriptionLimitNavigation`, `SubscriptionPaymentSuccessNavigation` — argument keys for
   those routes are constants on these classes; read them via the provided
   `*FromArguments()` helpers, not by indexing `Get.arguments` directly.
@@ -537,7 +553,11 @@ today, trial end, first charge, what renews after, what's included, and the paym
 - `_quoteFor(plan)` gives the charged price and the package's own price, crossed out during an offer.
 - `offer.endsAt` comes from `ends_in` against this device's clock.
 - When the banner's countdown reaches zero, the screen rebuilds without the offer.
-- On iOS an offer shows only when it has its own App Store product (`offer.appleStoreId`).
+- App Store product ids come only from the server (`apple_store_id`, admin > Packages); the app has no
+  built-in ids. A plan without one can't be bought on iOS ("not available on the App Store yet").
+- On iOS an offer shows only when it has its own App Store product (`SubscriptionPackageModel.appleOfferAt`:
+  `offer.appleStoreId` set and not the package's own `apple_store_id`), and at checkout only when that
+  product's store price is below the package product's. Admin > Packages > Offer refuses the package's own id.
 
 **Plan limits** are all enforced now.
 - The bottle cap: `collection/add` (server).
@@ -567,6 +587,17 @@ pushed route through `AnalyticsScreens.screenKeyForRoute`. Give each new route a
 there; otherwise it falls back to the slugged path.
 Shell tab switches log through `BottomNavController.setIndex`. Crashlytics and Performance are
 set up in `bootstrapFirebase`.
+
+**Meta App Events** (`facebook_app_events`) go through `MetaAppEvents`
+([meta_app_events.dart](lib/app/core/analytics/meta_app_events.dart)): Meta's standard events only,
+with Meta's parameter names, fire-and-forget and never throwing. The App ID and Client Token are in
+`android/app/src/main/res/values/strings.xml` and `ios/Runner/Info.plist`. The SDK logs installs and
+opens itself. `UserSessionController` sets / clears the user (id, email, first name) as `user` changes.
+- CompleteRegistration: sign-up success. ViewContent: benchmark detail opened (value = average).
+- Search: a keyword search's first page, once per query (`PagedBottleSearch`, Market and Taste).
+- AddToWishlist: a new wishlist bottle (not a target edit).
+- InitiatedCheckout: `/subscription/confirm` popped `true`. StartTrial / Subscribe: Razorpay verify
+  or a new App Store purchase (not a restore), StartTrial when the checkout had trial days.
 
 **FCM topics** are all prefixed `oakspire_` and are documented in
 [fcm_topics_summary.txt](fcm_topics_summary.txt) — registration state, subscription tier,

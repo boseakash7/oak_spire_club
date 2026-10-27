@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Oak Spire Club</string>
+    <!-- Meta App Events (Meta for Developers > App settings > Basic / Advanced).
+         The same two values go in ios/Runner/Info.plist. -->
+    <string name="facebook_app_id">1764872724744428</string>
+    <string name="facebook_client_token">7cff2926f94048c5af425ee835efb726</string>
 </resources>
